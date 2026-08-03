@@ -1,8 +1,12 @@
 #!/bin/sh
-# Builds all four platform binaries from this one machine -- Go can cross-compile with zero
-# extra tooling, unlike the PyInstaller-based Python version this replaces (PyInstaller can only
-# ever produce a binary for the OS it's run ON). Requires only the Go toolchain -- no external
-# Go modules, nothing else to install.
+# Builds Linux + Windows binaries from this one machine -- Go can cross-compile with zero extra
+# tooling, unlike the PyInstaller-based Python version this replaces (PyInstaller can only ever
+# produce a binary for the OS it's run ON). Requires only the Go toolchain -- no external Go
+# modules, nothing else to install.
+#
+# No Mac build: Elite Dangerous itself has no supported native Mac client anymore (Frontier
+# pulled the old Mac port years ago, and Apple Silicon Macs can't Boot Camp into Windows), so
+# there's no realistic audience with journal files to point a native Mac binary at.
 #
 # Usage: ./build.sh [output-dir]   (defaults to ../dist-go)
 
@@ -25,12 +29,6 @@ go build -ldflags="-s -w" -o "$OUT/edexotracker-standalone-linux" .
 
 echo "Building Windows..."
 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o "$OUT/edexotracker-standalone-windows.exe" .
-
-echo "Building Mac (Intel)..."
-GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o "$OUT/edexotracker-standalone-mac-intel" .
-
-echo "Building Mac (Apple Silicon)..."
-GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o "$OUT/edexotracker-standalone-mac-arm" .
 
 echo
 echo "Done. Sizes:"
