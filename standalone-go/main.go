@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 )
 
 const defaultDBPath = "standalone.db"
@@ -27,27 +28,20 @@ func main() {
 	noOpen := flag.Bool("no-open", false, "Don't open the viewer in a browser automatically")
 	flag.Parse()
 
-	fmt.Println("standalone -- parsing your Elite Dangerous journal...")
+	fmt.Println("standalone -- Elite Dangerous journal viewer")
+	fmt.Println()
 
 	dir := *journalDir
 	if dir == "" {
-		dir = FindJournalDir()
+		dir = resolveJournalDir()
 		if dir == "" {
-			candidates := FindJournalDirCandidates()
-			if len(candidates) > 0 {
-				fmt.Println("Found more than one possible journal folder, can't pick automatically:")
-				for _, c := range candidates {
-					fmt.Println("  " + c)
-				}
-			} else {
-				fmt.Println("Could not find your Elite Dangerous journal folder automatically.")
-			}
-			fmt.Println("Pass it explicitly with --journal-dir PATH")
 			pauseOnWindows()
 			os.Exit(1)
 		}
-		fmt.Println("Auto-detected journal folder:", dir)
 	}
+	fmt.Println("Using journal folder:", dir)
+	fmt.Println()
+	fmt.Println("Parsing your Elite Dangerous journal...")
 
 	store, err := LoadStore(*dbPath)
 	if err != nil {
@@ -166,6 +160,79 @@ func processFileIncremental(store *Store, parser *Parser, path string) (int, err
 	return newLines, nil
 }
 
+// resolveJournalDir is the first thing that happens on every run without --journal-dir: it asks
+// before it acts, rather than silently guessing and only presenting a choice once auto-detection
+// has already failed. When stdin isn't an interactive terminal (scripted/piped run), it falls
+// back to the old one-shot auto-detect-or-fail behavior, since there's nobody there to answer a
+// prompt.
+func resolveJournalDir() string {
+	if !isInteractiveStdin() {
+		dir := FindJournalDir()
+		if dir == "" {
+			printAutoDetectFailure()
+			fmt.Println("Pass it explicitly with --journal-dir PATH")
+			return ""
+		}
+		return dir
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Println("Where's your Elite Dangerous journal folder?")
+		fmt.Println("  [Enter]  auto-detect it for me")
+		fmt.Println("  or type the full folder path and press Enter")
+		fmt.Print("> ")
+
+		line, _ := reader.ReadString('\n')
+		line = strings.TrimSpace(line)
+
+		if line == "" {
+			dir := FindJournalDir()
+			if dir != "" {
+				return dir
+			}
+			printAutoDetectFailure()
+			fmt.Println("Try typing the path instead.")
+			fmt.Println()
+			continue
+		}
+
+		info, err := os.Stat(line)
+		if err != nil || !info.IsDir() {
+			fmt.Println("That doesn't look like a folder -- try again.")
+			fmt.Println()
+			continue
+		}
+		matches, _ := filepath.Glob(filepath.Join(line, journalGlob))
+		if len(matches) == 0 {
+			fmt.Println("No Journal.*.log files found in that folder -- try again.")
+			fmt.Println()
+			continue
+		}
+		return line
+	}
+}
+
+func printAutoDetectFailure() {
+	candidates := FindJournalDirCandidates()
+	if len(candidates) > 0 {
+		fmt.Println("Found more than one possible journal folder, can't pick automatically:")
+		for _, c := range candidates {
+			fmt.Println("  " + c)
+		}
+	} else {
+		fmt.Println("Could not find your Elite Dangerous journal folder automatically.")
+	}
+}
+
+func isInteractiveStdin() bool {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (info.Mode() & os.ModeCharDevice) != 0
+}
+
 func openBrowser(path string) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -191,10 +258,7 @@ func openBrowser(path string) {
 // this Windows build under Wine: blocking unconditionally on stdin hangs forever when stdin is
 // a pipe/redirected/non-interactive, e.g. run from a script or CI, not just when double-clicked).
 func pauseOnWindows() {
-	if runtime.GOOS != "windows" {
-		return
-	}
-	if info, err := os.Stdin.Stat(); err != nil || (info.Mode()&os.ModeCharDevice) == 0 {
+	if runtime.GOOS != "windows" || !isInteractiveStdin() {
 		return
 	}
 	fmt.Print("\nPress Enter to close this window...")

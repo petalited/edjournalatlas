@@ -8,6 +8,7 @@ run.py` does the exact same thing for anyone who'd rather run it from source.
 from __future__ import annotations
 
 import argparse
+import glob
 import os
 import sys
 
@@ -27,32 +28,78 @@ def _pause_on_windows() -> None:
         input('\nPress Enter to close this window...')
 
 
+def _print_autodetect_failure() -> None:
+    candidates = journal_locate.find_journal_dir_candidates()
+    if candidates:
+        print("Found more than one possible journal folder, can't pick automatically:")
+        for c in candidates:
+            print(f'  {c}')
+    else:
+        print('Could not find your Elite Dangerous journal folder automatically.')
+
+
+def _resolve_journal_dir(explicit: str | None) -> str | None:
+    """Asks before it acts, rather than silently guessing and only presenting a choice once
+    auto-detection has already failed. Falls back to the old one-shot auto-detect-or-fail
+    behavior when stdin isn't an interactive terminal (piped/scripted run), since there's nobody
+    there to answer a prompt."""
+    if explicit:
+        return explicit
+
+    if not sys.stdin.isatty():
+        journal_dir = journal_locate.find_journal_dir()
+        if not journal_dir:
+            _print_autodetect_failure()
+            print('Pass it explicitly with --journal-dir PATH')
+            return None
+        return journal_dir
+
+    while True:
+        print("Where's your Elite Dangerous journal folder?")
+        print('  [Enter]  auto-detect it for me')
+        print('  or type the full folder path and press Enter')
+        line = input('> ').strip()
+
+        if not line:
+            journal_dir = journal_locate.find_journal_dir()
+            if journal_dir:
+                return journal_dir
+            _print_autodetect_failure()
+            print('Try typing the path instead.')
+            print()
+            continue
+
+        if not os.path.isdir(line):
+            print("That doesn't look like a folder -- try again.")
+            print()
+            continue
+        if not glob.glob(os.path.join(line, journal_locate.JOURNAL_GLOB)):
+            print('No Journal.*.log files found in that folder -- try again.')
+            print()
+            continue
+        return line
+
+
 def main() -> None:
-    # Double-clicking passes no arguments at all -- auto-detect handles that case. Anyone
+    # Double-clicking passes no arguments at all -- auto-detect/prompt handles that case. Anyone
     # launching this from a terminal (running from source, or the packaged program) can still
-    # pass these explicitly, e.g. if auto-detection can't find a single unambiguous folder.
+    # pass --journal-dir explicitly to skip the prompt entirely.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--journal-dir', default=None)
     parser.add_argument('--db', default=DB_PATH)
     parser.add_argument('--out', default=VIEWER_PATH)
     args, _unknown = parser.parse_known_args()
 
-    print('standalone -- parsing your Elite Dangerous journal...')
+    print('standalone -- Elite Dangerous journal viewer')
+    print()
 
-    journal_dir = args.journal_dir or journal_locate.find_journal_dir()
+    journal_dir = _resolve_journal_dir(args.journal_dir)
     if not journal_dir:
-        candidates = journal_locate.find_journal_dir_candidates()
-        if candidates:
-            print("Found more than one possible journal folder, can't pick automatically:")
-            for c in candidates:
-                print(f'  {c}')
-            print('Run from a terminal with --journal-dir PATH instead of double-clicking.')
-        else:
-            print('Could not find your Elite Dangerous journal folder automatically.')
-            print('Run from a terminal with --journal-dir PATH instead of double-clicking.')
         _pause_on_windows()
         sys.exit(1)
-    print(f'Journal folder: {journal_dir}')
+    print(f'Using journal folder: {journal_dir}')
+    print()
+    print('Parsing your Elite Dangerous journal...')
 
     con = db.connect(args.db)
     try:
