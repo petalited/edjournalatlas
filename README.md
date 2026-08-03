@@ -1,4 +1,4 @@
-# edexotracker-standalone
+# edjournalatlas
 
 A local "explore what you've found" viewer for Elite Dangerous. It reads your own game journal
 files directly and builds a browsable page showing every system you've visited: region,
