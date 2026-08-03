@@ -1,0 +1,53 @@
+{
+  "RT_MANIFEST": {
+    "#1": {
+      "0409": {
+        "identity": {
+          "name": "",
+          "version": ""
+        },
+        "description": "edexotracker-standalone: local Elite Dangerous journal parser and exploration/exobiology viewer",
+        "minimum-os": "win7",
+        "execution-level": "as invoker",
+        "ui-access": false,
+        "auto-elevate": false,
+        "dpi-awareness": "system",
+        "disable-theming": false,
+        "disable-window-filtering": false,
+        "high-resolution-scrolling-aware": false,
+        "ultra-high-resolution-scrolling-aware": false,
+        "long-path-aware": false,
+        "printer-driver-isolation": false,
+        "gdi-scaling": false,
+        "segment-heap": false,
+        "use-common-controls-v6": false
+      }
+    }
+  },
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": {
+          "file_version": "1.0.0.0",
+          "product_version": "1.0.0.0"
+        },
+        "info": {
+          "0409": {
+            "Comments": "Parses your own local Elite Dangerous journal files into a local database and a browsable HTML viewer. Reads only your own game journal folder; makes no network connections.",
+            "CompanyName": "edexotracker (personal project, unaffiliated with Frontier Developments)",
+            "FileDescription": "edexotracker standalone journal parser/viewer",
+            "FileVersion": "1.0.0.0",
+            "InternalName": "edexotracker-standalone",
+            "LegalCopyright": "",
+            "LegalTrademarks": "",
+            "OriginalFilename": "edexotracker-standalone-windows.exe",
+            "PrivateBuild": "",
+            "ProductName": "edexotracker standalone",
+            "ProductVersion": "1.0.0.0",
+            "SpecialBuild": ""
+          }
+        }
+      }
+    }
+  }
+}
