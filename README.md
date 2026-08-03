@@ -12,9 +12,10 @@ local cache file next to itself.
 
 Two implementations of the exact same tool are included, so pick whichever fits:
 
-- **`standalone-go/`** — a single ~3MB self-contained binary (Linux/Windows/Mac Intel/Mac Apple
-  Silicon), no runtime dependency of any kind. This is the one to grab if you just want to run
-  it.
+- **`standalone-go/`** — a single ~3MB self-contained binary (Linux/Windows), no runtime
+  dependency of any kind. This is the one to grab if you just want to run it. No Mac build:
+  Elite Dangerous has no supported native Mac client anymore, so there's no realistic audience
+  with journal files to point one at.
 - **`standalone/`** — the original Python version. Same features, same output, no packages to
   install (stdlib only) if running from source; also buildable into a double-click program via
   PyInstaller, at the cost of a larger file (~11.6MB) and builds that only work on whatever OS
@@ -25,19 +26,19 @@ switch between them freely.
 
 ## Running it (pre-built binary)
 
-If you have `edexotracker-standalone-linux` / `-mac-intel` / `-mac-arm` / `-windows.exe` — that's
-the whole program. Put it in its own folder and double-click it (or run it from a terminal). It
-finds your journal, builds/updates its own small local cache, and opens the viewer in your
-browser.
+If you have `edjournalatlas-linux` or `edjournalatlas-windows.exe` — that's the whole program.
+Put it in its own folder and double-click it (or run it from a terminal). It'll ask where your
+journal folder is (or you can just hit Enter to have it auto-detect), then build/update its own
+small local cache and open the viewer in your browser.
 
 Run it again any time — only new journal activity since last time gets processed, not everything
 from scratch, so it's fast after the first run.
 
-If it can't find your journal folder automatically (common on Linux, rarer on Windows/Mac), it'll
-ask you to point it there directly:
+If auto-detect can't find it (common on Linux, rarer on Windows), just type the path in when
+asked — or skip the prompt entirely by passing it up front:
 
 ```
-edexotracker-standalone --journal-dir "PATH TO YOUR JOURNAL FOLDER"
+edjournalatlas --journal-dir "PATH TO YOUR JOURNAL FOLDER"
 ```
 
 Your journal folder is normally named `Elite Dangerous`, under a `Saved Games` folder somewhere.
@@ -53,7 +54,7 @@ cd standalone-go
 ./build.sh
 ```
 
-Builds all four platforms in one go (Go cross-compiles natively — no need to run the build
+Builds both platforms in one go (Go cross-compiles natively — no need to run the build
 separately per OS). Optional: install
 [`go-winres`](https://github.com/tc-hib/go-winres)
 (`go install github.com/tc-hib/go-winres@latest`) first — `build.sh` will use it automatically to

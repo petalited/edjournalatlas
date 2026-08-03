@@ -38,7 +38,7 @@ def main() -> None:
             '  /tmp/build-venv/bin/python build_executable.py'
         )
 
-    name = 'edexotracker-standalone' + ('.exe' if sys.platform == 'win32' else '')
+    name = 'edjournalatlas' + ('.exe' if sys.platform == 'win32' else '')
     vendor_src = os.path.join(HERE, 'vendor')
     # PyInstaller's --add-data separator is ';' on Windows, ':' everywhere else.
     sep = ';' if sys.platform == 'win32' else ':'
@@ -46,7 +46,7 @@ def main() -> None:
     cmd = [
         sys.executable, '-m', 'PyInstaller',
         '--onefile',
-        '--name', 'edexotracker-standalone',
+        '--name', 'edjournalatlas',
         '--distpath', os.path.join(PROJECT_ROOT, 'dist'),
         '--workpath', os.path.join(PROJECT_ROOT, 'build', 'pyinstaller-work'),
         '--specpath', os.path.join(PROJECT_ROOT, 'build', 'pyinstaller-work'),

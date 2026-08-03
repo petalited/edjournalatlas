@@ -16,19 +16,19 @@ OUT="${1:-../dist-go}"
 mkdir -p "$OUT"
 
 # Regenerate the Windows version-info/manifest resource (winres/winres.json -> .syso) if
-# go-winres is available -- see docs/StandaloneGoRewrite.md's "Windows Defender false positive"
-# section for why this exists: a version-info-less, unsigned exe is exactly the shape Defender's
-# ML heuristic tends to flag, and this is the free (no-cert-purchase) mitigation for that.
+# go-winres is available. A version-info-less, unsigned exe is exactly the shape Windows
+# Defender's ML heuristic tends to flag as a false positive (Trojan:Win32/Wacatac.B!ml) -- this
+# is the free (no-cert-purchase) mitigation for that. See README.md for more.
 if command -v go-winres >/dev/null 2>&1; then
     echo "Regenerating Windows version-info resource..."
     go-winres make --arch amd64
 fi
 
 echo "Building Linux..."
-go build -ldflags="-s -w" -o "$OUT/edexotracker-standalone-linux" .
+go build -ldflags="-s -w" -o "$OUT/edjournalatlas-linux" .
 
 echo "Building Windows..."
-GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o "$OUT/edexotracker-standalone-windows.exe" .
+GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o "$OUT/edjournalatlas-windows.exe" .
 
 echo
 echo "Done. Sizes:"

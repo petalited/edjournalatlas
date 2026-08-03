@@ -5,7 +5,7 @@ TEMPLATE = r"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>standalone -- local exploration viewer</title>
+<title>edjournalatlas -- local exploration viewer</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root {
@@ -210,8 +210,7 @@ function edsmUrl(systemName) {
 }
 // No per-body/per-star deep link is reliable without EDSM's own internal numeric IDs (this
 // project never fetches them) -- every name links to the same system page instead, which lists
-// all of a system's known bodies once EDSM has data for it. Same approach edexotracker's main
-// report uses for its own Discord export.
+// all of a system's known bodies once EDSM has data for it.
 function discordLink(label, systemName) {
   return `[${label}](${edsmUrl(systemName)})`;
 }
@@ -287,10 +286,9 @@ function bodyNameBit(b, systemName) {
   return b.notableLabel ? `${nameBit} — ✨ ${b.notableLabel}` : nameBit;
 }
 
-// Two Discord export variants, same reasoning as edexotracker's main report: a commander's own
-// bonuses (first footfall, first-logged) are one-time opportunities -- once claimed, they're
-// gone for whoever else visits, so they don't belong in a number meant to represent what's
-// genuinely still "available" to share/compare.
+// Two Discord export variants: a commander's own bonuses (first footfall, first-logged) are
+// one-time opportunities -- once claimed, they're gone for whoever else visits, so they don't
+// belong in a number meant to represent what's genuinely still "available" to share/compare.
 //   - Personal ("your progress"): actual bonus-inclusive value, first-discovery bragging.
 //   - Objective ("what's available"): baseValue only (pre-bonus, from the value table) --
 //     what's guaranteed to be there for anyone.
@@ -458,8 +456,8 @@ function starChip(sys, st) {
 }
 
 // Groups bodies by which star they orbit (parentStars is a single nearest-star name here, or ''
-// if unknown -- unlike edexotracker/report.py's list-of-circumbinary-stars, standalone only
-// resolves one nearest parent per body, see docs/StandaloneJournalParser.md).
+// if unknown -- each body resolves to one nearest parent star, not a full list of co-orbiting
+// stars for circumbinary cases).
 function groupBodiesByOrbit(bodies) {
   const groups = new Map();
   for (const b of bodies) {
