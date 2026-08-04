@@ -125,3 +125,12 @@ support for something the recap doesn't cover.
 
 Read-only: it only ever reads your journal files and its own local cache — never touches your
 game, your saves, or anything else on your machine.
+
+## License
+
+GPLv2 (see [`LICENSE`](LICENSE)) — matches the license of the vendored reference data this project
+builds on (species values from EDMC-BioScan, region data from EDMC-ExploData).
+
+## A note on how this was built
+
+Large parts of this codebase were written with AI assistance.
