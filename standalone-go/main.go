@@ -24,6 +24,7 @@ const defaultEventsOutPath = "standalone_events.html"
 const defaultSummaryOutPath = "standalone_summary.html"
 const defaultUnmodeledOutPath = "standalone_unmodeled.json"
 const defaultMaterialsOutPath = "standalone_materials.html"
+const defaultEngineeringOutPath = "standalone_engineering.html"
 
 func main() {
 	journalDir := flag.String("journal-dir", "", "Directory containing Journal.*.log files (auto-detected if omitted)")
@@ -37,6 +38,8 @@ func main() {
 	noUnmodeled := flag.Bool("no-unmodeled", false, "Skip building the unmodeled-event-types coverage report")
 	materialsOutPath := flag.String("materials-out", defaultMaterialsOutPath, "Path to write the materials inventory page")
 	noMaterials := flag.Bool("no-materials", false, "Skip building the materials inventory page")
+	engineeringOutPath := flag.String("engineering-out", defaultEngineeringOutPath, "Path to write the engineering upgrade planner page")
+	noEngineering := flag.Bool("no-engineering", false, "Skip building the engineering upgrade planner page")
 	noOpen := flag.Bool("no-open", false, "Don't open the viewer in a browser automatically")
 	flag.Parse()
 
@@ -156,6 +159,17 @@ func main() {
 			fmt.Println("Error writing materials inventory page:", err)
 		} else {
 			fmt.Printf("Wrote %s (%d distinct materials -- current Raw/Manufactured/Encoded inventory)\n", *materialsOutPath, materialCount)
+		}
+	}
+
+	if !*noEngineering {
+		engineeringHTML, blueprintCount, err := RenderEngineeringPlanner(store)
+		if err != nil {
+			fmt.Println("Error building engineering planner page:", err)
+		} else if err := os.WriteFile(*engineeringOutPath, []byte(engineeringHTML), 0o644); err != nil {
+			fmt.Println("Error writing engineering planner page:", err)
+		} else {
+			fmt.Printf("Wrote %s (%d ship-module blueprints -- plan upgrades against your materials and engineers)\n", *engineeringOutPath, blueprintCount)
 		}
 	}
 

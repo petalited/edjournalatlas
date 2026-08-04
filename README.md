@@ -128,8 +128,11 @@ game, your saves, or anything else on your machine.
 
 ## License
 
-GPLv2 (see [`LICENSE`](LICENSE)) — matches the license of the vendored reference data this project
-builds on (species values from EDMC-BioScan, region data from EDMC-ExploData).
+GPLv2 (see [`LICENSE`](LICENSE)) — matches the license of most of the vendored reference data this
+project builds on (species values from EDMC-BioScan, region data from EDMC-ExploData). The
+engineering planner's blueprint data is a filtered copy of
+[msarilar/EDEngineer](https://github.com/msarilar/EDEngineer)'s data, MIT licensed — see
+`standalone-go/vendor/blueprints_README.md` for details.
 
 ## A note on how this was built
 

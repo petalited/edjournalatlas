@@ -249,3 +249,67 @@ var materialFamilyByKey = func() map[string]string {
 func materialFamily(name string) string {
 	return materialFamilyByKey[normalizeMaterialKey(name)]
 }
+
+// materialDisplayNames covers every key in materialGrades (checked at generation time, not just
+// the 108 that belong to a named family) -- the canonical name from the same EDCD material.csv
+// "name" column, needed so the engineering planner (engineeringplanner.go) can show a real
+// material name for an ingredient the commander doesn't currently hold at all, where there's no
+// real per-commander Name_Localised available to fall back on.
+var materialDisplayNames = map[string]string{
+	"adaptiveencryptors": "Adaptive Encryptors Capture", "ancientbiologicaldata": "Pattern Alpha Obelisk Data", "ancientculturaldata": "Pattern Beta Obelisk Data",
+	"ancienthistoricaldata": "Pattern Gamma Obelisk Data", "ancientlanguagedata": "Pattern Delta Obelisk Data", "ancienttechnologicaldata": "Pattern Epsilon Obelisk Data",
+	"antimony": "Antimony", "archivedemissiondata": "Irregular Emission Data", "arsenic": "Arsenic",
+	"basicconductors": "Basic Conductors", "biotechconductors": "Biotech Conductors", "boron": "Boron",
+	"bulkscandata": "Anomalous Bulk Scan Data", "cadmium": "Cadmium", "carbon": "Carbon",
+	"chemicaldistillery": "Chemical Distillery", "chemicalmanipulators": "Chemical Manipulators", "chemicalprocessors": "Chemical Processors",
+	"chemicalstorageunits": "Chemical Storage Units", "chromium": "Chromium", "classifiedscandata": "Classified Scan Fragment",
+	"compactcomposites": "Compact Composites", "compactemissionsdata": "Abnormal Compact Emissions Data", "compoundshielding": "Compound Shielding",
+	"conductiveceramics": "Conductive Ceramics", "conductivecomponents": "Conductive Components", "conductivepolymers": "Conductive Polymers",
+	"configurablecomponents": "Configurable Components", "consumerfirmware": "Modified Consumer Firmware", "crystalshards": "Crystal Shards",
+	"dataminedwake": "Datamined Wake Exceptions", "decodedemissiondata": "Decoded Emission Data", "disruptedwakeechoes": "Atypical Disrupted Wake Echoes",
+	"electrochemicalarrays": "Electrochemical Arrays", "embeddedfirmware": "Modified Embedded Firmware", "emissiondata": "Unexpected Emission Data",
+	"encodedscandata": "Divergent Scan Data", "encryptedfiles": "Unusual Encrypted Files", "encryptionarchives": "Atypical Encryption Archives",
+	"encryptioncodes": "Tagged Encryption Codes", "exquisitefocuscrystals": "Exquisite Focus Crystals", "fedcorecomposites": "Core Dynamics Composites",
+	"fedproprietarycomposites": "Proprietary Composites", "filamentcomposites": "Filament Composites", "focuscrystals": "Focus Crystals",
+	"fsdtelemetry": "Anomalous FSD Telemetry", "galvanisingalloys": "Galvanising Alloys", "germanium": "Germanium",
+	"gridresistors": "Grid Resistors", "guardianmoduleblueprint": "Guardian Module Blueprint Segment", "guardianpowercell": "Guardian Power Cell",
+	"guardianpowerconduit": "Guardian Power Conduit", "guardiansentinelweaponparts": "Guardian Sentinel Weapon Parts", "guardiansentinelwreckagecomponents": "Guardian Sentinel Wreckage Components",
+	"guardiantechcomponent": "Guardian Technology Component", "guardianvesselblueprint": "Guardian Vessel Blueprint Segment", "guardianweaponblueprint": "Guardian Weapon Blueprint Segment",
+	"heatconductionwiring": "Heat Conduction Wiring", "heatdispersionplate": "Heat Dispersion Plate", "heatexchangers": "Heat Exchangers",
+	"heatresistantceramics": "Heat Resistant Ceramics", "heatvanes": "Heat Vanes", "highdensitycomposites": "High Density Composites",
+	"hybridcapacitors": "Hybrid Capacitors", "hyperspacetrajectories": "Eccentric Hyperspace Trajectories", "imperialshielding": "Imperial Shielding",
+	"improvisedcomponents": "Improvised Components", "industrialfirmware": "Cracked Industrial Firmware", "iron": "Iron",
+	"lead": "Lead", "legacyfirmware": "Specialised Legacy Firmware", "manganese": "Manganese",
+	"mechanicalcomponents": "Mechanical Components", "mechanicalequipment": "Mechanical Equipment", "mechanicalscrap": "Mechanical Scrap",
+	"mercury": "Mercury", "militarygradealloys": "Military Grade Alloys", "militarysupercapacitors": "Military Supercapacitors",
+	"molybdenum": "Molybdenum", "nickel": "Nickel", "niobium": "Niobium",
+	"pharmaceuticalisolators": "Pharmaceutical Isolators", "phasealloys": "Phase Alloys", "phosphorus": "Phosphorus",
+	"polonium": "Polonium", "polymercapacitors": "Polymer Capacitors", "precipitatedalloys": "Precipitated Alloys",
+	"protoheatradiators": "Proto Heat Radiators", "protolightalloys": "Proto Light Alloys", "protoradiolicalloys": "Proto Radiolic Alloys",
+	"refinedfocuscrystals": "Refined Focus Crystals", "rhenium": "Rhenium", "ruthenium": "Ruthenium",
+	"salvagedalloys": "Salvaged Alloys", "scanarchives": "Unidentified Scan Archives", "scandatabanks": "Classified Scan Databanks",
+	"scrambledemissiondata": "Exceptional Scrambled Emission Data", "securityfirmware": "Security Firmware Patch", "selenium": "Selenium",
+	"shieldcyclerecordings": "Distorted Shield Cycle Recordings", "shielddensityreports": "Untypical Shield Scans", "shieldemitters": "Shield Emitters",
+	"shieldfrequencydata": "Peculiar Shield Frequency Data", "shieldingsensors": "Shielding Sensors", "shieldpatternanalysis": "Aberrant Shield Pattern Analysis",
+	"shieldsoakanalysis": "Inconsistent Shield Soak Analysis", "sulphur": "Sulphur", "symmetrickeys": "Open Symmetric Keys",
+	"technetium": "Technetium", "tellurium": "Tellurium", "temperedalloys": "Tempered Alloys",
+	"tgbiomechanicalconduits": "Bio-Mechanical Conduits", "tgcompositiondata": "Thargoid Material Composition Data", "tgpropulsionelement": "Propulsion Elements",
+	"tgresiduedata": "Thargoid Residue Data", "tgshipflightdata": "Ship Flight Data", "tgshipsystemsdata": "Ship Systems Data",
+	"tgstructuraldata": "Thargoid Structural Data", "tgweaponparts": "Weapon Parts", "tgwreckagecomponents": "Wreckage Components",
+	"thermicalloys": "Thermic Alloys", "tin": "Tin", "tungsten": "Tungsten",
+	"uncutfocuscrystals": "Flawed Focus Crystals", "unknowncarapace": "Thargoid Carapace", "unknownenergycell": "Thargoid Energy Cell",
+	"unknownenergysource": "Sensor Fragment", "unknownorganiccircuitry": "Thargoid Organic Circuitry", "unknownshipsignature": "Thargoid Ship Signature",
+	"unknowntechnologycomponents": "Thargoid Technological Components", "unknownwakedata": "Thargoid Wake Data", "vanadium": "Vanadium",
+	"wakesolutions": "Strange Wake Solutions", "wornshieldemitters": "Worn Shield Emitters", "yttrium": "Yttrium",
+	"zinc": "Zinc", "zirconium": "Zirconium",
+}
+
+// materialDisplayName falls back to the raw key itself (title-cased) for anything genuinely
+// missing from the table -- shouldn't happen for the 137 keys this covers, but stays safe rather
+// than panicking or showing an empty string if the game ever adds something new.
+func materialDisplayName(key string) string {
+	if name, ok := materialDisplayNames[key]; ok {
+		return name
+	}
+	return prettifyKeyStandalone(key)
+}

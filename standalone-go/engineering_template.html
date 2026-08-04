@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>edjournalatlas -- engineering planner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  color-scheme: light dark;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+  --transition: 160ms ease;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --good: #0ca30c; --good-bg: #e5f7e5; --warning: #b5710a; --warning-bg: #fdf1de;
+  --notable-bg: #efe6fb; --notable-text: #6b3fb0;
+  --shadow: 0 1px 3px rgba(11,11,11,0.08), 0 1px 2px rgba(11,11,11,0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0d0d; --panel: #1a1a19; --text: #ffffff; --muted: #c3c2b7; --muted-faint: #898781;
+    --border: #2c2c2a; --border-strong: #383835; --accent: #3987e5; --accent-weak: #182338;
+    --good: #3ecf3e; --good-bg: #12291a; --warning: #e0a53c; --warning-bg: #2e2312;
+    --notable-bg: #2c2140; --notable-text: #caa9f7;
+    --shadow: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.35);
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text); padding: var(--space-5); font-variant-numeric: tabular-nums; }
+.page-nav { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.page-nav-link { font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill); border: 1px solid var(--border); transition: border-color var(--transition), color var(--transition); }
+.page-nav-link:hover { color: var(--accent); border-color: var(--accent); }
+.page-nav-link.page-nav-active { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+h1 { font-size: 1.4rem; margin: 0 0 2px; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 var(--space-4); max-width: 900px; }
+.picker { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-end; margin-bottom: var(--space-5);
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-4); box-shadow: var(--shadow); }
+.picker-field { display: flex; flex-direction: column; gap: 4px; }
+.picker-field label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+select, input[type=number], input[type=text] { background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); font-size: 0.9rem;
+  transition: border-color var(--transition); font: inherit; }
+#pickType, #pickName { min-width: 200px; }
+#pickGrade { min-width: 90px; }
+#pickQty { width: 70px; }
+button { font: inherit; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+  background: var(--panel); color: var(--text); padding: var(--space-2) var(--space-4); transition: background var(--transition), border-color var(--transition); }
+button:hover { border-color: var(--accent); color: var(--accent); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { color: #fff; opacity: 0.9; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.section-block { margin-bottom: var(--space-6); }
+.section-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 var(--space-3); display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+.section-sub { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.basket-table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow); }
+.basket-table th, .basket-table td { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+.basket-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 600; }
+.basket-table tr:last-child td { border-bottom: none; }
+.basket-qty { width: 55px; }
+.basket-remove { padding: 3px 10px; font-size: 0.8rem; }
+.need-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-3); }
+.need-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3); box-shadow: var(--shadow); }
+.need-card.need-short { border-color: var(--warning); background: var(--warning-bg); }
+.need-card.need-met { border-color: var(--good); background: var(--good-bg); }
+.need-name { font-weight: 600; font-size: 0.9rem; }
+.need-amounts { font-size: 0.95rem; font-weight: 700; margin-top: 2px; }
+.need-status { font-size: 0.75rem; margin-top: 3px; }
+.need-short .need-status { color: var(--warning); }
+.need-met .need-status { color: var(--good); }
+.engineer-group { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3); box-shadow: var(--shadow); margin-bottom: var(--space-3); }
+.engineer-group-title { font-weight: 600; font-size: 0.92rem; margin-bottom: var(--space-2); }
+.engineer-group.engineer-blocked { border-color: var(--warning); }
+.engineer-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.engineer-chip { font-size: 0.78rem; padding: 3px 10px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong); color: var(--muted); }
+.engineer-chip.engineer-unlocked { border-color: var(--good); color: var(--good); background: var(--good-bg); }
+.engineer-chip.engineer-invited { border-color: var(--warning); color: var(--warning); background: var(--warning-bg); }
+.engineer-chip.engineer-unknown { opacity: 0.7; }
+.blocked-note { font-size: 0.78rem; color: var(--warning); margin-top: var(--space-2); }
+.empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center; }
+.empty-note-icon { font-size: 1.6rem; margin-bottom: var(--space-2); opacity: 0.7; }
+.caveat { font-size: 0.78rem; color: var(--muted-faint); margin-top: var(--space-2); }
+a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm);
+}
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+  <a class="page-nav-link" href="standalone_viewer.html">🗺️ Systems</a>
+  <a class="page-nav-link" href="standalone_events.html">🔍 Journal search</a>
+  <a class="page-nav-link" href="standalone_summary.html">📊 Recap</a>
+  <a class="page-nav-link" href="standalone_materials.html">🧪 Materials</a>
+  <a class="page-nav-link page-nav-active" href="standalone_engineering.html">⚙️ Engineering planner</a>
+</nav>
+
+<h1>standalone -- engineering planner</h1>
+<p class="subtitle" id="subtitle"></p>
+
+<div class="picker">
+  <div class="picker-field">
+    <label for="pickType">Module</label>
+    <select id="pickType"></select>
+  </div>
+  <div class="picker-field">
+    <label for="pickName">Upgrade</label>
+    <select id="pickName"></select>
+  </div>
+  <div class="picker-field">
+    <label for="pickGrade">Grade</label>
+    <select id="pickGrade"></select>
+  </div>
+  <div class="picker-field">
+    <label for="pickQty">Qty</label>
+    <input type="number" id="pickQty" value="1" min="1">
+  </div>
+  <button type="button" class="btn-primary" id="addBtn">Add to plan</button>
+</div>
+
+<div id="planSections"></div>
+
+<script id="engineering-data" type="application/json">__DATA_JSON__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('engineering-data').textContent);
+const STORAGE_KEY = 'standalone_engineering_basket';
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// bpIndex: type -> name -> grade -> blueprint. Also a flat lookup by "type|name|grade" for the basket.
+const bpIndex = {};
+const bpByKey = {};
+DATA.blueprints.forEach(bp => {
+  bpIndex[bp.type] = bpIndex[bp.type] || {};
+  bpIndex[bp.type][bp.name] = bpIndex[bp.type][bp.name] || {};
+  bpIndex[bp.type][bp.name][bp.grade] = bp;
+  bpByKey[`${bp.type}|${bp.name}|${bp.grade}`] = bp;
+});
+
+document.getElementById('subtitle').textContent =
+  `${DATA.blueprints.length} real ship-module engineering blueprints (grades 1-5), sourced from a community reference (Odyssey on-foot suit/weapon engineering isn't covered -- this project has no inventory data for that resource pool). ` +
+  (DATA.hasSnapshot
+    ? `Materials compared against your inventory as of ${DATA.snapshotAt.replace('T', ' ').replace('Z', '')} UTC.`
+    : `No materials inventory captured yet -- open your in-game Materials screen, then re-run this tool, to see what you already have.`) +
+  ' ' +
+  (DATA.hasEngineerData
+    ? `Engineer unlock status from your most recent EngineerProgress.`
+    : `No engineer progress captured yet -- log in-game once, then re-run this tool, to see which engineers you've actually met.`);
+
+function populateTypes() {
+  const select = document.getElementById('pickType');
+  select.innerHTML = Object.keys(bpIndex).sort().map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  populateNames();
+}
+
+function populateNames() {
+  const type = document.getElementById('pickType').value;
+  const select = document.getElementById('pickName');
+  select.innerHTML = Object.keys(bpIndex[type] || {}).sort().map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  populateGrades();
+}
+
+function populateGrades() {
+  const type = document.getElementById('pickType').value;
+  const name = document.getElementById('pickName').value;
+  const grades = Object.keys((bpIndex[type] || {})[name] || {}).map(Number).sort((a, b) => a - b);
+  const select = document.getElementById('pickGrade');
+  select.innerHTML = grades.map(g => `<option value="${g}">Grade ${g}</option>`).join('');
+}
+
+document.getElementById('pickType').addEventListener('change', populateNames);
+document.getElementById('pickName').addEventListener('change', populateGrades);
+
+function loadBasket() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+function saveBasket(basket) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(basket));
+  } catch (e) { /* ignore -- storage unavailable or full, plan just won't persist across reloads */ }
+}
+
+let basket = loadBasket();
+
+document.getElementById('addBtn').addEventListener('click', () => {
+  const type = document.getElementById('pickType').value;
+  const name = document.getElementById('pickName').value;
+  const grade = Number(document.getElementById('pickGrade').value);
+  const qty = Math.max(1, Number(document.getElementById('pickQty').value) || 1);
+  if (!bpByKey[`${type}|${name}|${grade}`]) return;
+  const existing = basket.find(b => b.type === type && b.name === name && b.grade === grade);
+  if (existing) {
+    existing.qty += qty;
+  } else {
+    basket.push({ type, name, grade, qty });
+  }
+  saveBasket(basket);
+  render();
+});
+
+function removeItem(idx) {
+  basket.splice(idx, 1);
+  saveBasket(basket);
+  render();
+}
+function updateQty(idx, qty) {
+  qty = Math.max(1, Number(qty) || 1);
+  basket[idx].qty = qty;
+  saveBasket(basket);
+  render();
+}
+function clearBasket() {
+  basket = [];
+  saveBasket(basket);
+  render();
+}
+window.removeItem = removeItem;
+window.updateQty = updateQty;
+window.clearBasket = clearBasket;
+
+function basketTable() {
+  if (!basket.length) return '';
+  const rows = basket.map((item, idx) => {
+    const bp = bpByKey[`${item.type}|${item.name}|${item.grade}`];
+    if (!bp) return '';
+    return `<tr>
+      <td>${escapeHtml(item.type)}</td>
+      <td>${escapeHtml(item.name)}</td>
+      <td>Grade ${item.grade}</td>
+      <td><input type="number" class="basket-qty" min="1" value="${item.qty}" onchange="updateQty(${idx}, this.value)"></td>
+      <td><button type="button" class="basket-remove" onclick="removeItem(${idx})">Remove</button></td>
+    </tr>`;
+  }).join('');
+  return `<div class="section-block">
+    <div class="section-title">Your plan <span class="section-sub">${basket.length} upgrade${basket.length === 1 ? '' : 's'} queued</span>
+      <button type="button" onclick="clearBasket()">Clear all</button>
+    </div>
+    <table class="basket-table">
+      <thead><tr><th>Module</th><th>Upgrade</th><th>Grade</th><th>Qty</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function materialsSummary() {
+  const needed = {}; // key -> {name, count}
+  basket.forEach(item => {
+    const bp = bpByKey[`${item.type}|${item.name}|${item.grade}`];
+    if (!bp) return;
+    bp.ingredients.forEach(ing => {
+      if (!needed[ing.key]) needed[ing.key] = { name: ing.name, count: 0 };
+      needed[ing.key].count += ing.count * item.qty;
+    });
+  });
+  if (!Object.keys(needed).length) return '';
+  const withKeys = Object.entries(needed).map(([key, v]) => ({ key, ...v }));
+  withKeys.sort((a, b) => {
+    const shortA = a.count - (DATA.heldMaterials[a.key] || 0);
+    const shortB = b.count - (DATA.heldMaterials[b.key] || 0);
+    return shortB - shortA || a.name.localeCompare(b.name);
+  });
+  const cards = withKeys.map(m => {
+    const held = DATA.heldMaterials[m.key] || 0;
+    const short = m.count - held;
+    const cls = short > 0 ? 'need-short' : 'need-met';
+    const status = !DATA.hasSnapshot
+      ? 'No inventory captured yet'
+      : short > 0 ? `Short by ${short.toLocaleString('en-US')}` : 'You have enough';
+    return `<div class="need-card ${cls}">
+      <div class="need-name">${escapeHtml(m.name)}</div>
+      <div class="need-amounts">${held.toLocaleString('en-US')} / ${m.count.toLocaleString('en-US')}</div>
+      <div class="need-status">${status}</div>
+    </div>`;
+  }).join('');
+  return `<div class="section-block">
+    <div class="section-title">Materials needed <span class="section-sub">held / needed, across your whole plan</span></div>
+    <div class="need-grid">${cards}</div>
+  </div>`;
+}
+
+function engineerChip(e) {
+  const cls = e.progress === 'Unlocked' ? 'engineer-unlocked' : e.progress === 'Invited' ? 'engineer-invited' : 'engineer-unknown';
+  const label = e.progress === 'Unlocked' && e.rank ? `${e.name} (Rank ${e.rank})` : e.progress ? `${e.name} (${e.progress})` : `${e.name} (no record)`;
+  return `<span class="engineer-chip ${cls}">${escapeHtml(label)}</span>`;
+}
+
+function engineersSummary() {
+  const seen = new Set();
+  const uniqueBps = [];
+  basket.forEach(item => {
+    const bp = bpByKey[`${item.type}|${item.name}|${item.grade}`];
+    if (!bp) return;
+    const k = `${bp.type}|${bp.name}|${bp.grade}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    uniqueBps.push(bp);
+  });
+  if (!uniqueBps.length) return '';
+  const groups = uniqueBps.map(bp => {
+    const hasUnlocked = bp.engineers.some(e => e.progress === 'Unlocked');
+    const blockedNote = (!hasUnlocked && DATA.hasEngineerData)
+      ? `<div class="blocked-note">⚠️ None of these engineers are unlocked yet</div>` : '';
+    return `<div class="engineer-group ${hasUnlocked ? '' : 'engineer-blocked'}">
+      <div class="engineer-group-title">${escapeHtml(bp.type)} -- ${escapeHtml(bp.name)} (Grade ${bp.grade})</div>
+      <div class="engineer-list">${bp.engineers.map(engineerChip).join('')}</div>
+      ${blockedNote}
+    </div>`;
+  }).join('');
+  return `<div class="section-block">
+    <div class="section-title">Engineers <span class="section-sub">who can give you each upgrade in your plan</span></div>
+    ${groups}
+    ${!DATA.hasEngineerData ? '<p class="caveat">No engineer progress captured yet, so unlock status can\'t be shown -- log in-game once and re-run this tool.</p>' : ''}
+  </div>`;
+}
+
+function render() {
+  if (!basket.length) {
+    document.getElementById('planSections').innerHTML =
+      `<div class="empty-note"><div class="empty-note-icon">⚙️</div>Your plan is empty -- pick a module and upgrade above, then "Add to plan".</div>`;
+    return;
+  }
+  document.getElementById('planSections').innerHTML = basketTable() + materialsSummary() + engineersSummary();
+}
+
+populateTypes();
+render();
+</script>
+</body>
+</html>
