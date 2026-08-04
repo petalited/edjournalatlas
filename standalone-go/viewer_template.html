@@ -369,11 +369,14 @@ const DISCORD_CHAR_BUDGET = 1800;
 // it) instead of one flat list. Discord's `-#` subtext marker has to be the literal first
 // characters of the line -- no leading whitespace before it (confirmed: it and header markdown
 // both only trigger when they open the line) -- so the "offset to the right" has to come from
-// the connector itself (plus the space after it) rather than leading spaces before `-#`.
+// the connector itself rather than leading spaces before `-#`.
 //
-// Real tree semantics, not the same glyph for every moon: `├─` for every moon except the last
-// one sharing a given parent planet (b.orbitsBodyId), `└─` to cap off that last one -- matches
-// how a normal file-tree view distinguishes "more siblings follow" from "this branch is done".
+// Real tree semantics, not the same glyph for every moon: `├` for every moon except the last one
+// sharing a given parent planet (b.orbitsBodyId), `└` to cap off that last one -- matches how a
+// normal file-tree view distinguishes "more siblings follow" from "this branch is done". Each is
+// a single character on its own (its short rightward stub is already part of the glyph) -- no
+// separate trailing `─` needed to "extend" it into the body text; that just widened the gap
+// between the connector and what it's supposed to be connecting to.
 // lastMoonIndexByParent maps each parent BodyID to the LIST INDEX of its last moon (bodies stay
 // in the existing distance-from-star order, not regrouped by parent, so this is a lookup against
 // that existing order rather than a real grouping pass).
@@ -387,7 +390,7 @@ function lastMoonIndexByParent(bodies) {
 function bodyLinePrefix(b, index, lastMoonIndex) {
   if (!b.isMoon) return '  ';
   const isLast = b.orbitsBodyId == null || lastMoonIndex.get(b.orbitsBodyId) === index;
-  return isLast ? '-# └─ ' : '-# ├─ ';
+  return isLast ? '-# └ ' : '-# ├ ';
 }
 
 // Appends a "**Bodies:**" section listing every body passed in (one line each, via

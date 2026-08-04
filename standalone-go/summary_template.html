@@ -36,11 +36,16 @@ h1 { font-size: 1.6rem; margin: 0 0 2px; display: inline-block; }
   padding: 4px var(--space-4); font-size: 0.82rem; cursor: pointer; transition: background-color var(--transition); }
 .copy-btn:hover { background: color-mix(in srgb, var(--accent) 85%, black); }
 .copy-btn.copied { background: var(--accent); }
+.copy-btn-small { background: transparent; color: var(--muted); border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+  padding: 2px var(--space-3); font-size: 0.72rem; font-weight: 400; cursor: pointer; transition: background-color var(--transition), color var(--transition), border-color var(--transition); }
+.copy-btn-small:hover { color: var(--accent); border-color: var(--accent); }
+.copy-btn-small.copied { color: white; background: var(--accent); border-color: var(--accent); }
 .highlights { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
 .highlight { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4); box-shadow: var(--shadow); font-size: 0.9rem; }
 .section { margin-bottom: var(--space-6); }
-.section-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 var(--space-3); }
+.section-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 var(--space-3);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3); }
 .stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: var(--space-4); box-shadow: var(--shadow); }
@@ -126,6 +131,26 @@ document.getElementById('discordCopyBtn').addEventListener('click', () => {
   copyWithFeedback(document.getElementById('discordCopyBtn'), formatRecapForDiscord());
 });
 
+// Same per-stat formatting formatRecapForDiscord uses, just scoped to one section -- for sharing
+// a single category (e.g. just Career Earnings) without pasting the whole recap.
+function formatSectionForDiscord(section) {
+  const lines = [`**${section.title}**`];
+  for (const stat of section.stats) {
+    lines.push(`  ${stat.label}: **${stat.value}**${stat.sub ? ` (${stat.sub})` : ''}`);
+  }
+  return lines.join('\n');
+}
+// Delegated rather than bound per-button: the section list is rebuilt from DATA.sections below,
+// so binding individual listeners would mean rebinding every time; one listener on the
+// already-static #sections container works regardless of how many sections render.
+document.getElementById('sections').addEventListener('click', e => {
+  const btn = e.target.closest('.copy-btn-small');
+  if (!btn) return;
+  const section = DATA.sections[Number(btn.dataset.sectionIndex)];
+  if (!section) return;
+  copyWithFeedback(btn, formatSectionForDiscord(section));
+});
+
 const totalStats = DATA.sections.reduce((n, s) => n + s.stats.length, 0);
 document.getElementById('subtitle').textContent =
   `Generated ${DATA.generatedAt} — ${totalStats} stats across ${DATA.sections.length} categories, computed from your whole journal history.`;
@@ -135,9 +160,12 @@ document.getElementById('highlights').innerHTML = DATA.highlights
   .join('');
 
 document.getElementById('sections').innerHTML = DATA.sections.length
-  ? DATA.sections.map(section => `
+  ? DATA.sections.map((section, i) => `
     <div class="section">
-      <div class="section-title">${escapeHtml(section.title)}</div>
+      <div class="section-title">
+        <span>${escapeHtml(section.title)}</span>
+        <button class="copy-btn-small" type="button" data-section-index="${i}">💬 Copy</button>
+      </div>
       <div class="stat-grid">
         ${section.stats.map(stat => `
           <div class="stat-card">
