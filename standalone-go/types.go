@@ -48,20 +48,21 @@ type Planet struct {
 	ParentStarBodyID *int
 	BarycenterIDs    []int // set instead of ParentStarBodyID for circumbinary bodies -- orbits
 	// the shared center of two+ stars, not any single one of them (see parentAncestry in parse.go)
-	TerraformState string
-	Atmosphere     string
-	Gravity        float64
-	Temp           float64
-	Pressure       float64
-	Discovered     bool
-	WasDiscovered  *bool
-	Mapped         bool
-	WasMapped      *bool
-	Efficient      bool
-	WasFootfalled  *bool
-	BioSignalCount int
-	Flora          map[string]*FloraScan // keyed by genus+"|"+species
-	UpdatedAt      string
+	OrbitsPlanetBodyID *int // set when this body's closest real Parents entry is another Planet, not a Star -- a moon, orbiting a planet rather than the primary directly (see orbitsPlanet in parse.go)
+	TerraformState     string
+	Atmosphere         string
+	Gravity            float64
+	Temp               float64
+	Pressure           float64
+	Discovered         bool
+	WasDiscovered      *bool
+	Mapped             bool
+	WasMapped          *bool
+	Efficient          bool
+	WasFootfalled      *bool
+	BioSignalCount     int
+	Flora              map[string]*FloraScan // keyed by genus+"|"+species
+	UpdatedAt          string
 }
 
 type FloraScan struct {

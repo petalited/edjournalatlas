@@ -39,6 +39,21 @@ type factionKillBondEvent struct {
 	VictimFaction string `json:"VictimFaction"`
 }
 
+// RedeemVoucher.Amount is the ACTUAL money credited (net of any broker fee, per the journal
+// manual) at the moment of redemption -- confirmed real vs. Bounty/FactionKillBond, which only
+// record a voucher being EARNED, not collected (real vouchers are lost entirely if the ship is
+// destroyed before redeeming). Type casing is confirmed inconsistent in real data ("bounty",
+// "trade" lowercase; "CombatBond" camelCase in the same commander's own journal), so matched
+// case-insensitively rather than assuming one casing convention.
+type redeemVoucherEvent struct {
+	Type   string `json:"Type"`
+	Amount int64  `json:"Amount"`
+}
+
+type missionCompletedEvent struct {
+	Reward int64 `json:"Reward"`
+}
+
 // KillerName isn't always a real name -- confirmed against real data (a third-party tester's own
 // journal, not this project's own): an NPC with no distinct personal identity (a generic
 // Federation Navy patrol ship, not a named pilot) has KillerName as a raw, unresolved
@@ -489,8 +504,13 @@ func BuildRecap(store *Store) recapData {
 		shipsPurchased int
 		totalShipSpend int64
 
-		missionsCompleted int
-		missionsAccepted  int
+		missionsCompleted  int
+		missionsAccepted   int
+		totalMissionReward int64
+
+		voucherBountyBonds int64 // RedeemVoucher Type "bounty"/"CombatBond" -- real credited money, see BuildRecap's Career Earnings comment for why this isn't the same as Combat's "Bounty"/"FactionKillBond" earned-but-not-yet-collected totals
+		voucherTrade       int64 // RedeemVoucher Type "trade" -- a real, separate mechanic from direct MarketSell
+		voucherOther       int64 // RedeemVoucher Type "settlement"/"scannable" -- rare, real if present
 
 		fsdJumps            int
 		totalLightYears     float64
@@ -687,8 +707,24 @@ func BuildRecap(store *Store) recapData {
 			}
 		case "MissionCompleted":
 			missionsCompleted++
+			var v missionCompletedEvent
+			if json.Unmarshal([]byte(e.Raw), &v) == nil {
+				totalMissionReward += v.Reward
+			}
 		case "MissionAccepted":
 			missionsAccepted++
+		case "RedeemVoucher":
+			var v redeemVoucherEvent
+			if json.Unmarshal([]byte(e.Raw), &v) == nil {
+				switch strings.ToLower(v.Type) {
+				case "bounty", "combatbond":
+					voucherBountyBonds += v.Amount
+				case "trade":
+					voucherTrade += v.Amount
+				default: // "settlement", "scannable", or anything future/unrecognized -- still real money, not dropped
+					voucherOther += v.Amount
+				}
+			}
 		case "CommitCrime":
 			var v commitCrimeEvent
 			if json.Unmarshal([]byte(e.Raw), &v) == nil {
@@ -940,10 +976,54 @@ func BuildRecap(store *Store) recapData {
 	// Same value formula the main viewer uses (ComputeFloraValues, reconcile.go) -- sold+unclaimed,
 	// excluding lost, matching viewer.go's own bioValue aggregation exactly.
 	var bioValue int64
+	var bioSoldValue int64 // subset of bioValue that's actually been sold -- real money received, for Career Earnings below (bioValue itself includes still-unsold/unclaimed data, which isn't money yet)
 	for _, fv := range ComputeFloraValues(store) {
 		if fv.HasValue && !fv.Lost {
 			bioValue += fv.Value
+			if fv.Sold {
+				bioSoldValue += fv.Value
+			}
 		}
+	}
+
+	// "Cumulative money made" (owner: "i think thats important") -- deliberately NOT just
+	// totalCombatEarnings (Bounty/FactionKillBond) added to everything else: those two only
+	// record a voucher being EARNED, not real credited money -- confirmed real per the journal
+	// manual and cross-checked against this project's own commander's data, where redeemed
+	// voucher totals didn't line up with raw earned totals (vouchers are lost entirely if the
+	// ship's destroyed before reaching a station to redeem them). Using RedeemVoucher's Amount
+	// instead avoids double-counting the same kill's bounty at both the earn and collect points,
+	// and doesn't overcount vouchers that were earned but never actually collected. Every other
+	// category here (trade, exploration, exobiology, missions) credits instantly with no
+	// redemption step, so those ARE safe to use as-is from what's already tracked elsewhere in
+	// this function. Deliberately excludes asset liquidation (selling ships/modules/drones back)
+	// -- that's recovering value from something already owned, not new income.
+	if voucherBountyBonds > 0 || voucherTrade > 0 || voucherOther > 0 || totalTradeProfit > 0 ||
+		explorationEarnings > 0 || bioSoldValue > 0 || totalMissionReward > 0 {
+		cumulativeMoney := voucherBountyBonds + voucherTrade + voucherOther + totalTradeProfit +
+			explorationEarnings + bioSoldValue + totalMissionReward
+		earningsStats := []recapStat{
+			{Label: "Cumulative money made", Value: formatCr(cumulativeMoney), Sub: "bounties/bonds, trading, exploration, exobiology, and mission rewards actually collected"},
+		}
+		if voucherBountyBonds > 0 {
+			earningsStats = append(earningsStats, recapStat{Label: "Bounties & combat bonds collected", Value: formatCr(voucherBountyBonds)})
+		}
+		if totalTradeProfit+voucherTrade > 0 {
+			earningsStats = append(earningsStats, recapStat{Label: "Trading profit", Value: formatCr(totalTradeProfit + voucherTrade)})
+		}
+		if explorationEarnings > 0 {
+			earningsStats = append(earningsStats, recapStat{Label: "Exploration & Cartographics", Value: formatCr(explorationEarnings)})
+		}
+		if bioSoldValue > 0 {
+			earningsStats = append(earningsStats, recapStat{Label: "Exobiology sales", Value: formatCr(bioSoldValue)})
+		}
+		if totalMissionReward > 0 {
+			earningsStats = append(earningsStats, recapStat{Label: "Mission rewards", Value: formatCr(totalMissionReward)})
+		}
+		if voucherOther > 0 {
+			earningsStats = append(earningsStats, recapStat{Label: "Other vouchers redeemed", Value: formatCr(voucherOther), Sub: "settlement/scannable"})
+		}
+		sections = append(sections, recapSection{Title: "Career Earnings", Stats: earningsStats})
 	}
 
 	explorationStats := []recapStat{

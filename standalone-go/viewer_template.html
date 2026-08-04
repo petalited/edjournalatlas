@@ -353,7 +353,8 @@ function bodyDesignator(b, systemName) {
   return suffix || b.name;
 }
 function bodyNameBit(b, systemName) {
-  const nameBit = `${bodyEmoji(b)} ${bodyDesignator(b, systemName)}`;
+  const typeBit = b.type ? `${b.type} ` : '';
+  const nameBit = `${bodyEmoji(b)} ${typeBit}${bodyDesignator(b, systemName)}`;
   return b.notableLabel ? `${nameBit} — ✨ ${b.notableLabel}` : nameBit;
 }
 
@@ -361,6 +362,33 @@ function bodyNameBit(b, systemName) {
 // comfortably under that so nothing gets cut off mid-line, and leave headroom for the
 // "+N more" line itself.
 const DISCORD_CHAR_BUDGET = 1800;
+
+// Moons (b.isMoon -- orbit a planet directly, not the system's primary) get Discord's small/
+// muted "subtext" line style plus a tree-drawing connector instead of the plain two-space indent
+// every other body gets, so the list itself reads as a tree (planet, then its moons hanging off
+// it) instead of one flat list. Discord's `-#` subtext marker has to be the literal first
+// characters of the line -- no leading whitespace before it (confirmed: it and header markdown
+// both only trigger when they open the line) -- so the "offset to the right" has to come from
+// the connector itself (plus the space after it) rather than leading spaces before `-#`.
+//
+// Real tree semantics, not the same glyph for every moon: `├─` for every moon except the last
+// one sharing a given parent planet (b.orbitsBodyId), `└─` to cap off that last one -- matches
+// how a normal file-tree view distinguishes "more siblings follow" from "this branch is done".
+// lastMoonIndexByParent maps each parent BodyID to the LIST INDEX of its last moon (bodies stay
+// in the existing distance-from-star order, not regrouped by parent, so this is a lookup against
+// that existing order rather than a real grouping pass).
+function lastMoonIndexByParent(bodies) {
+  const m = new Map();
+  bodies.forEach((b, i) => {
+    if (b.isMoon && b.orbitsBodyId != null) m.set(b.orbitsBodyId, i);
+  });
+  return m;
+}
+function bodyLinePrefix(b, index, lastMoonIndex) {
+  if (!b.isMoon) return '  ';
+  const isLast = b.orbitsBodyId == null || lastMoonIndex.get(b.orbitsBodyId) === index;
+  return isLast ? '-# └─ ' : '-# ├─ ';
+}
 
 // Appends a "**Bodies:**" section listing every body passed in (one line each, via
 // bodyDesignator/bodyNameBit to keep lines short), until the running total gets close to
@@ -371,9 +399,11 @@ const DISCORD_CHAR_BUDGET = 1800;
 function appendBodyLines(lines, bodies, lineForBody) {
   if (!bodies.length) return;
   lines.push('', '**Bodies:**');
+  const lastMoonIndex = lastMoonIndexByParent(bodies);
   let shown = 0;
-  for (const b of bodies) {
-    const line = '  ' + lineForBody(b);
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i];
+    const line = bodyLinePrefix(b, i, lastMoonIndex) + lineForBody(b);
     const budgetUsed = lines.join('\n').length;
     if (shown > 0 && budgetUsed + line.length + 1 > DISCORD_CHAR_BUDGET - 24) break;
     lines.push(line);

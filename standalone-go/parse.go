@@ -418,6 +418,7 @@ func (p *Parser) onScan(e *scanEntry, timestamp string) {
 			pl.Distance = *e.DistanceFromArrivalLS
 		}
 		pl.ParentStarBodyID, pl.BarycenterIDs = parentAncestry(e.Parents)
+		pl.OrbitsPlanetBodyID = orbitsPlanet(e.Parents)
 		pl.TerraformState = e.TerraformState
 		pl.Atmosphere = e.AtmosphereType
 		if e.SurfaceGravity != nil {
@@ -464,6 +465,22 @@ func (p *Parser) onScan(e *scanEntry, timestamp string) {
 // pass through the same outer node as a third, unrelated star -- accepted as a rare edge case
 // with no real example confirmed in this project's data, versus the near-certain false negative
 // of the single-nearest-barycenter approach on any real binary.
+// orbitsPlanet: `Parents` is closest-first (see parentAncestry above), so a body whose very
+// first ancestor entry is a "Planet" (not a "Star" or a barycenter "Null") is a moon orbiting
+// that planet directly, not the system's primary. Real moon chains have no Null entries at all
+// (that's specifically a circumbinary-star thing, a separate concern from parentAncestry) --
+// checking only parents[0] is enough, no need to search the whole chain.
+func orbitsPlanet(parents []map[string]int) *int {
+	if len(parents) == 0 {
+		return nil
+	}
+	if id, ok := parents[0]["Planet"]; ok {
+		v := id
+		return &v
+	}
+	return nil
+}
+
 func parentAncestry(parents []map[string]int) (starID *int, barycenterIDs []int) {
 	for _, entry := range parents {
 		if id, ok := entry["Star"]; ok {

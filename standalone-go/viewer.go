@@ -67,6 +67,8 @@ type viewerBody struct {
 	Mass           float64       `json:"mass"`
 	Distance       float64       `json:"distance"`
 	ParentStars    []string      `json:"parentStars"`
+	IsMoon         bool          `json:"isMoon"`                 // orbits another planet directly (see Planet.OrbitsPlanetBodyID, parse.go), not the primary
+	OrbitsBodyID   *int          `json:"orbitsBodyId,omitempty"` // the parent planet's raw BodyID, same value as IsMoon is derived from -- exposed so the client can group sibling moons under the same parent to tell the last one apart (tree connector: "├─" vs "└─")
 	Terraformable  bool          `json:"terraformable"`
 	TerraformState string        `json:"terraformState,omitempty"`
 	Atmosphere     string        `json:"atmosphere,omitempty"`
@@ -195,7 +197,7 @@ func Render(store *Store) (string, int, error) {
 			}
 			bodies = append(bodies, viewerBody{
 				Name: pl.Name, Type: pl.Type, Landable: pl.Landable, Mass: pl.Mass,
-				Distance: pl.Distance, ParentStars: parentStars,
+				Distance: pl.Distance, ParentStars: parentStars, IsMoon: pl.OrbitsPlanetBodyID != nil, OrbitsBodyID: pl.OrbitsPlanetBodyID,
 				Terraformable:  pl.TerraformState == "Terraformable" || pl.TerraformState == "Terraforming" || pl.TerraformState == "Terraformed",
 				TerraformState: pl.TerraformState, Atmosphere: pl.Atmosphere,
 				Gravity: pl.Gravity, Temp: pl.Temp, Pressure: pl.Pressure,
