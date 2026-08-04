@@ -65,6 +65,24 @@ input[type=text], select { background: var(--bg); border: 1px solid var(--border
 .material-usage-detail { margin-top: 4px; font-size: 0.72rem; color: var(--muted); }
 .empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center; }
 .empty-note-icon { font-size: 1.6rem; margin-bottom: var(--space-2); opacity: 0.7; }
+.view-toggle { display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 3px; }
+.view-toggle-btn { font: inherit; font-size: 0.82rem; color: var(--muted); background: transparent; border: none;
+  padding: 5px 12px; border-radius: var(--radius-pill); cursor: pointer; transition: background var(--transition), color var(--transition); }
+.view-toggle-btn:hover { color: var(--text); }
+.view-toggle-active, .view-toggle-active:hover { background: var(--panel); color: var(--accent); font-weight: 600; box-shadow: var(--shadow); }
+.grid-families { display: flex; flex-direction: column; gap: var(--space-3); }
+.grid-family { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3); box-shadow: var(--shadow); }
+.grid-family-name { font-weight: 600; font-size: 0.85rem; margin-bottom: var(--space-2); color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.03em; }
+.grid-family-cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--space-2); }
+.grid-cell { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2); }
+.grid-cell-held { background: var(--accent-weak); border-color: var(--accent); }
+.grid-cell-empty { opacity: 0.5; }
+.grid-cell-grade { font-size: 0.65rem; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }
+.grid-cell-name { font-size: 0.82rem; font-weight: 600; margin-top: 1px; }
+.grid-cell-count { font-size: 0.95rem; font-weight: 700; margin-top: 2px; }
+.grid-cell-usage { font-size: 0.68rem; color: var(--notable-text); margin-top: 3px; }
 a:focus-visible, input:focus-visible, select:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm);
 }
@@ -85,8 +103,12 @@ a:focus-visible, input:focus-visible, select:focus-visible {
 <div class="cards" id="summaryCards"></div>
 
 <div class="controls" id="controlsBar" style="display:none">
-  <input type="text" id="filterInput" placeholder="Search materials...">
-  <select id="sortSelect">
+  <div class="view-toggle" id="viewToggle">
+    <button type="button" class="view-toggle-btn view-toggle-active" data-mode="grid">🗂️ Grid (in-game families)</button>
+    <button type="button" class="view-toggle-btn" data-mode="list">📋 List (sortable)</button>
+  </div>
+  <input type="text" id="filterInput" placeholder="Search materials..." style="display:none">
+  <select id="sortSelect" style="display:none">
     <option value="count">Sort by amount held</option>
     <option value="name">Sort alphabetically</option>
     <option value="grade">Sort by grade (highest first)</option>
@@ -109,6 +131,7 @@ document.getElementById('subtitle').textContent = DATA.hasSnapshot
 
 let filterText = '';
 let sortKey = 'count';
+let viewMode = 'grid';
 
 const CATEGORIES = [
   { key: 'raw', title: 'Raw', sub: 'Elements mined/scooped from planetary surfaces and asteroids' },
@@ -153,13 +176,7 @@ function materialCard(m) {
   </div>`;
 }
 
-function render() {
-  if (!DATA.hasSnapshot) {
-    document.getElementById('sections').innerHTML =
-      `<div class="empty-note"><div class="empty-note-icon">🧪</div>No materials inventory captured yet -- open your in-game Materials screen (or just play a session; it syncs automatically on login), then run this tool again.</div>`;
-    return;
-  }
-
+function renderList() {
   const sections = CATEGORIES.map(cat => {
     const list = filteredSorted(DATA[cat.key]);
     const totalTypes = DATA[cat.key].length;
@@ -179,6 +196,68 @@ function render() {
   }).join('');
 
   document.getElementById('sections').innerHTML = sections;
+}
+
+function gridCell(cell) {
+  const usage = cell.usage
+    ? `<div class="grid-cell-usage" title="Total consumed across your real engineering history">🔧 ${cell.usage.totalUsed.toLocaleString('en-US')}x</div>`
+    : '';
+  return `<div class="grid-cell ${cell.held ? 'grid-cell-held' : 'grid-cell-empty'}">
+    <div class="grid-cell-grade">Grade ${cell.grade}</div>
+    <div class="grid-cell-name">${escapeHtml(cell.name)}</div>
+    <div class="grid-cell-count">${cell.held ? cell.count.toLocaleString('en-US') : '—'}</div>
+    ${usage}
+  </div>`;
+}
+
+function gridFamilyRow(fam) {
+  return `<div class="grid-family">
+    <div class="grid-family-name">${escapeHtml(fam.name)}</div>
+    <div class="grid-family-cells">${fam.cells.map(gridCell).join('')}</div>
+  </div>`;
+}
+
+// The grid groups materials into the same named families (Capacitors, Encoded Firmware,
+// "Category 1"-"Category 7" for Raw, ...) the game itself uses for Material Trader trade lines
+// and the community reference data this project's grades come from -- one column per grade,
+// filled in with what you actually hold, empty where you don't, so it shows the real shape of
+// each family rather than just a flat pile of whatever's currently in the inventory.
+function renderGrid() {
+  const familySections = CATEGORIES.map(cat => {
+    const families = DATA.grid[cat.key] || [];
+    if (!families.length) return '';
+    const held = families.reduce((s, f) => s + f.cells.filter(c => c.held).length, 0);
+    const total = families.reduce((s, f) => s + f.cells.length, 0);
+    return `<div class="section-block">
+      <div class="section-title">${cat.title}
+        <span class="section-sub">${cat.sub} -- ${held} of ${total} grades held</span>
+      </div>
+      <div class="grid-families">${families.map(gridFamilyRow).join('')}</div>
+    </div>`;
+  }).join('');
+
+  // Guardian/Thargoid/Unknown-* materials don't belong to a named family -- shown separately
+  // rather than silently dropped from the grid view.
+  const otherItems = CATEGORIES.flatMap(cat => DATA[cat.key].filter(m => !m.family));
+  const otherSection = otherItems.length ? `<div class="section-block">
+      <div class="section-title">Other <span class="section-sub">Guardian / Thargoid / not part of a named family</span></div>
+      <div class="material-grid">${otherItems.map(materialCard).join('')}</div>
+    </div>` : '';
+
+  document.getElementById('sections').innerHTML = familySections + otherSection;
+}
+
+function render() {
+  if (!DATA.hasSnapshot) {
+    document.getElementById('sections').innerHTML =
+      `<div class="empty-note"><div class="empty-note-icon">🧪</div>No materials inventory captured yet -- open your in-game Materials screen (or just play a session; it syncs automatically on login), then run this tool again.</div>`;
+    return;
+  }
+  if (viewMode === 'list') {
+    renderList();
+  } else {
+    renderGrid();
+  }
 }
 
 function renderSummary() {
@@ -205,6 +284,15 @@ function renderSummary() {
 
 document.getElementById('filterInput').addEventListener('input', e => { filterText = e.target.value; render(); });
 document.getElementById('sortSelect').addEventListener('change', e => { sortKey = e.target.value; render(); });
+document.getElementById('viewToggle').addEventListener('click', e => {
+  const btn = e.target.closest('.view-toggle-btn');
+  if (!btn) return;
+  viewMode = btn.dataset.mode;
+  document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.toggle('view-toggle-active', b === btn));
+  document.getElementById('filterInput').style.display = viewMode === 'list' ? '' : 'none';
+  document.getElementById('sortSelect').style.display = viewMode === 'list' ? '' : 'none';
+  render();
+});
 
 renderSummary();
 render();

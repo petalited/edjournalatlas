@@ -69,6 +69,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	// RawEvents is append-only, in file-processing order for THIS run -- not necessarily true
+	// chronological order overall. Importing an old commander's journals (e.g. from another PC)
+	// after already having parsed newer ones appends that old journal's events at the END of the
+	// slice, even though their real in-game timestamps are much earlier. Every event already
+	// carries its own real timestamp straight from the journal line itself (not derived from the
+	// filename or any file metadata), so re-sort on that directly -- stable, so events that
+	// share the same one-second timestamp resolution keep their real relative order.
+	sort.SliceStable(store.RawEvents, func(i, j int) bool {
+		return store.RawEvents[i].Timestamp < store.RawEvents[j].Timestamp
+	})
+
 	if filesTouched == 0 {
 		// "Up to date" implies there WAS a previous successful parse -- misleading the first time
 		// this runs against a folder that genuinely has no Journal.*.log files in it yet (e.g. a

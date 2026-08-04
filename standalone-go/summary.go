@@ -761,9 +761,9 @@ func BuildRecap(store *Store) recapData {
 		case "Powerplay":
 			var v powerplayEvent
 			if json.Unmarshal([]byte(e.Raw), &v) == nil && v.Power != "" {
-				pledgedPower = v.Power
 				if latestPPTimestamp == "" || e.Timestamp >= latestPPTimestamp {
 					latestPPTimestamp = e.Timestamp
+					pledgedPower = v.Power
 					currentPPRank = v.Rank
 					currentPPMerits = v.Merits
 					currentPPTimePledged = v.TimePledged
@@ -775,9 +775,9 @@ func BuildRecap(store *Store) recapData {
 			// whichever of the two events is more recent, not just the last "Powerplay" seen.
 			var v powerplayRankEvent
 			if json.Unmarshal([]byte(e.Raw), &v) == nil && v.Power != "" {
-				pledgedPower = v.Power
 				if latestPPTimestamp == "" || e.Timestamp >= latestPPTimestamp {
 					latestPPTimestamp = e.Timestamp
+					pledgedPower = v.Power
 					currentPPRank = v.Rank
 				}
 			}

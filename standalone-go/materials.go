@@ -62,10 +62,34 @@ type engineeringUsage struct {
 }
 
 type materialOut struct {
+	Name   string            `json:"name"`
+	Grade  int               `json:"grade,omitempty"`
+	Family string            `json:"family,omitempty"` // "" means not part of a named family -- Guardian/Thargoid/Unknown-* materials, see materialgrades.go
+	Count  int64             `json:"count"`
+	Usage  *engineeringUsage `json:"usage,omitempty"`
+}
+
+// gridCellOut is one family/grade slot in the in-game-style grid view -- always present for
+// every real grade 1-N slot in a family regardless of whether the commander currently holds it,
+// so the grid shows the true shape of the family (what's held, what's missing), not just a list
+// of what happens to be in the inventory right now.
+type gridCellOut struct {
+	Grade int               `json:"grade"`
 	Name  string            `json:"name"`
-	Grade int               `json:"grade,omitempty"`
 	Count int64             `json:"count"`
+	Held  bool              `json:"held"`
 	Usage *engineeringUsage `json:"usage,omitempty"`
+}
+
+type gridFamilyOut struct {
+	Name  string        `json:"name"`
+	Cells []gridCellOut `json:"cells"`
+}
+
+type materialsGrid struct {
+	Raw          []gridFamilyOut `json:"raw"`
+	Manufactured []gridFamilyOut `json:"manufactured"`
+	Encoded      []gridFamilyOut `json:"encoded"`
 }
 
 type materialsData struct {
@@ -75,6 +99,7 @@ type materialsData struct {
 	Raw          []materialOut `json:"raw"`
 	Manufactured []materialOut `json:"manufactured"`
 	Encoded      []materialOut `json:"encoded"`
+	Grid         materialsGrid `json:"grid"`
 }
 
 // latestMaterialsSnapshot scans every RawEvent for "Materials" and keeps whichever has the
@@ -172,7 +197,7 @@ func toMaterialOut(entries []materialEntry, usage map[string]*engineeringUsage) 
 		if name == "" {
 			name = prettifyKeyStandalone(m.Name) // confirmed real: Raw entries never carry Name_Localised
 		}
-		mo := materialOut{Name: name, Grade: materialGrade(m.Name), Count: m.Count}
+		mo := materialOut{Name: name, Grade: materialGrade(m.Name), Family: materialFamily(m.Name), Count: m.Count}
 		if u, ok := usage[name]; ok {
 			mo.Usage = u
 		}
@@ -180,6 +205,60 @@ func toMaterialOut(entries []materialEntry, usage map[string]*engineeringUsage) 
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Count > out[j].Count })
 	return out
+}
+
+// indexEntriesByKey maps each entry's normalized internal Name to itself, for the grid builder's
+// "does the commander currently hold the material that belongs in this family/grade slot" lookup.
+func indexEntriesByKey(entries []materialEntry) map[string]materialEntry {
+	idx := make(map[string]materialEntry, len(entries))
+	for _, e := range entries {
+		idx[normalizeMaterialKey(e.Name)] = e
+	}
+	return idx
+}
+
+// buildMaterialGrid lays out every material this project knows the family/grade for (see
+// materialFamilyCatalog in materialgrades.go) into the same family-rows/grade-columns shape the
+// game and community tools organize them in -- filled in with real held counts where the
+// commander actually has the material, and left correctly empty (Held: false) where they don't,
+// so the grid shows the real shape of what's missing, not just what's already in the inventory.
+func buildMaterialGrid(snapshot materialsSnapshotEvent, usage map[string]*engineeringUsage) materialsGrid {
+	byType := map[string]map[string]materialEntry{
+		"raw":          indexEntriesByKey(snapshot.Raw),
+		"manufactured": indexEntriesByKey(snapshot.Manufactured),
+		"encoded":      indexEntriesByKey(snapshot.Encoded),
+	}
+
+	var grid materialsGrid
+	for _, fam := range materialFamilyCatalog {
+		owned := byType[fam.Type]
+		famOut := gridFamilyOut{Name: fam.Name, Cells: make([]gridCellOut, 0, len(fam.Slots))}
+		for i, slot := range fam.Slots {
+			name := slot.Display
+			cell := gridCellOut{Grade: i + 1}
+			if entry, ok := owned[slot.Key]; ok {
+				cell.Held = true
+				cell.Count = entry.Count
+				if entry.NameLocalised != "" {
+					name = entry.NameLocalised // real per-commander localisation, preferred over the vendored fallback
+				}
+			}
+			cell.Name = name
+			if u, ok := usage[name]; ok {
+				cell.Usage = u
+			}
+			famOut.Cells = append(famOut.Cells, cell)
+		}
+		switch fam.Type {
+		case "raw":
+			grid.Raw = append(grid.Raw, famOut)
+		case "manufactured":
+			grid.Manufactured = append(grid.Manufactured, famOut)
+		case "encoded":
+			grid.Encoded = append(grid.Encoded, famOut)
+		}
+	}
+	return grid
 }
 
 func BuildMaterialsData(store *Store) materialsData {
@@ -195,6 +274,7 @@ func BuildMaterialsData(store *Store) materialsData {
 		data.Raw = toMaterialOut(snapshot.Raw, usage)
 		data.Manufactured = toMaterialOut(snapshot.Manufactured, usage)
 		data.Encoded = toMaterialOut(snapshot.Encoded, usage)
+		data.Grid = buildMaterialGrid(snapshot, usage)
 	}
 	return data
 }

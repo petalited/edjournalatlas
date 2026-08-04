@@ -93,3 +93,159 @@ func normalizeMaterialKey(s string) string {
 func materialGrade(name string) int {
 	return materialGrades[normalizeMaterialKey(name)]
 }
+
+// Most materials aren't just "a pile of grade-N stuff" -- they're organized into named families
+// (Capacitors, Crystals, Encoded Firmware, ...), one material per grade 1-5 per family, and
+// that's a real in-game/community grouping, not an invented one: it's the same `category` column
+// already sitting right there in the vendored EDCD material.csv (see this file's header), and
+// it's confirmed to be exactly the grouping the game itself uses for Material Trader "trade
+// lines" (trading within the same family/category is what a Material Trader actually does) --
+// cross-checked against a second independent source (the Elite Dangerous wiki's Raw Materials
+// trade-line writeup), not just taken on the CSV's say-so.
+//
+// Raw materials are the one wrinkle: the CSV's `category` column for Raw is a bare number (1-7),
+// not a text name like Manufactured/Encoded get -- there IS no further official name for these
+// beyond "Category N" (confirmed against the same wiki source: "only referred to numerically"),
+// so "Category N" here is the real, complete name, not a placeholder standing in for one this
+// project couldn't find. Raw families hold 4 grades each (1-4), not 5 -- Raw materials simply
+// don't go to grade 5 in this game.
+//
+// The Guardian/Thargoid/Unknown-* materials (material.csv's `category` is literally "None" for
+// these) don't belong to any family at all -- they're excluded from this table entirely and
+// stay grade-only (materialGrades above already covers them), same as everything else that
+// isn't part of the grade-1-through-N ladder these families represent.
+type materialFamilySlot struct {
+	Key     string // normalized material key
+	Display string // vendored official name -- fallback only; the real per-commander Name_Localised is always preferred when the material is actually held
+}
+
+type materialFamilyDef struct {
+	Name  string // "Capacitors", "Encoded Firmware", "Category 1", etc -- real in-game/CSV names, not invented
+	Type  string // "raw", "manufactured", or "encoded" -- which inventory category this family belongs to
+	Slots []materialFamilySlot
+}
+
+var materialFamilyCatalog = []materialFamilyDef{
+	{Name: "Category 1", Type: "raw", Slots: []materialFamilySlot{
+		{"carbon", "Carbon"}, {"vanadium", "Vanadium"}, {"niobium", "Niobium"}, {"yttrium", "Yttrium"},
+	}},
+	{Name: "Category 2", Type: "raw", Slots: []materialFamilySlot{
+		{"phosphorus", "Phosphorus"}, {"chromium", "Chromium"}, {"molybdenum", "Molybdenum"}, {"technetium", "Technetium"},
+	}},
+	{Name: "Category 3", Type: "raw", Slots: []materialFamilySlot{
+		{"sulphur", "Sulphur"}, {"manganese", "Manganese"}, {"cadmium", "Cadmium"}, {"ruthenium", "Ruthenium"},
+	}},
+	{Name: "Category 4", Type: "raw", Slots: []materialFamilySlot{
+		{"iron", "Iron"}, {"zinc", "Zinc"}, {"tin", "Tin"}, {"selenium", "Selenium"},
+	}},
+	{Name: "Category 5", Type: "raw", Slots: []materialFamilySlot{
+		{"nickel", "Nickel"}, {"germanium", "Germanium"}, {"tungsten", "Tungsten"}, {"tellurium", "Tellurium"},
+	}},
+	{Name: "Category 6", Type: "raw", Slots: []materialFamilySlot{
+		{"rhenium", "Rhenium"}, {"arsenic", "Arsenic"}, {"mercury", "Mercury"}, {"polonium", "Polonium"},
+	}},
+	{Name: "Category 7", Type: "raw", Slots: []materialFamilySlot{
+		{"lead", "Lead"}, {"zirconium", "Zirconium"}, {"boron", "Boron"}, {"antimony", "Antimony"},
+	}},
+
+	{Name: "Capacitors", Type: "manufactured", Slots: []materialFamilySlot{
+		{"gridresistors", "Grid Resistors"}, {"hybridcapacitors", "Hybrid Capacitors"},
+		{"electrochemicalarrays", "Electrochemical Arrays"}, {"polymercapacitors", "Polymer Capacitors"},
+		{"militarysupercapacitors", "Military Supercapacitors"},
+	}},
+	{Name: "Crystals", Type: "manufactured", Slots: []materialFamilySlot{
+		{"crystalshards", "Crystal Shards"}, {"uncutfocuscrystals", "Flawed Focus Crystals"},
+		{"focuscrystals", "Focus Crystals"}, {"refinedfocuscrystals", "Refined Focus Crystals"},
+		{"exquisitefocuscrystals", "Exquisite Focus Crystals"},
+	}},
+	{Name: "Thermic", Type: "manufactured", Slots: []materialFamilySlot{
+		{"temperedalloys", "Tempered Alloys"}, {"heatresistantceramics", "Heat Resistant Ceramics"},
+		{"precipitatedalloys", "Precipitated Alloys"}, {"thermicalloys", "Thermic Alloys"},
+		{"militarygradealloys", "Military Grade Alloys"},
+	}},
+	{Name: "Conductive", Type: "manufactured", Slots: []materialFamilySlot{
+		{"basicconductors", "Basic Conductors"}, {"conductivecomponents", "Conductive Components"},
+		{"conductiveceramics", "Conductive Ceramics"}, {"conductivepolymers", "Conductive Polymers"},
+		{"biotechconductors", "Biotech Conductors"},
+	}},
+	{Name: "Mechanical Components", Type: "manufactured", Slots: []materialFamilySlot{
+		{"mechanicalscrap", "Mechanical Scrap"}, {"mechanicalequipment", "Mechanical Equipment"},
+		{"mechanicalcomponents", "Mechanical Components"}, {"configurablecomponents", "Configurable Components"},
+		{"improvisedcomponents", "Improvised Components"},
+	}},
+	{Name: "Heat", Type: "manufactured", Slots: []materialFamilySlot{
+		{"heatconductionwiring", "Heat Conduction Wiring"}, {"heatdispersionplate", "Heat Dispersion Plate"},
+		{"heatexchangers", "Heat Exchangers"}, {"heatvanes", "Heat Vanes"},
+		{"protoheatradiators", "Proto Heat Radiators"},
+	}},
+	{Name: "Shielding", Type: "manufactured", Slots: []materialFamilySlot{
+		{"wornshieldemitters", "Worn Shield Emitters"}, {"shieldemitters", "Shield Emitters"},
+		{"shieldingsensors", "Shielding Sensors"}, {"compoundshielding", "Compound Shielding"},
+		{"imperialshielding", "Imperial Shielding"},
+	}},
+	{Name: "Composite", Type: "manufactured", Slots: []materialFamilySlot{
+		{"compactcomposites", "Compact Composites"}, {"filamentcomposites", "Filament Composites"},
+		{"highdensitycomposites", "High Density Composites"}, {"fedproprietarycomposites", "Proprietary Composites"},
+		{"fedcorecomposites", "Core Dynamics Composites"},
+	}},
+	{Name: "Alloys", Type: "manufactured", Slots: []materialFamilySlot{
+		{"salvagedalloys", "Salvaged Alloys"}, {"galvanisingalloys", "Galvanising Alloys"},
+		{"phasealloys", "Phase Alloys"}, {"protolightalloys", "Proto Light Alloys"},
+		{"protoradiolicalloys", "Proto Radiolic Alloys"},
+	}},
+	{Name: "Chemical", Type: "manufactured", Slots: []materialFamilySlot{
+		{"chemicalstorageunits", "Chemical Storage Units"}, {"chemicalprocessors", "Chemical Processors"},
+		{"chemicaldistillery", "Chemical Distillery"}, {"chemicalmanipulators", "Chemical Manipulators"},
+		{"pharmaceuticalisolators", "Pharmaceutical Isolators"},
+	}},
+
+	{Name: "Encoded Firmware", Type: "encoded", Slots: []materialFamilySlot{
+		{"legacyfirmware", "Specialised Legacy Firmware"}, {"consumerfirmware", "Modified Consumer Firmware"},
+		{"industrialfirmware", "Cracked Industrial Firmware"}, {"securityfirmware", "Security Firmware Patch"},
+		{"embeddedfirmware", "Modified Embedded Firmware"},
+	}},
+	{Name: "Encryption Files", Type: "encoded", Slots: []materialFamilySlot{
+		{"encryptedfiles", "Unusual Encrypted Files"}, {"encryptioncodes", "Tagged Encryption Codes"},
+		{"symmetrickeys", "Open Symmetric Keys"}, {"encryptionarchives", "Atypical Encryption Archives"},
+		{"adaptiveencryptors", "Adaptive Encryptors Capture"},
+	}},
+	{Name: "Data Archives", Type: "encoded", Slots: []materialFamilySlot{
+		{"bulkscandata", "Anomalous Bulk Scan Data"}, {"scanarchives", "Unidentified Scan Archives"},
+		{"scandatabanks", "Classified Scan Databanks"}, {"encodedscandata", "Divergent Scan Data"},
+		{"classifiedscandata", "Classified Scan Fragment"},
+	}},
+	{Name: "Wake Scans", Type: "encoded", Slots: []materialFamilySlot{
+		{"disruptedwakeechoes", "Atypical Disrupted Wake Echoes"}, {"fsdtelemetry", "Anomalous FSD Telemetry"},
+		{"wakesolutions", "Strange Wake Solutions"}, {"hyperspacetrajectories", "Eccentric Hyperspace Trajectories"},
+		{"dataminedwake", "Datamined Wake Exceptions"},
+	}},
+	{Name: "Emission Data", Type: "encoded", Slots: []materialFamilySlot{
+		{"scrambledemissiondata", "Exceptional Scrambled Emission Data"}, {"archivedemissiondata", "Irregular Emission Data"},
+		{"emissiondata", "Unexpected Emission Data"}, {"decodedemissiondata", "Decoded Emission Data"},
+		{"compactemissionsdata", "Abnormal Compact Emissions Data"},
+	}},
+	{Name: "Shield Data", Type: "encoded", Slots: []materialFamilySlot{
+		{"shieldcyclerecordings", "Distorted Shield Cycle Recordings"}, {"shieldsoakanalysis", "Inconsistent Shield Soak Analysis"},
+		{"shielddensityreports", "Untypical Shield Scans"}, {"shieldpatternanalysis", "Aberrant Shield Pattern Analysis"},
+		{"shieldfrequencydata", "Peculiar Shield Frequency Data"},
+	}},
+}
+
+// materialFamilyByKey maps a normalized material key straight to its family name -- built once
+// from materialFamilyCatalog rather than hand-duplicated, so the two can never drift apart.
+var materialFamilyByKey = func() map[string]string {
+	m := map[string]string{}
+	for _, fam := range materialFamilyCatalog {
+		for _, slot := range fam.Slots {
+			m[slot.Key] = fam.Name
+		}
+	}
+	return m
+}()
+
+// materialFamily returns "" for anything not part of a named family (Guardian/Thargoid/Unknown
+// materials, or anything new enough to the game that this table hasn't been updated for yet) --
+// distinct from a real family name, same "0/empty means unknown" convention as materialGrade.
+func materialFamily(name string) string {
+	return materialFamilyByKey[normalizeMaterialKey(name)]
+}
