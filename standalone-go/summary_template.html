@@ -12,12 +12,14 @@
   --transition: 160ms ease;
   --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
   --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --bad-text: #c22f2f;
   --shadow: 0 1px 3px rgba(11,11,11,0.08), 0 1px 2px rgba(11,11,11,0.05);
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0d0d0d; --panel: #1a1a19; --text: #ffffff; --muted: #c3c2b7; --muted-faint: #898781;
     --border: #2c2c2a; --border-strong: #383835; --accent: #3987e5; --accent-weak: #182338;
+    --bad-text: #e66767;
     --shadow: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.35);
   }
 }
@@ -36,10 +38,12 @@ h1 { font-size: 1.6rem; margin: 0 0 2px; display: inline-block; }
   padding: 4px var(--space-4); font-size: 0.82rem; cursor: pointer; transition: background-color var(--transition); }
 .copy-btn:hover { background: color-mix(in srgb, var(--accent) 85%, black); }
 .copy-btn.copied { background: var(--accent); }
+.copy-btn.copy-failed { background: var(--bad-text); }
 .copy-btn-small { background: transparent; color: var(--muted); border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
   padding: 2px var(--space-3); font-size: 0.72rem; font-weight: 400; cursor: pointer; transition: background-color var(--transition), color var(--transition), border-color var(--transition); }
 .copy-btn-small:hover { color: var(--accent); border-color: var(--accent); }
 .copy-btn-small.copied { color: white; background: var(--accent); border-color: var(--accent); }
+.copy-btn-small.copy-failed { color: white; background: var(--bad-text); border-color: var(--bad-text); }
 .highlights { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
 .highlight { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4); box-shadow: var(--shadow); font-size: 0.9rem; }
@@ -83,28 +87,41 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// Real bug this fixed: execCommand('copy') needs the source element to actually have browser
+// FOCUS, not just a text selection, in enough real browsers that skipping ta.focus() here made
+// the fallback silently do nothing whenever the Clipboard API path also failed (e.g. opened as a
+// bare file:// page, where clipboard permission often isn't granted) -- while the UI still
+// unconditionally claimed success either way, so a real failure looked to the user like the
+// paste itself was broken/rejected rather than the copy never having happened at all. Now checks
+// execCommand's own success return value and reports the real outcome.
 function fallbackCopy(text) {
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.position = 'fixed';
   ta.style.left = '-9999px';
   document.body.appendChild(ta);
+  ta.focus();
   ta.select();
-  try { document.execCommand('copy'); } catch (e) { /* best effort */ }
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* best effort */ }
   document.body.removeChild(ta);
+  return ok;
 }
 function copyWithFeedback(btn, text) {
-  const showCopied = () => {
+  const showResult = ok => {
     const original = btn.textContent;
-    btn.textContent = '✓ Copied';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1200);
+    btn.textContent = ok ? '✓ Copied' : '✗ Failed';
+    btn.classList.add(ok ? 'copied' : 'copy-failed');
+    if (!ok) btn.title = 'Copy failed -- your browser blocked clipboard access. Select the text manually instead.';
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove(ok ? 'copied' : 'copy-failed');
+    }, ok ? 1200 : 2500);
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(showCopied, () => { fallbackCopy(text); showCopied(); });
+    navigator.clipboard.writeText(text).then(() => showResult(true), () => showResult(fallbackCopy(text)));
   } else {
-    fallbackCopy(text);
-    showCopied();
+    showResult(fallbackCopy(text));
   }
 }
 

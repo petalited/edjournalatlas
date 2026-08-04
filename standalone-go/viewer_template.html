@@ -167,6 +167,7 @@ td.num, th.num { text-align: right; }
   border-radius: var(--radius-sm); padding: 1px 5px; font-size: 0.8rem; line-height: 1.4; cursor: pointer; }
 .copy-btn:hover { color: var(--accent); border-color: var(--border); }
 .copy-btn.copied { color: var(--good); border-color: var(--good); }
+.copy-btn.copy-failed { color: var(--bad-text); border-color: var(--bad-text); }
 .ext-link { font-size: 0.78rem; color: var(--accent); text-decoration: none; border: 1px solid var(--border);
   border-radius: var(--radius-pill); padding: 2px var(--space-3); transition: border-color var(--transition); }
 .ext-link:hover { text-decoration: underline; border-color: var(--accent); }
@@ -300,28 +301,43 @@ function bodyEmoji(b) {
   return '🌑';
 }
 
+// Real bug this fixed (owner: "it wont paste into discord i think theres a character discord
+// rejects and it ignores the paste"): not a character problem at all -- execCommand('copy') needs
+// the source element to actually have browser FOCUS, not just a text selection, in enough real
+// browsers that skipping ta.focus() here made the fallback silently do nothing whenever the
+// Clipboard API path also failed (e.g. opened as a bare file:// page, where clipboard permission
+// often isn't granted) -- while the UI still unconditionally claimed "✓ Copied" either way. So
+// the paste looked "ignored" because the clipboard was never actually written to, not because of
+// any character in the text. Now actually checks execCommand's own success return value and
+// reports the real outcome instead of assuming success.
 function fallbackCopy(text) {
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.position = 'fixed';
   ta.style.left = '-9999px';
   document.body.appendChild(ta);
+  ta.focus();
   ta.select();
-  try { document.execCommand('copy'); } catch (e) { /* best effort */ }
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* best effort */ }
   document.body.removeChild(ta);
+  return ok;
 }
 function copyWithFeedback(btn, text) {
-  const showCopied = () => {
+  const showResult = ok => {
     const original = btn.textContent;
-    btn.textContent = '✓';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1200);
+    btn.textContent = ok ? '✓' : '✗';
+    btn.classList.add(ok ? 'copied' : 'copy-failed');
+    if (!ok) btn.title = 'Copy failed -- your browser blocked clipboard access. Select the text manually instead.';
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove(ok ? 'copied' : 'copy-failed');
+    }, ok ? 1200 : 2500);
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(showCopied, () => { fallbackCopy(text); showCopied(); });
+    navigator.clipboard.writeText(text).then(() => showResult(true), () => showResult(fallbackCopy(text)));
   } else {
-    fallbackCopy(text);
-    showCopied();
+    showResult(fallbackCopy(text));
   }
 }
 function copyBtn(name) {
@@ -368,8 +384,17 @@ const DISCORD_CHAR_BUDGET = 1800;
 // every other body gets, so the list itself reads as a tree (planet, then its moons hanging off
 // it) instead of one flat list. Discord's `-#` subtext marker has to be the literal first
 // characters of the line -- no leading whitespace before it (confirmed: it and header markdown
-// both only trigger when they open the line) -- so the "offset to the right" has to come from
-// the connector itself rather than leading spaces before `-#`.
+// both only trigger when they open the line).
+//
+// Tried a non-breaking space (U+00A0) here to force a visible offset, since Discord collapses
+// plain leading spaces -- REVERTED. Real-world testing on Discord's actual desktop client found
+// that a message containing "-# " immediately followed by NBSP pastes as blank and then crashes
+// the client on send. Confirmed it wasn't a fluke: pasting the same clipboard content into a
+// plain text editor first, then copying THAT and pasting into Discord, works fine -- meaning an
+// intermediate plain-text app was silently normalizing the NBSP away, and Discord's own paste
+// handler chokes on it directly. Not worth the crash risk for a cosmetic offset, so this is back
+// to a plain space -- Discord will collapse it (no visible offset), but the connector glyph
+// itself plus the muted subtext styling is still a real, safe visual distinction on its own.
 //
 // Real tree semantics, not the same glyph for every moon: `├` for every moon except the last one
 // sharing a given parent planet (b.orbitsBodyId), `└` to cap off that last one -- matches how a
@@ -390,7 +415,7 @@ function lastMoonIndexByParent(bodies) {
 function bodyLinePrefix(b, index, lastMoonIndex) {
   if (!b.isMoon) return '  ';
   const isLast = b.orbitsBodyId == null || lastMoonIndex.get(b.orbitsBodyId) === index;
-  return isLast ? '-# └ ' : '-# ├ ';
+  return '-# ' + (isLast ? '└' : '├') + ' ';
 }
 
 // Appends a "**Bodies:**" section listing every body passed in (one line each, via

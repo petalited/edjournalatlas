@@ -85,6 +85,7 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 .engineer-chip-clickable { cursor: pointer; transition: background var(--transition), color var(--transition), border-color var(--transition); }
 .engineer-chip-clickable:hover { border-color: var(--accent); color: var(--accent); }
 .engineer-chip-copied, .engineer-chip-copied:hover { border-color: var(--accent); color: #fff; background: var(--accent); }
+.engineer-chip-copy-failed, .engineer-chip-copy-failed:hover { border-color: var(--warning); color: #fff; background: var(--warning); }
 .blocked-note { font-size: 0.78rem; color: var(--warning); margin-top: var(--space-2); }
 .empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center; }
 .empty-note-icon { font-size: 1.6rem; margin-bottom: var(--space-2); opacity: 0.7; }
@@ -342,9 +343,16 @@ function engineerChip(e) {
 // Copies via the modern Clipboard API when available, falling back to the classic hidden-
 // textarea + execCommand trick -- this page can be opened directly as a file:// document (no
 // server, no HTTPS), where navigator.clipboard isn't guaranteed to be available.
+//
+// Real bug this fixed: execCommand('copy') needs the source element to actually have browser
+// FOCUS, not just a text selection, in enough real browsers that skipping ta.focus() here made
+// the fallback silently do nothing whenever the Clipboard API path also failed -- while the UI
+// still unconditionally claimed success either way, so a real failure looked like a broken/
+// rejected paste rather than the copy never having happened. Now resolves to whether it actually
+// worked, and the caller reports the real outcome.
 function copyToClipboard(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    return navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
+    return navigator.clipboard.writeText(text).then(() => true, () => legacyCopy(text));
   }
   return Promise.resolve(legacyCopy(text));
 }
@@ -354,9 +362,12 @@ function legacyCopy(text) {
   ta.style.position = 'fixed';
   ta.style.opacity = '0';
   document.body.appendChild(ta);
+  ta.focus();
   ta.select();
-  try { document.execCommand('copy'); } catch (e) { /* best effort */ }
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* best effort */ }
   document.body.removeChild(ta);
+  return ok;
 }
 
 document.getElementById('planSections').addEventListener('click', e => {
@@ -364,13 +375,14 @@ document.getElementById('planSections').addEventListener('click', e => {
   if (!chip) return;
   const system = chip.dataset.system;
   const label = chip.dataset.label;
-  copyToClipboard(system).then(() => {
-    chip.textContent = `Copied "${system}"`;
-    chip.classList.add('engineer-chip-copied');
+  copyToClipboard(system).then(ok => {
+    chip.textContent = ok ? `Copied "${system}"` : 'Copy failed';
+    chip.classList.add(ok ? 'engineer-chip-copied' : 'engineer-chip-copy-failed');
+    if (!ok) chip.title = 'Copy failed -- your browser blocked clipboard access. Select the text manually instead.';
     setTimeout(() => {
       chip.textContent = label;
-      chip.classList.remove('engineer-chip-copied');
-    }, 1400);
+      chip.classList.remove(ok ? 'engineer-chip-copied' : 'engineer-chip-copy-failed');
+    }, ok ? 1400 : 2500);
   });
 });
 
