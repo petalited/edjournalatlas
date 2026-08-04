@@ -300,22 +300,41 @@ func topByValue(m map[string]*nameCount, n int) []*nameCount {
 	return list
 }
 
-// Pilots Federation rank ladders (9 levels, 0-8) plus the two superpower Navy ladders (15 levels,
-// 0-14). These titles are NOT present anywhere in the journal itself -- Rank/Promotion only ever
-// give the numeric level -- so unlike everything else in this file, they can't be grounded
-// against this commander's own data. Sourced and cross-checked against multiple independent
-// community references (elite-dangerous.fandom.com, the Player Journal manual appendix, and
-// direct confirmation of the Exobiologist ladder via real player discussion threads using these
-// exact title names) rather than a single source, the same "vendored community reference data"
-// category as vendor/value_table.json's species values -- not runtime-fetched, not guaranteed to
-// never drift from a future in-game rebalance, but the best available offline ground truth.
+// Pilots Federation rank ladders (14 levels, 0-13) plus the two superpower Navy ladders (15
+// levels, 0-14). These titles are NOT present anywhere in the journal itself -- Rank/Promotion
+// only ever give the numeric level -- so unlike everything else in this file, they can't be
+// grounded against this commander's own data. The base 9 (0-8, up to plain "Elite") were sourced
+// and cross-checked against multiple independent community references (elite-dangerous.fandom.com,
+// the Player Journal manual appendix, and direct confirmation of the Exobiologist ladder via real
+// player discussion threads using these exact title names).
+//
+// The 5 further "Elite" prestige tiers (indices 9-13, added with Odyssey) were a real gap this
+// project had until a real bug report: a commander at Elite I-V got an empty title (rankTitle
+// returning "" for any level > 8) and the "Rank" card silently fell back to showing the raw
+// "level/max" fraction instead -- with `max` itself hardcoded to 8, so the fraction looked
+// visibly broken (level exceeding its own stated max) rather than just unlabeled. Confirmed the
+// numeric encoding is a plain linear continuation (9=Elite I ... 13=Elite V, same simple
+// "Elite N" naming for all 6 of these ladders, no per-track variation for the prestige tiers
+// specifically) against EDDiscovery/EliteDangerousCore's Ranks.cs (Apache 2.0 licensed,
+// https://github.com/EDDiscovery/EliteDangerousCore -- real production code parsing this exact
+// same journal Rank field), cross-checked against a second, independent source confirming
+// exactly 5 Elite prestige tiers exist (a Frontier forums thread on the topic) before trusting
+// it. Federation/Empire have no prestige tiers -- confirmed by the same EDDiscovery source
+// (their rank enums stop at 14/King and 14/Admiral with nothing beyond), consistent with this
+// project's pre-existing 0-14 handling for those two, left unchanged.
 var pilotsFederationRankTitles = map[string][]string{
-	"Combat":       {"Harmless", "Mostly Harmless", "Novice", "Competent", "Expert", "Master", "Dangerous", "Deadly", "Elite"},
-	"Trade":        {"Penniless", "Mostly Penniless", "Peddler", "Dealer", "Merchant", "Broker", "Entrepreneur", "Tycoon", "Elite"},
-	"Explore":      {"Aimless", "Mostly Aimless", "Scout", "Surveyor", "Trailblazer", "Pathfinder", "Ranger", "Pioneer", "Elite"},
-	"CQC":          {"Helpless", "Mostly Helpless", "Amateur", "Semi Professional", "Professional", "Champion", "Hero", "Legend", "Elite"},
-	"Soldier":      {"Defenceless", "Mostly Defenceless", "Rookie", "Soldier", "Gunslinger", "Warrior", "Gladiator", "Deadeye", "Elite"},
-	"Exobiologist": {"Directionless", "Mostly Directionless", "Compiler", "Collector", "Cataloguer", "Taxonomist", "Ecologist", "Geneticist", "Elite"},
+	"Combat": {"Harmless", "Mostly Harmless", "Novice", "Competent", "Expert", "Master", "Dangerous", "Deadly",
+		"Elite", "Elite I", "Elite II", "Elite III", "Elite IV", "Elite V"},
+	"Trade": {"Penniless", "Mostly Penniless", "Peddler", "Dealer", "Merchant", "Broker", "Entrepreneur", "Tycoon",
+		"Elite", "Elite I", "Elite II", "Elite III", "Elite IV", "Elite V"},
+	"Explore": {"Aimless", "Mostly Aimless", "Scout", "Surveyor", "Trailblazer", "Pathfinder", "Ranger", "Pioneer",
+		"Elite", "Elite I", "Elite II", "Elite III", "Elite IV", "Elite V"},
+	"CQC": {"Helpless", "Mostly Helpless", "Amateur", "Semi Professional", "Professional", "Champion", "Hero", "Legend",
+		"Elite", "Elite I", "Elite II", "Elite III", "Elite IV", "Elite V"},
+	"Soldier": {"Defenceless", "Mostly Defenceless", "Rookie", "Soldier", "Gunslinger", "Warrior", "Gladiator", "Deadeye",
+		"Elite", "Elite I", "Elite II", "Elite III", "Elite IV", "Elite V"},
+	"Exobiologist": {"Directionless", "Mostly Directionless", "Compiler", "Collector", "Cataloguer", "Taxonomist", "Ecologist", "Geneticist",
+		"Elite", "Elite I", "Elite II", "Elite III", "Elite IV", "Elite V"},
 }
 var federationRankTitles = []string{"None", "Recruit", "Cadet", "Midshipman", "Petty Officer", "Chief Petty Officer", "Warrant Officer", "Ensign", "Lieutenant", "Lieutenant Commander", "Post Commander", "Post Captain", "Rear Admiral", "Vice Admiral", "Admiral"}
 var empireRankTitles = []string{"None", "Outsider", "Serf", "Master", "Squire", "Knight", "Lord", "Baron", "Viscount", "Count", "Earl", "Marquis", "Duke", "Prince", "King"}
@@ -972,24 +991,38 @@ func BuildRecap(store *Store) recapData {
 			"Federation": latestRank.Federation, "Empire": latestRank.Empire,
 		}
 		maxLevel := map[string]int{"Federation": 14, "Empire": 14}
+		var levelSum, maxSum int
 		for _, track := range trackOrder {
 			level := levelByTrack[track]
 			if level <= 0 {
 				continue
 			}
-			max := 8
+			max := 13 // Pilots Federation ladders top out at Elite V (index 13), see pilotsFederationRankTitles' comment
 			if m, ok := maxLevel[track]; ok {
 				max = m
 			}
+			levelSum += level
+			maxSum += max
 			title := rankTitle(track, level)
 			sub := fmtInt(int64(level)) + "/" + fmtInt(int64(max))
 			value := title
 			if value == "" {
-				value = sub // title lookup failure (shouldn't happen for a valid 0-14/0-8 level) falls back to the raw progress instead of an empty card
+				value = sub // title lookup failure (shouldn't happen for a valid 0-14/0-13 level) falls back to the raw progress instead of an empty card
 			}
 			rankStats = append(rankStats, recapStat{Label: rankTrackLabels[track], Value: value, Sub: sub})
 		}
 		if len(rankStats) > 0 {
+			// Owner request: "add an overall rank% too? %to all max" -- one combined headline
+			// stat across every track shown above (same tracks, same maxes), not a 9th separate
+			// card. Placed first since it's the summary of everything that follows.
+			overallPct := 0
+			if maxSum > 0 {
+				overallPct = levelSum * 100 / maxSum
+			}
+			rankStats = append([]recapStat{{
+				Label: "Overall rank progress", Value: fmtInt(int64(overallPct)) + "%",
+				Sub: fmtInt(int64(levelSum)) + "/" + fmtInt(int64(maxSum)) + " combined levels across " + fmtInt(int64(len(rankStats))) + " ranks",
+			}}, rankStats...)
 			sections = append(sections, recapSection{Title: "Rank", Stats: rankStats})
 		}
 	}
