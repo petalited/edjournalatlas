@@ -45,6 +45,7 @@ select, input[type=number], input[type=text] { background: var(--bg); border: 1p
   transition: border-color var(--transition); font: inherit; }
 #pickType, #pickName { min-width: 200px; }
 #pickGrade { min-width: 90px; }
+#pickEffect { min-width: 180px; }
 #pickQty { width: 70px; }
 button { font: inherit; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
   background: var(--panel); color: var(--text); padding: var(--space-2) var(--space-4); transition: background var(--transition), border-color var(--transition); }
@@ -117,6 +118,10 @@ a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible
     <select id="pickGrade"></select>
   </div>
   <div class="picker-field">
+    <label for="pickEffect">Experimental effect</label>
+    <select id="pickEffect"></select>
+  </div>
+  <div class="picker-field">
     <label for="pickQty">Qty</label>
     <input type="number" id="pickQty" value="1" min="1">
   </div>
@@ -144,8 +149,18 @@ DATA.blueprints.forEach(bp => {
   bpByKey[`${bp.type}|${bp.name}|${bp.grade}`] = bp;
 });
 
+// Experimental effects aren't tied to a grade of the base upgrade -- indexed by type only, and
+// looked up independently of which grade got picked above.
+const effectIndex = {};
+const effectByKey = {};
+DATA.effects.forEach(ef => {
+  effectIndex[ef.type] = effectIndex[ef.type] || [];
+  effectIndex[ef.type].push(ef);
+  effectByKey[`${ef.type}|${ef.name}`] = ef;
+});
+
 document.getElementById('subtitle').textContent =
-  `${DATA.blueprints.length} real ship-module engineering blueprints (grades 1-5), sourced from a community reference (Odyssey on-foot suit/weapon engineering isn't covered -- this project has no inventory data for that resource pool). ` +
+  `${DATA.blueprints.length} real ship-module engineering blueprints (grades 1-5) plus ${DATA.effects.length} Experimental Effects, sourced from a community reference (Odyssey on-foot suit/weapon engineering isn't covered -- this project has no inventory data for that resource pool). ` +
   (DATA.hasSnapshot
     ? `Materials compared against your inventory as of ${DATA.snapshotAt.replace('T', ' ').replace('Z', '')} UTC.`
     : `No materials inventory captured yet -- open your in-game Materials screen, then re-run this tool, to see what you already have.`) +
@@ -165,6 +180,7 @@ function populateNames() {
   const select = document.getElementById('pickName');
   select.innerHTML = Object.keys(bpIndex[type] || {}).sort().map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
   populateGrades();
+  populateEffects();
 }
 
 function populateGrades() {
@@ -173,6 +189,15 @@ function populateGrades() {
   const grades = Object.keys((bpIndex[type] || {})[name] || {}).map(Number).sort((a, b) => a - b);
   const select = document.getElementById('pickGrade');
   select.innerHTML = grades.map(g => `<option value="${g}">Grade ${g}</option>`).join('');
+  // default to the highest grade -- that's normally what you actually want, saves a click every time.
+  if (grades.length) select.value = String(Math.max(...grades));
+}
+
+function populateEffects() {
+  const type = document.getElementById('pickType').value;
+  const select = document.getElementById('pickEffect');
+  const effects = (effectIndex[type] || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+  select.innerHTML = '<option value="">None</option>' + effects.map(e => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`).join('');
 }
 
 document.getElementById('pickType').addEventListener('change', populateNames);
@@ -198,13 +223,15 @@ document.getElementById('addBtn').addEventListener('click', () => {
   const type = document.getElementById('pickType').value;
   const name = document.getElementById('pickName').value;
   const grade = Number(document.getElementById('pickGrade').value);
+  const effect = document.getElementById('pickEffect').value || null;
   const qty = Math.max(1, Number(document.getElementById('pickQty').value) || 1);
   if (!bpByKey[`${type}|${name}|${grade}`]) return;
-  const existing = basket.find(b => b.type === type && b.name === name && b.grade === grade);
+  if (effect && !effectByKey[`${type}|${effect}`]) return;
+  const existing = basket.find(b => b.type === type && b.name === name && b.grade === grade && b.effect === effect);
   if (existing) {
     existing.qty += qty;
   } else {
-    basket.push({ type, name, grade, qty });
+    basket.push({ type, name, grade, effect, qty });
   }
   saveBasket(basket);
   render();
@@ -239,6 +266,7 @@ function basketTable() {
       <td>${escapeHtml(item.type)}</td>
       <td>${escapeHtml(item.name)}</td>
       <td>Grade ${item.grade}</td>
+      <td>${item.effect ? escapeHtml(item.effect) : '<span style="color:var(--muted-faint)">--</span>'}</td>
       <td><input type="number" class="basket-qty" min="1" value="${item.qty}" onchange="updateQty(${idx}, this.value)"></td>
       <td><button type="button" class="basket-remove" onclick="removeItem(${idx})">Remove</button></td>
     </tr>`;
@@ -248,7 +276,7 @@ function basketTable() {
       <button type="button" onclick="clearBasket()">Clear all</button>
     </div>
     <table class="basket-table">
-      <thead><tr><th>Module</th><th>Upgrade</th><th>Grade</th><th>Qty</th><th></th></tr></thead>
+      <thead><tr><th>Module</th><th>Upgrade</th><th>Grade</th><th>Effect</th><th>Qty</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </div>`;
@@ -263,6 +291,15 @@ function materialsSummary() {
       if (!needed[ing.key]) needed[ing.key] = { name: ing.name, count: 0 };
       needed[ing.key].count += ing.count * item.qty;
     });
+    if (item.effect) {
+      const ef = effectByKey[`${item.type}|${item.effect}`];
+      if (ef) {
+        ef.ingredients.forEach(ing => {
+          if (!needed[ing.key]) needed[ing.key] = { name: ing.name, count: 0 };
+          needed[ing.key].count += ing.count * item.qty;
+        });
+      }
+    }
   });
   if (!Object.keys(needed).length) return '';
   const withKeys = Object.entries(needed).map(([key, v]) => ({ key, ...v }));
@@ -296,31 +333,45 @@ function engineerChip(e) {
   return `<span class="engineer-chip ${cls}">${escapeHtml(label)}</span>`;
 }
 
+function engineerGroupHtml(title, engineers) {
+  const hasUnlocked = engineers.some(e => e.progress === 'Unlocked');
+  const blockedNote = (!hasUnlocked && DATA.hasEngineerData)
+    ? `<div class="blocked-note">⚠️ None of these engineers are unlocked yet</div>` : '';
+  return `<div class="engineer-group ${hasUnlocked ? '' : 'engineer-blocked'}">
+    <div class="engineer-group-title">${escapeHtml(title)}</div>
+    <div class="engineer-list">${engineers.map(engineerChip).join('')}</div>
+    ${blockedNote}
+  </div>`;
+}
+
 function engineersSummary() {
-  const seen = new Set();
-  const uniqueBps = [];
+  const seenBp = new Set();
+  const seenEffect = new Set();
+  const groups = [];
   basket.forEach(item => {
     const bp = bpByKey[`${item.type}|${item.name}|${item.grade}`];
-    if (!bp) return;
-    const k = `${bp.type}|${bp.name}|${bp.grade}`;
-    if (seen.has(k)) return;
-    seen.add(k);
-    uniqueBps.push(bp);
+    if (bp) {
+      const k = `${bp.type}|${bp.name}|${bp.grade}`;
+      if (!seenBp.has(k)) {
+        seenBp.add(k);
+        groups.push(engineerGroupHtml(`${bp.type} -- ${bp.name} (Grade ${bp.grade})`, bp.engineers));
+      }
+    }
+    if (item.effect) {
+      const ef = effectByKey[`${item.type}|${item.effect}`];
+      if (ef) {
+        const k = `${ef.type}|${ef.name}`;
+        if (!seenEffect.has(k)) {
+          seenEffect.add(k);
+          groups.push(engineerGroupHtml(`${ef.type} -- ${ef.name} (Experimental Effect)`, ef.engineers));
+        }
+      }
+    }
   });
-  if (!uniqueBps.length) return '';
-  const groups = uniqueBps.map(bp => {
-    const hasUnlocked = bp.engineers.some(e => e.progress === 'Unlocked');
-    const blockedNote = (!hasUnlocked && DATA.hasEngineerData)
-      ? `<div class="blocked-note">⚠️ None of these engineers are unlocked yet</div>` : '';
-    return `<div class="engineer-group ${hasUnlocked ? '' : 'engineer-blocked'}">
-      <div class="engineer-group-title">${escapeHtml(bp.type)} -- ${escapeHtml(bp.name)} (Grade ${bp.grade})</div>
-      <div class="engineer-list">${bp.engineers.map(engineerChip).join('')}</div>
-      ${blockedNote}
-    </div>`;
-  }).join('');
+  if (!groups.length) return '';
   return `<div class="section-block">
     <div class="section-title">Engineers <span class="section-sub">who can give you each upgrade in your plan</span></div>
-    ${groups}
+    ${groups.join('')}
     ${!DATA.hasEngineerData ? '<p class="caveat">No engineer progress captured yet, so unlock status can\'t be shown -- log in-game once and re-run this tool.</p>' : ''}
   </div>`;
 }

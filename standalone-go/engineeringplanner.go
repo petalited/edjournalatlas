@@ -27,6 +27,16 @@ package main
 // engineer can give me this"). 786 real ship-module blueprints remain, and every one of their
 // ingredients resolved cleanly against this project's own 137-material table.
 //
+// Experimental Effects (real owner catch: "you forgot experimental effects lol") are also from
+// engineers and cost the same material pool -- vendored as a second, separate list, scoped the
+// same way (real engineer, ship-module, not Suit/Weapon) plus two effect-specific exclusions:
+// the upstream data's "@Technology"-only entries (Technology Broker unlocks, not a real
+// Engineer) and its "Unlock" Type (engineer INVITE requirements -- a different concept from
+// applying an effect to a module you already have). 154 real ship-module experimental effects
+// remain. Unlike graded blueprints, an effect isn't tied to a specific grade -- the same effect
+// applies regardless of which grade you rolled the base upgrade to, so it's a second, independent
+// pick in the UI (Type -> Upgrade -> Grade -> optional Effect), not a 4th column on the same row.
+//
 // Fully static/offline like every other vendored table here -- no live network calls, refreshed
 // by re-running the vendoring step against a newer copy of the upstream JSON.
 
@@ -52,17 +62,26 @@ type blueprintIngredient struct {
 type blueprintDef struct {
 	Type        string                `json:"type"`
 	Name        string                `json:"name"`
-	Grade       int                   `json:"grade"`
+	Grade       int                   `json:"grade"` // 0 for entries loaded into effectCatalog -- effects aren't graded
 	Engineers   []string              `json:"engineers"`
 	Ingredients []blueprintIngredient `json:"ingredients"`
 }
 
+type vendoredBlueprintData struct {
+	Blueprints []blueprintDef `json:"blueprints"`
+	Effects    []blueprintDef `json:"effects"`
+}
+
 var blueprintCatalog []blueprintDef
+var effectCatalog []blueprintDef
 
 func init() {
-	if err := json.Unmarshal(blueprintsJSON, &blueprintCatalog); err != nil {
+	var vendored vendoredBlueprintData
+	if err := json.Unmarshal(blueprintsJSON, &vendored); err != nil {
 		panic("failed to parse embedded blueprint catalog: " + err.Error())
 	}
+	blueprintCatalog = vendored.Blueprints
+	effectCatalog = vendored.Effects
 }
 
 type engineerProgressEntry struct {
@@ -147,13 +166,43 @@ type plannerBlueprintOut struct {
 	Ingredients []plannerIngredientOut `json:"ingredients"`
 }
 
+// plannerEffectOut is the same shape as plannerBlueprintOut minus Grade -- an Experimental
+// Effect isn't tied to a specific grade of the base upgrade, see this file's header comment.
+type plannerEffectOut struct {
+	Type        string                 `json:"type"`
+	Name        string                 `json:"name"`
+	Engineers   []engineerStatusOut    `json:"engineers"`
+	Ingredients []plannerIngredientOut `json:"ingredients"`
+}
+
 type plannerData struct {
 	GeneratedAt     string                `json:"generatedAt"`
 	Blueprints      []plannerBlueprintOut `json:"blueprints"`
+	Effects         []plannerEffectOut    `json:"effects"`
 	HeldMaterials   map[string]int64      `json:"heldMaterials"`
 	HasSnapshot     bool                  `json:"hasSnapshot"`
 	SnapshotAt      string                `json:"snapshotAt,omitempty"`
 	HasEngineerData bool                  `json:"hasEngineerData"`
+}
+
+func resolveEngineers(names []string, engineerByKey map[string]engineerProgressEntry) []engineerStatusOut {
+	out := make([]engineerStatusOut, 0, len(names))
+	for _, eng := range names {
+		if real, ok := engineerByKey[normalizeEngineerName(eng)]; ok {
+			out = append(out, engineerStatusOut{Name: real.Engineer, Progress: real.Progress, Rank: real.Rank})
+		} else {
+			out = append(out, engineerStatusOut{Name: eng})
+		}
+	}
+	return out
+}
+
+func resolveIngredients(ings []blueprintIngredient) []plannerIngredientOut {
+	out := make([]plannerIngredientOut, 0, len(ings))
+	for _, ing := range ings {
+		out = append(out, plannerIngredientOut{Key: ing.Key, Name: materialDisplayName(ing.Key), Count: ing.Count})
+	}
+	return out
 }
 
 func BuildPlannerData(store *Store) plannerData {
@@ -173,23 +222,26 @@ func BuildPlannerData(store *Store) plannerData {
 
 	blueprints := make([]plannerBlueprintOut, 0, len(blueprintCatalog))
 	for _, bp := range blueprintCatalog {
-		out := plannerBlueprintOut{Type: bp.Type, Name: bp.Name, Grade: bp.Grade}
-		for _, eng := range bp.Engineers {
-			if real, ok := engineerByKey[normalizeEngineerName(eng)]; ok {
-				out.Engineers = append(out.Engineers, engineerStatusOut{Name: real.Engineer, Progress: real.Progress, Rank: real.Rank})
-			} else {
-				out.Engineers = append(out.Engineers, engineerStatusOut{Name: eng})
-			}
-		}
-		for _, ing := range bp.Ingredients {
-			out.Ingredients = append(out.Ingredients, plannerIngredientOut{Key: ing.Key, Name: materialDisplayName(ing.Key), Count: ing.Count})
-		}
-		blueprints = append(blueprints, out)
+		blueprints = append(blueprints, plannerBlueprintOut{
+			Type: bp.Type, Name: bp.Name, Grade: bp.Grade,
+			Engineers:   resolveEngineers(bp.Engineers, engineerByKey),
+			Ingredients: resolveIngredients(bp.Ingredients),
+		})
+	}
+
+	effects := make([]plannerEffectOut, 0, len(effectCatalog))
+	for _, ef := range effectCatalog {
+		effects = append(effects, plannerEffectOut{
+			Type: ef.Type, Name: ef.Name,
+			Engineers:   resolveEngineers(ef.Engineers, engineerByKey),
+			Ingredients: resolveIngredients(ef.Ingredients),
+		})
 	}
 
 	data := plannerData{
 		GeneratedAt:     time.Now().UTC().Format("2006-01-02 15:04 MST"),
 		Blueprints:      blueprints,
+		Effects:         effects,
 		HeldMaterials:   held,
 		HasSnapshot:     hasSnapshot,
 		HasEngineerData: hasEngineerData,
