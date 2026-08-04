@@ -38,7 +38,7 @@ var recognizedEventTypes = map[string]bool{
 	"MarketSell": true, "MarketBuy": true, "MiningRefined": true,
 	"MissionCompleted": true, "MissionAccepted": true, "CommitCrime": true,
 	"FSDJump": true, "Scan": true, "SAAScanComplete": true, "MultiSellExplorationData": true,
-	"WingAdd": true, "EngineerCraft": true, "MaterialCollected": true,
+	"WingAdd": true, "EngineerCraft": true, "MaterialCollected": true, "Materials": true,
 	"Powerplay": true, "PowerplayRank": true, "PowerplayMerits": true,
 	"NpcCrewPaidWage": true, "CarrierJump": true, "CarrierStats": true, "Docked": true,
 	"ColonisationConstructionDepot": true, "ColonisationContribution": true, "ColonisationSystemClaim": true,

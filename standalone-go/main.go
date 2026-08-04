@@ -23,6 +23,7 @@ const defaultOutPath = "standalone_viewer.html"
 const defaultEventsOutPath = "standalone_events.html"
 const defaultSummaryOutPath = "standalone_summary.html"
 const defaultUnmodeledOutPath = "standalone_unmodeled.json"
+const defaultMaterialsOutPath = "standalone_materials.html"
 
 func main() {
 	journalDir := flag.String("journal-dir", "", "Directory containing Journal.*.log files (auto-detected if omitted)")
@@ -34,6 +35,8 @@ func main() {
 	noSummary := flag.Bool("no-summary", false, "Skip building the career recap page")
 	unmodeledOutPath := flag.String("unmodeled-out", defaultUnmodeledOutPath, "Path to write the unmodeled-event-types coverage report")
 	noUnmodeled := flag.Bool("no-unmodeled", false, "Skip building the unmodeled-event-types coverage report")
+	materialsOutPath := flag.String("materials-out", defaultMaterialsOutPath, "Path to write the materials inventory page")
+	noMaterials := flag.Bool("no-materials", false, "Skip building the materials inventory page")
 	noOpen := flag.Bool("no-open", false, "Don't open the viewer in a browser automatically")
 	flag.Parse()
 
@@ -131,6 +134,17 @@ func main() {
 			fmt.Println("Error writing unmodeled-event coverage report:", err)
 		} else if unmodeledCount > 0 {
 			fmt.Printf("Wrote %s (%d journal event types your recap doesn't summarize yet -- safe to share, only lists event/field names, never personal values)\n", *unmodeledOutPath, unmodeledCount)
+		}
+	}
+
+	if !*noMaterials {
+		materialsHTML, materialCount, err := RenderMaterials(store)
+		if err != nil {
+			fmt.Println("Error building materials inventory page:", err)
+		} else if err := os.WriteFile(*materialsOutPath, []byte(materialsHTML), 0o644); err != nil {
+			fmt.Println("Error writing materials inventory page:", err)
+		} else {
+			fmt.Printf("Wrote %s (%d distinct materials -- current Raw/Manufactured/Encoded inventory)\n", *materialsOutPath, materialCount)
 		}
 	}
 

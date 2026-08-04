@@ -39,9 +39,19 @@ type factionKillBondEvent struct {
 	VictimFaction string `json:"VictimFaction"`
 }
 
+// KillerName isn't always a real name -- confirmed against real data (a third-party tester's own
+// journal, not this project's own): an NPC with no distinct personal identity (a generic
+// Federation Navy patrol ship, not a named pilot) has KillerName as a raw, unresolved
+// localization key ("$ShipName_Military_Federation;") with the real display text sitting in the
+// sibling KillerName_Localised field ("Federal Navy Ship") instead -- same pattern as other
+// enum-ish fields elsewhere in this journal, just not one this project's own real data ever
+// happened to exercise. KillerShip also isn't always a ship: the same real tester's data has
+// genuine kills by a settlement's defenses ("outpostindustrial") and an on-foot Odyssey NPC
+// combatant ("assaultsuitai_class1") -- see the highlights-building code for how that's handled.
 type diedEvent struct {
-	KillerName string `json:"KillerName"`
-	KillerShip string `json:"KillerShip"`
+	KillerName          string `json:"KillerName"`
+	KillerNameLocalised string `json:"KillerName_Localised"`
+	KillerShip          string `json:"KillerShip"`
 }
 
 type marketSellEvent struct {
@@ -1229,9 +1239,39 @@ func BuildRecap(store *Store) recapData {
 	sections = append(sections, recapSection{Title: "Missions", Stats: missionStats})
 
 	var highlights []string
-	for _, k := range realKillers {
-		ship := displayShip(k.KillerShip)
-		highlights = append(highlights, "Destroyed by "+k.KillerName+" flying a "+ship)
+	// Capped to the most recent few -- confirmed against a real, more PvP-active tester's data
+	// that this can otherwise grow into a wall of text (realKillers has no size limit of its own,
+	// since it's every real Died event with a killer name, and someone who dies a lot has a lot).
+	// Highlights are meant to stay highlight-sized; the full history is what the events search
+	// page is for.
+	const maxDeathHighlights = 5
+	shownKillers := realKillers
+	omittedDeaths := 0
+	if len(shownKillers) > maxDeathHighlights {
+		omittedDeaths = len(shownKillers) - maxDeathHighlights
+		shownKillers = shownKillers[omittedDeaths:] // most recent N -- realKillers is chronological
+	}
+	for _, k := range shownKillers {
+		name := k.KillerNameLocalised
+		if name == "" {
+			name = k.KillerName
+		}
+		// Not always literally a ship -- confirmed against real data (settlement defenses, an
+		// on-foot Odyssey combatant) alongside real ship kills, and there's no reliable field to
+		// tell the two apart. "(X)" reads correctly either way; "flying a X" only reads correctly
+		// for the ship case and was actively wrong ("flying a Outpostindustrial") for the other.
+		line := "Destroyed by " + name
+		if k.KillerShip != "" {
+			line += " (" + displayShip(k.KillerShip) + ")"
+		}
+		highlights = append(highlights, line)
+	}
+	if omittedDeaths > 0 {
+		plural := "s"
+		if omittedDeaths == 1 {
+			plural = ""
+		}
+		highlights = append(highlights, fmt.Sprintf("...and %d earlier death%s not shown here", omittedDeaths, plural))
 	}
 	// Only called out as a highlight once it's genuinely "frequent" (2+ sessions) -- a single
 	// shared wing session isn't a "best friend" story, just a data point already covered by the

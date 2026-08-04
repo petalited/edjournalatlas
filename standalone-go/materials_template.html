@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>edjournalatlas -- materials inventory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  color-scheme: light dark;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+  --transition: 160ms ease;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --good: #0ca30c; --warning: #fab219;
+  --notable-bg: #efe6fb; --notable-text: #6b3fb0;
+  --shadow: 0 1px 3px rgba(11,11,11,0.08), 0 1px 2px rgba(11,11,11,0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0d0d; --panel: #1a1a19; --text: #ffffff; --muted: #c3c2b7; --muted-faint: #898781;
+    --border: #2c2c2a; --border-strong: #383835; --accent: #3987e5; --accent-weak: #182338;
+    --good: #0ca30c; --warning: #fab219;
+    --notable-bg: #2c2140; --notable-text: #caa9f7;
+    --shadow: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.35);
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text); padding: var(--space-5); font-variant-numeric: tabular-nums; }
+.page-nav { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.page-nav-link { font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill); border: 1px solid var(--border); transition: border-color var(--transition), color var(--transition); }
+.page-nav-link:hover { color: var(--accent); border-color: var(--accent); }
+.page-nav-link.page-nav-active { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+h1 { font-size: 1.4rem; margin: 0 0 2px; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 var(--space-4); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3);
+  margin-bottom: var(--space-4); max-width: 900px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4); box-shadow: var(--shadow); }
+.card .num { font-size: 1.3rem; font-weight: 600; }
+.card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.controls { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-bottom: var(--space-5);
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4); box-shadow: var(--shadow); }
+input[type=text], select { background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); font-size: 0.9rem;
+  transition: border-color var(--transition); }
+#filterInput { width: 260px; }
+.section-block { margin-bottom: var(--space-6); }
+.section-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 4px; display: flex; align-items: baseline; gap: var(--space-2); }
+.section-sub { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.material-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); }
+.material-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3); box-shadow: var(--shadow); }
+.material-name { font-weight: 600; font-size: 0.92rem; }
+.material-count { font-size: 1.15rem; font-weight: 700; margin-top: 2px; }
+.material-usage { margin-top: var(--space-2); font-size: 0.75rem; color: var(--notable-text);
+  background: var(--notable-bg); border-radius: var(--radius-sm); padding: 3px var(--space-2); display: inline-block; }
+.material-usage-detail { margin-top: 4px; font-size: 0.72rem; color: var(--muted); }
+.empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center; }
+.empty-note-icon { font-size: 1.6rem; margin-bottom: var(--space-2); opacity: 0.7; }
+a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm);
+}
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+  <a class="page-nav-link" href="standalone_viewer.html">🗺️ Systems</a>
+  <a class="page-nav-link" href="standalone_events.html">🔍 Journal search</a>
+  <a class="page-nav-link" href="standalone_summary.html">📊 Recap</a>
+  <a class="page-nav-link page-nav-active" href="standalone_materials.html">🧪 Materials</a>
+</nav>
+
+<h1>standalone -- materials inventory</h1>
+<p class="subtitle" id="subtitle"></p>
+
+<div class="cards" id="summaryCards"></div>
+
+<div class="controls" id="controlsBar" style="display:none">
+  <input type="text" id="filterInput" placeholder="Search materials...">
+  <select id="sortSelect">
+    <option value="count">Sort by amount held</option>
+    <option value="name">Sort alphabetically</option>
+  </select>
+</div>
+
+<div id="sections"></div>
+
+<script id="materials-data" type="application/json">__DATA_JSON__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('materials-data').textContent);
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('subtitle').textContent = DATA.hasSnapshot
+  ? `Generated ${DATA.generatedAt} -- inventory as of ${DATA.snapshotAt.replace('T', ' ').replace('Z', '')} UTC, the last time the game reported your full materials to the journal (this happens automatically each time you log in -- log in again in-game, then re-run this tool, to refresh).`
+  : `Generated ${DATA.generatedAt}.`;
+
+let filterText = '';
+let sortKey = 'count';
+
+const CATEGORIES = [
+  { key: 'raw', title: 'Raw', sub: 'Elements mined/scooped from planetary surfaces and asteroids' },
+  { key: 'manufactured', title: 'Manufactured', sub: 'Salvaged components and commodities' },
+  { key: 'encoded', title: 'Encoded', sub: 'Data recovered from scans and signal sources' },
+];
+
+function filteredSorted(list) {
+  const needle = filterText.trim().toLowerCase();
+  let out = needle ? list.filter(m => m.name.toLowerCase().includes(needle)) : list.slice();
+  out.sort((a, b) => sortKey === 'name' ? a.name.localeCompare(b.name) : b.count - a.count);
+  return out;
+}
+
+function usageBadge(m) {
+  if (!m.usage) return '';
+  const bpEntries = Object.entries(m.usage.blueprints).sort((a, b) => b[1] - a[1]);
+  const bpList = bpEntries.map(([bp, n]) => `${escapeHtml(bp)}${n > 1 ? ` (${n}x)` : ''}`).join(', ');
+  return `<div class="material-usage" title="Total consumed across your real engineering history">🔧 used ${m.usage.totalUsed.toLocaleString('en-US')}x in engineering</div>
+    <div class="material-usage-detail">${bpList}</div>`;
+}
+
+function materialCard(m) {
+  return `<div class="material-card">
+    <div class="material-name">${escapeHtml(m.name)}</div>
+    <div class="material-count">${m.count.toLocaleString('en-US')}</div>
+    ${usageBadge(m)}
+  </div>`;
+}
+
+function render() {
+  if (!DATA.hasSnapshot) {
+    document.getElementById('sections').innerHTML =
+      `<div class="empty-note"><div class="empty-note-icon">🧪</div>No materials inventory captured yet -- open your in-game Materials screen (or just play a session; it syncs automatically on login), then run this tool again.</div>`;
+    return;
+  }
+
+  const sections = CATEGORIES.map(cat => {
+    const list = filteredSorted(DATA[cat.key]);
+    const totalTypes = DATA[cat.key].length;
+    const totalUnits = DATA[cat.key].reduce((s, m) => s + m.count, 0);
+    if (!list.length) {
+      return `<div class="section-block">
+        <div class="section-title">${cat.title} <span class="section-sub">${cat.sub}</span></div>
+        <div class="empty-note">No ${cat.title.toLowerCase()} materials match your search.</div>
+      </div>`;
+    }
+    return `<div class="section-block">
+      <div class="section-title">${cat.title}
+        <span class="section-sub">${cat.sub} -- ${totalTypes} type${totalTypes === 1 ? '' : 's'}, ${totalUnits.toLocaleString('en-US')} units held</span>
+      </div>
+      <div class="material-grid">${list.map(materialCard).join('')}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('sections').innerHTML = sections;
+}
+
+function renderSummary() {
+  if (!DATA.hasSnapshot) {
+    document.getElementById('summaryCards').innerHTML = '';
+    return;
+  }
+  const totalTypes = DATA.raw.length + DATA.manufactured.length + DATA.encoded.length;
+  const totalUnits = [...DATA.raw, ...DATA.manufactured, ...DATA.encoded].reduce((s, m) => s + m.count, 0);
+  const usedInEngineering = [...DATA.raw, ...DATA.manufactured, ...DATA.encoded].filter(m => m.usage).length;
+  const cards = [
+    [DATA.raw.length, 'Raw types held'],
+    [DATA.manufactured.length, 'Manufactured types held'],
+    [DATA.encoded.length, 'Encoded types held'],
+    [totalTypes, 'Total distinct materials'],
+    [totalUnits.toLocaleString('en-US'), 'Total units held'],
+    [usedInEngineering, 'Used in past engineering'],
+  ];
+  document.getElementById('summaryCards').innerHTML = cards.map(([num, label]) =>
+    `<div class="card"><div class="num">${num}</div><div class="label">${escapeHtml(label)}</div></div>`
+  ).join('');
+  document.getElementById('controlsBar').style.display = '';
+}
+
+document.getElementById('filterInput').addEventListener('input', e => { filterText = e.target.value; render(); });
+document.getElementById('sortSelect').addEventListener('change', e => { sortKey = e.target.value; render(); });
+
+renderSummary();
+render();
+</script>
+</body>
+</html>

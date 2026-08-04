@@ -75,8 +75,8 @@ type FloraScan struct {
 
 // Store is the whole in-memory database -- persisted as one gob file between runs.
 type Store struct {
-	Commander     string
-	CommanderFID  string
+	Commander string // in-game commander name only -- deliberately no Frontier account ID (FID)
+	// anywhere in this struct, see parse.go's onCommander/recordRawEvent comments for why
 	Systems       map[int64]*System // keyed by SystemAddress
 	SaleTimes     []string          // exobio_sales.sold_at
 	DeathTimes    []string

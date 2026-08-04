@@ -10,6 +10,7 @@ standalone_viewer.html
 standalone_events.html
 standalone_summary.html
 standalone_unmodeled.json
+standalone_materials.html
 
 __pycache__/
 *.pyc

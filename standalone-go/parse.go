@@ -37,10 +37,12 @@ type genericHead struct {
 	BodyID     *int   `json:"BodyID"`
 }
 
+// Deliberately no FID field -- Frontier's own persistent account identifier, not anything about
+// what happened in the game. Never parsed, let alone stored: see recordRawEvent's own comment for
+// why the raw capture strips it too, confirmed present on real Commander/LoadGame events.
 type commanderEntry struct {
 	Name      string `json:"Name"`
 	Commander string `json:"Commander"`
-	FID       string `json:"FID"`
 }
 
 type jumpEntry struct {
@@ -218,6 +220,45 @@ func (p *Parser) ProcessLine(line []byte) {
 // recordRawEvent captures every valid journal line unconditionally, regardless of whether any
 // case above recognizes its event type -- the foundation for "the whole journal, searchable",
 // not just the exploration-relevant subset every other part of this program cares about.
+// Only these event types are ever confirmed to carry a sensitive field (see scrubSensitiveFields)
+// -- checked against a real, independent commander's full journal (262,840 events, every distinct
+// field name across all of them), not guessed. Skipping the scrub check entirely for the other
+// 99%+ of events avoids parsing/re-serializing every single captured line just to look for a
+// field that's essentially never there.
+var eventsNeedingScrub = map[string]bool{"Commander": true, "LoadGame": true, "Fileheader": true}
+
+// FID (Frontier's own persistent account identifier) and language (the player's local UI/system
+// language) describe the player's account or computer, not anything that happened in the game --
+// out of scope for a tool whose whole point is "what did I do in Elite Dangerous," and exactly
+// the kind of thing that shouldn't end up in a .db file someone might hand to someone else (this
+// is a real scenario, not hypothetical: a third-party tester's real .db was shared for
+// troubleshooting a different bug and both fields were sitting in it). The in-game commander NAME
+// is kept -- that's the "ign" this capture is meant to hold, just not the account ID or locale
+// alongside it.
+var scrubbedRawFields = []string{"FID", "language"}
+
+func scrubSensitiveFields(line []byte) []byte {
+	var generic map[string]json.RawMessage
+	if json.Unmarshal(line, &generic) != nil {
+		return line // best-effort -- if it doesn't even parse as an object, nothing to scrub
+	}
+	changed := false
+	for _, field := range scrubbedRawFields {
+		if _, ok := generic[field]; ok {
+			delete(generic, field)
+			changed = true
+		}
+	}
+	if !changed {
+		return line
+	}
+	scrubbed, err := json.Marshal(generic)
+	if err != nil {
+		return line
+	}
+	return scrubbed
+}
+
 func (p *Parser) recordRawEvent(head eventHead, line []byte) {
 	var g genericHead
 	json.Unmarshal(line, &g) // best-effort -- a decode failure here just means less context, not a dropped event
@@ -225,11 +266,15 @@ func (p *Parser) recordRawEvent(head eventHead, line []byte) {
 	if systemName == "" {
 		systemName = p.currentSystemName
 	}
+	raw := line
+	if eventsNeedingScrub[head.Event] {
+		raw = scrubSensitiveFields(line)
+	}
 	p.store.RawEvents = append(p.store.RawEvents, RawEvent{
-		// string(line) always copies -- safe even though the caller's scanner buffer backing
+		// string(...) always copies -- safe even though the caller's scanner buffer backing
 		// `line` gets reused/overwritten on the next call.
 		Timestamp: head.Timestamp, Event: head.Event, SystemName: systemName, BodyID: g.BodyID,
-		Raw: string(line),
+		Raw: string(raw),
 	})
 }
 
@@ -242,9 +287,6 @@ func (p *Parser) onCommander(e *commanderEntry) {
 		return
 	}
 	p.store.Commander = name
-	if e.FID != "" {
-		p.store.CommanderFID = e.FID
-	}
 }
 
 func (p *Parser) onJumpOrLocation(e *jumpEntry, timestamp string) {
