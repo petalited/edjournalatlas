@@ -54,7 +54,11 @@ input[type=text], select { background: var(--bg); border: 1px solid var(--border
 .material-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); }
 .material-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: var(--space-3); box-shadow: var(--shadow); }
+.material-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 .material-name { font-weight: 600; font-size: 0.92rem; }
+.material-grade { flex: 0 0 auto; font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: var(--radius-pill);
+  color: var(--muted); background: var(--bg); border: 1px solid var(--border-strong); }
+.material-grade-4, .material-grade-5 { color: var(--notable-text); background: var(--notable-bg); border-color: transparent; }
 .material-count { font-size: 1.15rem; font-weight: 700; margin-top: 2px; }
 .material-usage { margin-top: var(--space-2); font-size: 0.75rem; color: var(--notable-text);
   background: var(--notable-bg); border-radius: var(--radius-sm); padding: 3px var(--space-2); display: inline-block; }
@@ -85,6 +89,7 @@ a:focus-visible, input:focus-visible, select:focus-visible {
   <select id="sortSelect">
     <option value="count">Sort by amount held</option>
     <option value="name">Sort alphabetically</option>
+    <option value="grade">Sort by grade (highest first)</option>
   </select>
 </div>
 
@@ -114,7 +119,13 @@ const CATEGORIES = [
 function filteredSorted(list) {
   const needle = filterText.trim().toLowerCase();
   let out = needle ? list.filter(m => m.name.toLowerCase().includes(needle)) : list.slice();
-  out.sort((a, b) => sortKey === 'name' ? a.name.localeCompare(b.name) : b.count - a.count);
+  if (sortKey === 'name') {
+    out.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sortKey === 'grade') {
+    out.sort((a, b) => (b.grade || 0) - (a.grade || 0) || b.count - a.count);
+  } else {
+    out.sort((a, b) => b.count - a.count);
+  }
   return out;
 }
 
@@ -126,9 +137,17 @@ function usageBadge(m) {
     <div class="material-usage-detail">${bpList}</div>`;
 }
 
+function gradeBadge(m) {
+  if (!m.grade) return '';
+  return `<span class="material-grade material-grade-${m.grade}" title="Grade ${m.grade} material">G${m.grade}</span>`;
+}
+
 function materialCard(m) {
   return `<div class="material-card">
-    <div class="material-name">${escapeHtml(m.name)}</div>
+    <div class="material-card-head">
+      <div class="material-name">${escapeHtml(m.name)}</div>
+      ${gradeBadge(m)}
+    </div>
     <div class="material-count">${m.count.toLocaleString('en-US')}</div>
     ${usageBadge(m)}
   </div>`;

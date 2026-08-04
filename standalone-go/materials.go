@@ -63,6 +63,7 @@ type engineeringUsage struct {
 
 type materialOut struct {
 	Name  string            `json:"name"`
+	Grade int               `json:"grade,omitempty"`
 	Count int64             `json:"count"`
 	Usage *engineeringUsage `json:"usage,omitempty"`
 }
@@ -171,7 +172,7 @@ func toMaterialOut(entries []materialEntry, usage map[string]*engineeringUsage) 
 		if name == "" {
 			name = prettifyKeyStandalone(m.Name) // confirmed real: Raw entries never carry Name_Localised
 		}
-		mo := materialOut{Name: name, Count: m.Count}
+		mo := materialOut{Name: name, Grade: materialGrade(m.Name), Count: m.Count}
 		if u, ok := usage[name]; ok {
 			mo.Usage = u
 		}
