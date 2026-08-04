@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>edjournalatlas -- career recap</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  color-scheme: light dark;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+  --transition: 160ms ease;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --shadow: 0 1px 3px rgba(11,11,11,0.08), 0 1px 2px rgba(11,11,11,0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0d0d; --panel: #1a1a19; --text: #ffffff; --muted: #c3c2b7; --muted-faint: #898781;
+    --border: #2c2c2a; --border-strong: #383835; --accent: #3987e5; --accent-weak: #182338;
+    --shadow: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.35);
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text); padding: var(--space-5); font-variant-numeric: tabular-nums; }
+.page-nav { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.page-nav-link { font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill); border: 1px solid var(--border); transition: border-color var(--transition), color var(--transition); }
+.page-nav-link:hover { color: var(--accent); border-color: var(--accent); }
+.page-nav-link.page-nav-active { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+h1 { font-size: 1.6rem; margin: 0 0 2px; display: inline-block; }
+.header-row { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 var(--space-5); }
+.copy-btn { background: var(--accent); color: white; border: 1px solid transparent; border-radius: var(--radius-pill);
+  padding: 4px var(--space-4); font-size: 0.82rem; cursor: pointer; transition: background-color var(--transition); }
+.copy-btn:hover { background: color-mix(in srgb, var(--accent) 85%, black); }
+.copy-btn.copied { background: var(--accent); }
+.highlights { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
+.highlight { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4); box-shadow: var(--shadow); font-size: 0.9rem; }
+.section { margin-bottom: var(--space-6); }
+.section-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 var(--space-3); }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3); }
+.stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-4); box-shadow: var(--shadow); }
+.stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em;
+  margin: 0 0 4px; }
+.stat-value { font-size: 1.4rem; font-weight: 700; line-height: 1.2; }
+.stat-sub { font-size: 0.8rem; color: var(--muted-faint); margin-top: 2px; }
+.empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center; }
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+  <a class="page-nav-link" href="standalone_viewer.html">🗺️ Systems</a>
+  <a class="page-nav-link" href="standalone_events.html">🔍 Journal search</a>
+  <a class="page-nav-link page-nav-active" href="standalone_summary.html">📊 Recap</a>
+</nav>
+
+<div class="header-row">
+  <h1>standalone -- career recap</h1>
+  <button class="copy-btn" id="discordCopyBtn" type="button">💬 Copy for Discord</button>
+</div>
+<p class="subtitle" id="subtitle"></p>
+
+<div class="highlights" id="highlights"></div>
+<div id="sections"></div>
+
+<script id="recap-data" type="application/json">__DATA_JSON__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('recap-data').textContent);
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) { /* best effort */ }
+  document.body.removeChild(ta);
+}
+function copyWithFeedback(btn, text) {
+  const showCopied = () => {
+    const original = btn.textContent;
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(showCopied, () => { fallbackCopy(text); showCopied(); });
+  } else {
+    fallbackCopy(text);
+    showCopied();
+  }
+}
+
+function formatRecapForDiscord() {
+  const lines = [
+    `🚀 **CMDR ${DATA.commander || 'Unknown'}'s Career Recap**`,
+    `_Generated ${DATA.generatedAt}_`,
+    '',
+  ];
+  for (const section of DATA.sections) {
+    lines.push(`**${section.title}**`);
+    for (const stat of section.stats) {
+      lines.push(`  ${stat.label}: **${stat.value}**${stat.sub ? ` (${stat.sub})` : ''}`);
+    }
+    lines.push('');
+  }
+  if (DATA.highlights.length) {
+    lines.push('**Highlights**');
+    for (const h of DATA.highlights) lines.push(`  ${h}`);
+  }
+  return lines.join('\n').trim();
+}
+document.getElementById('discordCopyBtn').addEventListener('click', () => {
+  copyWithFeedback(document.getElementById('discordCopyBtn'), formatRecapForDiscord());
+});
+
+const totalStats = DATA.sections.reduce((n, s) => n + s.stats.length, 0);
+document.getElementById('subtitle').textContent =
+  `Generated ${DATA.generatedAt} — ${totalStats} stats across ${DATA.sections.length} categories, computed from your whole journal history.`;
+
+document.getElementById('highlights').innerHTML = DATA.highlights
+  .map(h => `<div class="highlight">${escapeHtml(h)}</div>`)
+  .join('');
+
+document.getElementById('sections').innerHTML = DATA.sections.length
+  ? DATA.sections.map(section => `
+    <div class="section">
+      <div class="section-title">${escapeHtml(section.title)}</div>
+      <div class="stat-grid">
+        ${section.stats.map(stat => `
+          <div class="stat-card">
+            <div class="stat-label">${escapeHtml(stat.label)}</div>
+            <div class="stat-value">${escapeHtml(stat.value)}</div>
+            ${stat.sub ? `<div class="stat-sub">${escapeHtml(stat.sub)}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('')
+  : '<div class="empty-note">No recap-relevant events found in your journal yet.</div>';
+</script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>edjournalatlas -- full journal search</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  color-scheme: light dark;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+  --transition: 160ms ease;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --shadow: 0 1px 3px rgba(11,11,11,0.08), 0 1px 2px rgba(11,11,11,0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0d0d; --panel: #1a1a19; --text: #ffffff; --muted: #c3c2b7; --muted-faint: #898781;
+    --border: #2c2c2a; --border-strong: #383835; --accent: #3987e5; --accent-weak: #182338;
+    --shadow: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.35);
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text); padding: var(--space-5); font-variant-numeric: tabular-nums; }
+.page-nav { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.page-nav-link { font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill); border: 1px solid var(--border); transition: border-color var(--transition), color var(--transition); }
+.page-nav-link:hover { color: var(--accent); border-color: var(--accent); }
+.page-nav-link.page-nav-active { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+h1 { font-size: 1.4rem; margin: 0 0 2px; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 var(--space-5); }
+.controls { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-bottom: var(--space-4);
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4); box-shadow: var(--shadow); }
+input[type=text], select { background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); font-size: 0.9rem;
+  transition: border-color var(--transition); }
+#searchInput { width: 340px; }
+.result-count { color: var(--muted); font-size: 0.85rem; margin-bottom: var(--space-3); }
+.event-row { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  margin-bottom: var(--space-2); box-shadow: var(--shadow); cursor: pointer; overflow: hidden; }
+.event-row-head { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-2) var(--space-3);
+  flex-wrap: wrap; }
+.event-time { color: var(--muted-faint); font-size: 0.78rem; white-space: nowrap; }
+.event-type { font-weight: 600; }
+.event-system { color: var(--muted); font-size: 0.85rem; text-decoration: none; border-bottom: 1px dotted transparent; }
+.event-system:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.event-body { color: var(--muted-faint); font-size: 0.78rem; }
+.event-raw { display: none; margin: 0; padding: var(--space-3); border-top: 1px solid var(--border);
+  background: var(--bg); font-size: 0.78rem; white-space: pre-wrap; word-break: break-word; }
+.event-row.open .event-raw { display: block; }
+.empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center; }
+a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+  <a class="page-nav-link" href="standalone_viewer.html">🗺️ Systems</a>
+  <a class="page-nav-link page-nav-active" href="standalone_events.html">🔍 Journal search</a>
+  <a class="page-nav-link" href="standalone_summary.html">📊 Recap</a>
+</nav>
+
+<h1>standalone -- full journal search</h1>
+<p class="subtitle" id="subtitle"></p>
+
+<div class="controls">
+  <input type="text" id="searchInput" placeholder="Search event type, system, or raw JSON text...">
+  <select id="eventTypeSelect"><option value="">All event types</option></select>
+  <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;">
+    <input type="checkbox" id="sortAscInput"> Oldest first
+  </label>
+</div>
+
+<div class="result-count" id="resultCount"></div>
+<div id="results"></div>
+
+<script id="event-data" type="application/json">__DATA_JSON__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('event-data').textContent);
+const RESULT_CAP = 300;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Event-type counts, most frequent first -- lets the dropdown surface what's actually common in
+// THIS commander's own journal rather than a fixed alphabetical list of 170+ names to scroll.
+const typeCounts = new Map();
+for (const e of DATA.events) typeCounts.set(e.event, (typeCounts.get(e.event) || 0) + 1);
+const sortedTypes = [...typeCounts.entries()].sort((a, b) => b[1] - a[1]);
+document.getElementById('eventTypeSelect').innerHTML += sortedTypes
+  .map(([type, n]) => `<option value="${escapeHtml(type)}">${escapeHtml(type)} (${n.toLocaleString('en-US')})</option>`)
+  .join('');
+
+document.getElementById('subtitle').textContent =
+  `Generated ${DATA.generatedAt} — ${DATA.events.length.toLocaleString('en-US')} journal events, every event type, not just exploration-relevant ones.`;
+
+// standalone_viewer.html's "Journal ↗" button links here as "#q=<system name>" -- lets "show me
+// the raw journal for this system" be a real link between the two pages instead of a dead end
+// (the search page otherwise has no way to know why someone arrived at it). Read once at load,
+// same reasoning as viewer_template.html's systemFromHash: this page never rewrites its own
+// hash, so there's nothing for a hashchange listener to react to.
+const hashMatch = location.hash.match(/q=([^&]+)/);
+if (hashMatch) {
+  document.getElementById('searchInput').value = decodeURIComponent(hashMatch[1]);
+}
+
+let openKeys = new Set();
+
+function render() {
+  const needle = document.getElementById('searchInput').value.trim().toLowerCase();
+  const typeFilter = document.getElementById('eventTypeSelect').value;
+  const asc = document.getElementById('sortAscInput').checked;
+
+  let filtered = DATA.events.filter(e => {
+    if (typeFilter && e.event !== typeFilter) return false;
+    if (!needle) return true;
+    return (
+      e.event.toLowerCase().includes(needle) ||
+      (e.systemName && e.systemName.toLowerCase().includes(needle)) ||
+      e.raw.toLowerCase().includes(needle)
+    );
+  });
+
+  document.getElementById('resultCount').textContent = filtered.length
+    ? `${filtered.length.toLocaleString('en-US')} match${filtered.length === 1 ? '' : 'es'}${filtered.length > RESULT_CAP ? ` (showing first ${RESULT_CAP} -- refine your search to narrow it down)` : ''}`
+    : '';
+
+  if (!asc) filtered = filtered.slice().reverse(); // DATA.events is already timestamp-ascending
+
+  const shown = filtered.slice(0, RESULT_CAP);
+  const results = document.getElementById('results');
+  if (!shown.length) {
+    // Same reasoning as the systems viewer's empty state: "no journal captured at all" and
+    // "your search matched nothing" are different problems with different fixes.
+    results.innerHTML = `<div class="empty-note">${DATA.events.length ? 'No matching events.' : 'No journal events captured yet -- play some Elite Dangerous, then run this again.'}</div>`;
+    return;
+  }
+  results.innerHTML = shown.map((e, i) => {
+    const key = `${e.timestamp}::${i}`;
+    const isOpen = openKeys.has(key);
+    let pretty = e.raw;
+    try { pretty = JSON.stringify(JSON.parse(e.raw), null, 2); } catch (err) { /* show raw as-is */ }
+    return `<div class="event-row${isOpen ? ' open' : ''}" data-key="${escapeHtml(key)}" tabindex="0">
+      <div class="event-row-head">
+        <span class="event-time">${escapeHtml(e.timestamp.replace('T', ' ').replace('Z', ''))}</span>
+        <span class="event-type">${escapeHtml(e.event)}</span>
+        ${e.systemName ? `<a class="event-system" href="standalone_viewer.html#system=${encodeURIComponent(e.systemName)}" target="_blank" rel="noopener" title="Open this system in the systems viewer">${escapeHtml(e.systemName)}</a>` : ''}
+        ${e.bodyId != null ? `<span class="event-body">BodyID ${e.bodyId}</span>` : ''}
+      </div>
+      <pre class="event-raw">${escapeHtml(pretty)}</pre>
+    </div>`;
+  }).join('');
+
+  results.querySelectorAll('.event-row').forEach(row => {
+    const toggle = () => {
+      const key = row.getAttribute('data-key');
+      if (openKeys.has(key)) openKeys.delete(key); else openKeys.add(key);
+      render();
+    };
+    row.addEventListener('click', toggle);
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+  });
+  // Without this, clicking the system link would also bubble up and toggle the row open/closed
+  // in the SAME tab it's navigating away from -- harmless but sloppy, since the link already
+  // opens the viewer in its own new tab.
+  results.querySelectorAll('.event-system').forEach(a => {
+    a.addEventListener('click', e => e.stopPropagation());
+  });
+}
+
+let searchDebounce = null;
+document.getElementById('searchInput').addEventListener('input', () => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(render, 150);
+});
+document.getElementById('eventTypeSelect').addEventListener('change', render);
+document.getElementById('sortAscInput').addEventListener('change', render);
+
+render();
+</script>
+</body>
+</html>

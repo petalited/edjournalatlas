@@ -25,6 +25,7 @@ type FloraValue struct {
 	SpeciesName      string
 	Count            int
 	WasLogged        *bool
+	ScannedAt        string
 	BaseValue        int64
 	HasBaseValue     bool
 	FootfallBonus    bool
@@ -96,6 +97,7 @@ func ComputeFloraValues(store *Store) []FloraValue {
 					GenusName: genusDisplayName(fs.Genus),
 					Count:     fs.Count,
 					WasLogged: fs.WasLogged,
+					ScannedAt: fs.ScannedAt,
 				}
 				info, ok := lookupSpecies(fs.Genus, fs.Species)
 				if ok {

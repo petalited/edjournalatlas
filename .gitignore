@@ -1,0 +1,15 @@
+# Build output (binaries) -- regenerate with standalone-go/build.sh or standalone/build_executable.py
+/dist/
+/dist-go/
+
+# Generated at runtime -- your own local cache + viewer/search/recap output, never meant to be
+# committed (contains real personal journal data: commander name, credit balances, systems
+# visited, etc.)
+standalone.db
+standalone_viewer.html
+standalone_events.html
+standalone_summary.html
+standalone_unmodeled.json
+
+__pycache__/
+*.pyc

@@ -36,6 +36,11 @@
 * { box-sizing: border-box; }
 body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg); color: var(--text); padding: var(--space-5); font-variant-numeric: tabular-nums; }
+.page-nav { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.page-nav-link { font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill); border: 1px solid var(--border); transition: border-color var(--transition), color var(--transition); }
+.page-nav-link:hover { color: var(--accent); border-color: var(--accent); }
+.page-nav-link.page-nav-active { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); font-weight: 600; }
 h1 { font-size: 1.4rem; margin: 0 0 2px; }
 .subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 var(--space-5); }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3);
@@ -63,9 +68,34 @@ button.secondary:hover { background: var(--accent-weak); }
 .checkbox-field { display: flex; align-items: center; gap: var(--space-2); font-size: 0.85rem; cursor: pointer; }
 input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
 .sort-arrow { font-size: 0.7rem; margin-left: 3px; opacity: 0.7; }
-table { border-collapse: collapse; width: 100%; min-width: 900px; }
+/* table-layout: fixed (with explicit per-column widths below) keeps column widths tied only to
+   the header row -- with the default auto layout, the detail row's colspan cell (which can hold
+   an arbitrarily wide orbit-tree) forces the browser to widen System/Region/Population etc. to
+   fit it, stretching the whole table off-screen the moment any system is opened. Fixed layout
+   makes that impossible: the detail row's content is now genuinely confined to the already-
+   established column width and left to its own overflow-x:auto (see .orbit-tree) instead. */
+table { border-collapse: collapse; width: 100%; min-width: 900px; table-layout: fixed; }
+th.col-name { width: 24%; } th.col-region { width: 15%; } th.col-population { width: 12%; }
+th.col-bodies { width: 11%; } th.col-notable { width: 10%; } th.col-first { width: 15%; }
+th.col-bio { width: 13%; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  overflow-x: auto; box-shadow: var(--shadow); }
+  overflow-x: auto; box-shadow: var(--shadow); position: relative; }
+/* Edge-fade cue for horizontally-scrollable containers (the results table and each system's
+   orbit-tree row) -- overflow-x:auto alone gives no visual hint that there's more content
+   off-screen, so a fade toggles in via scroll-left/scroll-right classes kept in sync with actual
+   scroll position (see updateScrollShadows in the script). */
+.panel::before, .panel::after, .orbit-tree::before, .orbit-tree::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 28px;
+  pointer-events: none; opacity: 0; transition: opacity var(--transition); z-index: 2;
+}
+.panel::before, .orbit-tree::before { left: 0; }
+.panel::after, .orbit-tree::after { right: 0; }
+.panel::before { background: linear-gradient(to right, var(--panel), transparent); border-radius: var(--radius-lg) 0 0 var(--radius-lg); }
+.panel::after { background: linear-gradient(to left, var(--panel), transparent); border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
+.orbit-tree::before { background: linear-gradient(to right, var(--bg), transparent); }
+.orbit-tree::after { background: linear-gradient(to left, var(--bg), transparent); }
+.panel.scroll-left::before, .orbit-tree.scroll-left::before { opacity: 1; }
+.panel.scroll-right::after, .orbit-tree.scroll-right::after { opacity: 1; }
 th, td { padding: var(--space-2) var(--space-3); text-align: left; font-size: 0.88rem; }
 thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); border-bottom: 1px solid var(--border-strong);
   box-shadow: var(--header-shadow); color: var(--muted); font-weight: 600; cursor: pointer; user-select: none;
@@ -82,7 +112,9 @@ td.num, th.num { text-align: right; }
 .detail-row td { padding: 0; }
 .detail-wrap { padding: var(--space-1) var(--space-3) var(--space-4) var(--space-6); background: var(--bg); }
 .body-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3); width: 240px; }
+  padding: var(--space-2) var(--space-3); width: 240px; cursor: pointer; transition: border-color var(--transition); }
+.body-card:hover { border-color: var(--accent); }
+.body-card-open { border-color: var(--accent); width: 280px; }
 .body-title { display: flex; align-items: baseline; gap: var(--space-2); }
 .body-name { font-weight: 600; }
 .body-type { color: var(--muted); font-weight: 400; font-size: 0.8rem; }
@@ -93,7 +125,7 @@ td.num, th.num { text-align: right; }
    -- derived from ED's real body-naming convention: a trailing lowercase letter marks a moon of
    the preceding tokens). */
 .orbit-tree { display: flex; flex-direction: row; align-items: flex-start; gap: 18px;
-  overflow-x: auto; padding: var(--space-1) 2px var(--space-3); }
+  overflow-x: auto; padding: var(--space-1) 2px var(--space-3); position: relative; }
 .tree-column { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
 .tree-child { position: relative; margin-left: 20px; margin-top: var(--space-3); padding-left: var(--space-4);
   border-left: 2px solid var(--border); }
@@ -135,6 +167,20 @@ td.num, th.num { text-align: right; }
   border-radius: var(--radius-sm); padding: 1px 5px; font-size: 0.8rem; line-height: 1.4; cursor: pointer; }
 .copy-btn:hover { color: var(--accent); border-color: var(--border); }
 .copy-btn.copied { color: var(--good); border-color: var(--good); }
+.ext-link { font-size: 0.78rem; color: var(--accent); text-decoration: none; border: 1px solid var(--border);
+  border-radius: var(--radius-pill); padding: 2px var(--space-3); transition: border-color var(--transition); }
+.ext-link:hover { text-decoration: underline; border-color: var(--accent); }
+/* Same pill look as .ext-link, but a real <button> (triggers a state change, not navigation) --
+   needs its own background/border reset since the generic `button{...}` rule above would
+   otherwise still apply its solid accent background underneath .ext-link's own (unset)
+   background, producing near-invisible accent-on-accent text. */
+.nearest-btn { background: transparent; font-size: 0.78rem; color: var(--accent); border: 1px solid var(--border);
+  border-radius: var(--radius-pill); padding: 2px var(--space-3); transition: border-color var(--transition); }
+.nearest-btn:hover { background: transparent; border-color: var(--accent); }
+.distance-indicator { display: flex; align-items: center; gap: var(--space-2); font-size: 0.85rem;
+  color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4); margin-bottom: var(--space-4); box-shadow: var(--shadow); }
+.distance-indicator button { padding: 1px var(--space-3); font-size: 0.78rem; }
 .section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
   margin: var(--space-4) 0 var(--space-2); }
 .section-label:first-child { margin-top: 0; }
@@ -143,18 +189,26 @@ td.num, th.num { text-align: right; }
   padding: var(--space-2) var(--space-3); font-size: 0.82rem; box-shadow: var(--shadow); }
 .star-chip .star-type { color: var(--muted); margin-left: 4px; }
 a:focus-visible, input:focus-visible, select:focus-visible, .notable-chip:focus-visible,
-button:focus-visible, thead th[data-key]:focus-visible {
+button:focus-visible, thead th[data-key]:focus-visible, tbody tr.system-row:focus-visible,
+.body-card:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm);
 }
 </style>
 </head>
 <body>
 
+<nav class="page-nav">
+  <a class="page-nav-link page-nav-active" href="standalone_viewer.html">🗺️ Systems</a>
+  <a class="page-nav-link" href="standalone_events.html">🔍 Journal search</a>
+  <a class="page-nav-link" href="standalone_summary.html">📊 Recap</a>
+</nav>
+
 <h1>standalone</h1>
 <p class="subtitle" id="subtitle"></p>
 
 <div class="cards" id="summaryCards"></div>
 <div id="notableChips" style="margin-bottom: 16px;"></div>
+<p class="muted" style="font-size: 0.82rem; margin: -8px 0 16px;">💡 Bio values here include your personal first-footfall and first-logged-in-region bonuses. Open any system and use 🌐 to copy an objective, bonus-free summary — what's genuinely still there for anyone else, not just what you claimed first.</p>
 
 <div class="controls">
   <input type="text" id="filterInput" placeholder="Search systems, body types, species...">
@@ -169,22 +223,24 @@ button:focus-visible, thead th[data-key]:focus-visible {
   <button class="secondary" id="resetBtn">Reset filters</button>
 </div>
 
+<div id="distanceIndicator"></div>
+
 <div class="panel">
   <table>
     <thead>
       <tr>
-        <th data-key="name">System<span class="sort-arrow"></span></th>
-        <th data-key="region">Region<span class="sort-arrow"></span></th>
-        <th data-key="population" class="num">Population<span class="sort-arrow"></span></th>
-        <th data-key="recordedBodyCount" class="num" title="Bodies with any individual scan data, out of the Discovery Scanner's true total">Bodies<span class="sort-arrow"></span></th>
-        <th data-key="notableTotal" class="num">Notable<span class="sort-arrow"></span></th>
-        <th data-key="firstDiscoveryCount" class="num">First discoveries<span class="sort-arrow"></span></th>
-        <th data-key="bioValue" class="num">Bio value<span class="sort-arrow"></span></th>
+        <th class="col-name" data-key="name">System<span class="sort-arrow"></span></th>
+        <th class="col-region" data-key="region">Region<span class="sort-arrow"></span></th>
+        <th class="col-population num" data-key="population">Population<span class="sort-arrow"></span></th>
+        <th class="col-bodies num" data-key="recordedBodyCount" title="Bodies with any individual scan data, out of the Discovery Scanner's true total">Bodies<span class="sort-arrow"></span></th>
+        <th class="col-notable num" data-key="notableTotal">Notable<span class="sort-arrow"></span></th>
+        <th class="col-first num" data-key="firstDiscoveryCount">First discoveries<span class="sort-arrow"></span></th>
+        <th class="col-bio num" data-key="bioValue">Bio value<span class="sort-arrow"></span></th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
   </table>
-  <div class="empty-note" id="emptyNote" style="display:none"><div class="empty-note-icon">🔭</div>No systems match your filters.</div>
+  <div class="empty-note" id="emptyNote" style="display:none"><div class="empty-note-icon">🔭</div><span id="emptyNoteText">No systems match your filters.</span></div>
 </div>
 
 <script id="report-data" type="application/json">__DATA_JSON__</script>
@@ -204,6 +260,15 @@ function notableTotal(s) {
 
 function edsmUrl(systemName) {
   return `https://www.edsm.net/en/system?systemName=${encodeURIComponent(systemName)}`;
+}
+function inaraUrl(systemName) {
+  return `https://inara.cz/elite/starsystem/?search=${encodeURIComponent(systemName)}`;
+}
+// standalone_events.html reads this same "q=" hash param on load and pre-fills its search box --
+// the two pages are generated from the same underlying parse, so "show me the raw journal for
+// this system" is a real, answerable link rather than an external URL guess.
+function eventsSearchUrl(systemName) {
+  return `standalone_events.html#q=${encodeURIComponent(systemName)}`;
 }
 // No per-body/per-star deep link is reliable without EDSM's own internal numeric IDs (this
 // project never fetches them) -- every name links to the same system page instead, which lists
@@ -276,11 +341,44 @@ function starDiscordBits(s) {
   });
 }
 
-// A plain, non-notable body's type doesn't add much beyond what its own emoji already conveys
-// -- only spell it out when it's actually notable, where the label itself is the interesting part.
+// The system's own name repeated in full for every single body (plus a whole markdown link
+// pointing at the exact same URL every time -- there's no per-body EDSM deep link, see
+// discordLink's comment) is the single biggest thing eating the character budget for basically
+// zero benefit. Body names are always "<system name> <orbit designator>" (e.g. "AB 3 a"), so
+// stripping the system name off leaves just the short designator that's actually useful here.
+function bodyDesignator(b, systemName) {
+  const suffix = b.name.startsWith(systemName) ? b.name.slice(systemName.length).trim() : b.name;
+  return suffix || b.name;
+}
 function bodyNameBit(b, systemName) {
-  const nameBit = `${bodyEmoji(b)} ${discordLink(`**${b.name}**`, systemName)}`;
+  const nameBit = `${bodyEmoji(b)} ${bodyDesignator(b, systemName)}`;
   return b.notableLabel ? `${nameBit} — ✨ ${b.notableLabel}` : nameBit;
+}
+
+// Discord's hard cap for a normal (non-Nitro, non-embed) message is 2000 chars -- stop
+// comfortably under that so nothing gets cut off mid-line, and leave headroom for the
+// "+N more" line itself.
+const DISCORD_CHAR_BUDGET = 1800;
+
+// Appends a "**Bodies:**" section listing every body passed in (one line each, via
+// bodyDesignator/bodyNameBit to keep lines short), until the running total gets close to
+// Discord's message-length limit, then stops and reports an accurate count of what didn't fit --
+// a character budget rather than a fixed item count, so a modest system shows everything and
+// only a genuinely huge one gets truncated. Always shows at least one body so the section isn't
+// left empty just because the very first line happens to be long.
+function appendBodyLines(lines, bodies, lineForBody) {
+  if (!bodies.length) return;
+  lines.push('', '**Bodies:**');
+  let shown = 0;
+  for (const b of bodies) {
+    const line = '  ' + lineForBody(b);
+    const budgetUsed = lines.join('\n').length;
+    if (shown > 0 && budgetUsed + line.length + 1 > DISCORD_CHAR_BUDGET - 24) break;
+    lines.push(line);
+    shown++;
+  }
+  const remaining = bodies.length - shown;
+  if (remaining > 0) lines.push(`  _+${remaining} more_`);
 }
 
 // Two Discord export variants: a commander's own bonuses (first footfall, first-logged) are
@@ -310,29 +408,21 @@ function formatSystemForDiscordPersonal(s) {
   }
   if (s.firstDiscoveryCount > 0) lines.push(`🌟 First discoveries: ${s.firstDiscoveryCount}`);
 
-  const worthMentioning = s.bodies
-    .filter(b => b.bioSignalCount > 0 || b.notableLabel)
-    .sort((a, b) =>
-      b.flora.reduce((s2, f) => s2 + (f.value && !f.lost ? f.value : 0), 0) -
-      a.flora.reduce((s2, f) => s2 + (f.value && !f.lost ? f.value : 0), 0)
-    );
-  if (worthMentioning.length) {
-    lines.push('', '**Bodies:**');
-    const shown = worthMentioning.slice(0, 15);
-    for (const b of shown) {
-      const bits = [bodyNameBit(b, s.name)];
-      if (b.bioSignalCount > 0) {
-        const scanned = b.flora.filter(f => f.count === 3).length;
-        bits.push(`🧬 ${scanned}/${b.bioSignalCount} scanned`);
-        const unclaimed = b.flora.reduce((s2, f) => s2 + ((f.value && !f.sold && !f.lost) ? f.value : 0), 0);
-        if (unclaimed > 0) bits.push(`${formatCredits(unclaimed)} unclaimed`);
-      }
-      if (b.discovered && b.wasDiscovered === false) bits.push('🌟 first discovery');
-      lines.push('  ' + bits.join(' — '));
+  // Every recorded body, not just the notable/bio-bearing ones -- this is meant to be a full
+  // export of what you've got, not a curated highlight reel (see bodyDesignator for how each
+  // stays a one-liner despite that). Already in orbit order (viewer.go/viewer.py sort bodies by
+  // distance from their star), so left as-is rather than re-ranked by value.
+  appendBodyLines(lines, s.bodies, b => {
+    const bits = [bodyNameBit(b, s.name)];
+    if (b.bioSignalCount > 0) {
+      const scanned = b.flora.filter(f => f.count === 3).length;
+      bits.push(`🧬 ${scanned}/${b.bioSignalCount} scanned`);
+      const unclaimed = b.flora.reduce((s2, f) => s2 + ((f.value && !f.sold && !f.lost) ? f.value : 0), 0);
+      if (unclaimed > 0) bits.push(`${formatCredits(unclaimed)} unclaimed`);
     }
-    const remaining = worthMentioning.length - shown.length;
-    if (remaining > 0) lines.push(`  _+${remaining} more_`);
-  }
+    if (b.discovered && b.wasDiscovered === false) bits.push('🌟 first discovery');
+    return bits.join(' — ');
+  });
   return lines.join('\n');
 }
 
@@ -351,27 +441,17 @@ function formatSystemForDiscordObjective(s) {
   const bioBase = s.bodies.reduce((sum, b) => sum + b.flora.reduce((s2, f) => s2 + (f.baseValue || 0), 0), 0);
   if (bioBase > 0) lines.push(`🧬 Exobiology available: ${formatCredits(bioBase)}`);
 
-  const worthMentioning = s.bodies
-    .filter(b => b.bioSignalCount > 0 || b.notableLabel)
-    .sort((a, b) =>
-      b.flora.reduce((s2, f) => s2 + (f.baseValue || 0), 0) -
-      a.flora.reduce((s2, f) => s2 + (f.baseValue || 0), 0)
-    );
-  if (worthMentioning.length) {
-    lines.push('', '**Bodies:**');
-    const shown = worthMentioning.slice(0, 15);
-    for (const b of shown) {
-      const bits = [bodyNameBit(b, s.name)];
-      if (b.bioSignalCount > 0) {
-        bits.push(`🧬 ${b.bioSignalCount} signal${b.bioSignalCount === 1 ? '' : 's'}`);
-        const base = b.flora.reduce((s2, f) => s2 + (f.baseValue || 0), 0);
-        if (base > 0) bits.push(`${formatCredits(base)} available`);
-      }
-      lines.push('  ' + bits.join(' — '));
+  // Every recorded body, not just the notable/bio-bearing ones -- see the equivalent comment in
+  // formatSystemForDiscordPersonal.
+  appendBodyLines(lines, s.bodies, b => {
+    const bits = [bodyNameBit(b, s.name)];
+    if (b.bioSignalCount > 0) {
+      bits.push(`🧬 ${b.bioSignalCount} signal${b.bioSignalCount === 1 ? '' : 's'}`);
+      const base = b.flora.reduce((s2, f) => s2 + (f.baseValue || 0), 0);
+      if (base > 0) bits.push(`${formatCredits(base)} available`);
     }
-    const remaining = worthMentioning.length - shown.length;
-    if (remaining > 0) lines.push(`  _+${remaining} more_`);
-  }
+    return bits.join(' — ');
+  });
   return lines.join('\n');
 }
 
@@ -381,13 +461,23 @@ let filterText = '';
 let notableOnly = false;
 let bioOnly = false;
 let openSystem = null;
+let focusAfterRender = null;
+let focusAfterRenderBodyKey = null;
+// "Nearest systems to X" -- set to a system name once the 📍 button in that system's detail
+// header is clicked (see the detail-header markup in render()). Every system's own X/Y/Z is
+// already in DATA (no separate lookup/index needed for 470+ systems -- see sortedSystems), so
+// this reuses the plain sort pipeline rather than adding a whole new search feature/UI surface.
+let distanceFromSystem = null;
 
 function systemMatchesSearch(s, needle) {
   if (!needle) return true;
   if (s.name.toLowerCase().includes(needle)) return true;
   if (s.region && s.region.toLowerCase().includes(needle)) return true;
+  if (Object.keys(s.notableCounts).some(label => label.toLowerCase().includes(needle))) return true;
   if (s.bodies.some(b => b.type && b.type.toLowerCase().includes(needle))) return true;
+  if (s.bodies.some(b => b.notableLabel && b.notableLabel.toLowerCase().includes(needle))) return true;
   if (s.stars.some(st => st.type && st.type.toLowerCase().includes(needle))) return true;
+  if (s.stars.some(st => st.notableLabel && st.notableLabel.toLowerCase().includes(needle))) return true;
   if (s.bodies.some(b => b.flora.some(f =>
     (f.genus && f.genus.toLowerCase().includes(needle)) ||
     (f.species && f.species.toLowerCase().includes(needle))
@@ -400,7 +490,14 @@ function sortedSystems() {
   let list = DATA.systems.filter(s => systemMatchesSearch(s, needle));
   if (notableOnly) list = list.filter(s => notableTotal(s) > 0);
   if (bioOnly) list = list.filter(s => s.bioValue > 0);
-  list = list.map(s => ({...s, notableTotal: notableTotal(s)}));
+  // Plain Euclidean distance against every system's own galactic X/Y/Z -- an O(n) scan over
+  // 470-ish systems is trivial in a browser, no spatial index needed at this scale.
+  const refSys = distanceFromSystem ? DATA.systems.find(s => s.name === distanceFromSystem) : null;
+  list = list.map(s => ({
+    ...s,
+    notableTotal: notableTotal(s),
+    distance: refSys ? Math.sqrt((s.x - refSys.x) ** 2 + (s.y - refSys.y) ** 2 + (s.z - refSys.z) ** 2) : null,
+  }));
   list.sort((a, b) => {
     let av = a[sortKey], bv = b[sortKey];
     if (typeof av === 'string') return sortDir * av.localeCompare(bv || '');
@@ -420,7 +517,76 @@ function starAnchorId(systemName, starName) {
   return `star-${slugify(systemName)}-${slugify(starName)}`;
 }
 
-function bodyCard(b) {
+let openBodies = new Set();
+function bodyKey(sys, b) {
+  return `${sys.name}::${b.name}`;
+}
+
+// SurfaceGravity/SurfacePressure come off the journal in raw SI (m/s^2, Pa) -- converted here to
+// the units the game's own UI shows (Earth g, atmospheres) since that's what's actually
+// meaningful to a player, not the raw physics units.
+function formatGravity(gMs2) {
+  if (!gMs2) return null;
+  return `${(gMs2 / 9.797).toFixed(2)}g`;
+}
+function formatPressure(pa) {
+  if (!pa) return null;
+  const atm = pa / 101325;
+  return `${atm.toLocaleString('en-US', {maximumFractionDigits: atm < 10 ? 2 : 0})} atm`;
+}
+// Journal enum values arrive PascalCase/camelCase with no spaces (e.g. "CarbonDioxide",
+// "Terraformable") -- this is display-only formatting, not touching the underlying value.
+function formatCamel(s) {
+  return s ? s.replace(/([a-z0-9])([A-Z])/g, '$1 $2') : '';
+}
+
+// Every field the parser already captures for a body but the compact card doesn't normally show
+// -- surfaced in full once a body is clicked open, per the user's explicit "show me everything
+// already captured" request rather than just the summary badges.
+function bodyDetailRows(b) {
+  const rows = [[`Distance from arrival`, `${b.distance.toLocaleString('en-US', {maximumFractionDigits: 1})} ls`]];
+  if (b.mass) rows.push(['Mass', `${b.mass.toLocaleString('en-US', {maximumFractionDigits: 3})} Earth masses`]);
+  const gravity = formatGravity(b.gravity);
+  if (gravity) rows.push(['Gravity', gravity]);
+  if (b.temp) rows.push(['Surface temperature', `${Math.round(b.temp).toLocaleString('en-US')} K`]);
+  const pressure = formatPressure(b.pressure);
+  if (pressure) rows.push(['Surface pressure', pressure]);
+  if (b.atmosphere && b.atmosphere !== 'None') rows.push(['Atmosphere', formatCamel(b.atmosphere)]);
+  if (b.terraformState) rows.push(['Terraform state', formatCamel(b.terraformState)]);
+  rows.push(['Landable', b.landable ? 'Yes' : 'No']);
+  if (b.mapped) rows.push(['Mapped', b.wasMapped === false ? 'Yes — first mapping' : 'Yes']);
+  if (b.discovered) rows.push(['Discovered', b.wasDiscovered === false ? 'Yes — first discovery' : 'Yes']);
+  if (b.wasFootfalled !== null && b.wasFootfalled !== undefined) {
+    rows.push(['First footfall', b.wasFootfalled ? 'Already claimed' : 'Available']);
+  }
+  return rows;
+}
+
+// Raw journal Variant values are FDev internal localization keys, e.g.
+// "$Codex_Ent_Electricae_02_Antimony_Name;" -- confirmed against real data that the token right
+// before "_Name;" is always the actual meaningful variant (either a chemical element, when the
+// variant depends on system mineral content, or a single letter, when it depends on the host
+// star's spectral class), so that's all that's shown.
+function formatVariant(raw) {
+  if (!raw) return '';
+  const m = raw.match(/_([A-Za-z0-9]+)_Name;?$/);
+  if (!m) return raw;
+  return /^[A-Z]$/.test(m[1]) ? `${m[1]}-class star` : m[1];
+}
+
+function floraDetailLine(f) {
+  const bits = [];
+  if (f.variant) bits.push(formatVariant(f.variant));
+  if (f.wasLogged !== null && f.wasLogged !== undefined) {
+    bits.push(f.wasLogged ? 'first logged already' : 'first logged by you');
+  }
+  if (f.scannedAt) bits.push(`scanned ${f.scannedAt.replace('T', ' ').replace('Z', '')}`);
+  return bits.join(' · ');
+}
+
+function bodyCard(sys, b) {
+  const key = bodyKey(sys, b);
+  const isOpen = openBodies.has(key);
   const badges = [];
   if (b.notableLabel) badges.push(notableBadge(b.notableLabel));
   if (b.discovered && b.wasDiscovered === false) badges.push('<span class="badge">🌟 First discovery</span>');
@@ -433,18 +599,28 @@ function bodyCard(b) {
     else if (f.value) bits.push('<span class="badge badge-unclaimed">Unclaimed</span>');
     if (f.footfallBonus) bits.push('<span class="badge">Footfall bonus</span>');
     if (f.firstLoggedBonus) bits.push('<span class="badge">First logged bonus</span>');
-    return `<li><span>${escapeHtml(label)}</span><span>${f.value ? formatCredits(f.value) : ''} ${bits.join(' ')}</span></li>`;
+    const detailLine = isOpen ? floraDetailLine(f) : '';
+    const labelHtml = detailLine
+      ? `${escapeHtml(label)}<div class="muted" style="font-size:0.75rem">${escapeHtml(detailLine)}</div>`
+      : escapeHtml(label);
+    return `<li><span>${labelHtml}</span><span>${f.value ? formatCredits(f.value) : ''} ${bits.join(' ')}</span></li>`;
   }).join('')}</ul>` : '';
-  return `<div class="body-card">
+  const detailHtml = isOpen
+    ? `<ul class="flora-list">${bodyDetailRows(b).map(([label, value]) =>
+        `<li><span>${escapeHtml(label)}</span><span>${escapeHtml(value)}</span></li>`
+      ).join('')}</ul>`
+    : '';
+  return `<div class="body-card${isOpen ? ' body-card-open' : ''}" data-body-key="${escapeHtml(key)}" tabindex="0" aria-expanded="${isOpen}">
     <div class="body-title"><span class="body-name">${escapeHtml(b.name)}</span><span class="body-type">${escapeHtml(b.type)}</span></div>
     ${b.bioSignalCount > 0 ? `<div class="muted" style="font-size:0.8rem;margin-top:2px">${b.bioSignalCount} bio signal${b.bioSignalCount===1?'':'s'}</div>` : ''}
     ${badges.length ? `<div class="body-badges">${badges.join('')}</div>` : ''}
+    ${detailHtml}
     ${floraHtml}
   </div>`;
 }
 
 function starChip(sys, st) {
-  const label = st.distance > 0 ? `${st.distance.toLocaleString()} ls` : 'main star';
+  const label = st.distance > 0 ? `${st.distance.toLocaleString('en-US')} ls` : 'main star';
   const notable = st.notableLabel ? ` ${notableBadge(st.notableLabel)}` : '';
   const first = st.wasDiscovered === false ? ' <span class="badge">🌟 First discovery</span>' : '';
   return `<div class="star-chip" id="${starAnchorId(sys.name, st.name)}"><strong>${escapeHtml(st.name)}</strong>
@@ -452,14 +628,15 @@ function starChip(sys, st) {
   </div>`;
 }
 
-// Groups bodies by which star they orbit (parentStars is a single nearest-star name here, or ''
-// if unknown -- each body resolves to one nearest parent star, not a full list of co-orbiting
-// stars for circumbinary cases).
+// Groups bodies by which star(s) they orbit. parentStars is a list, not a single name -- a body
+// genuinely orbiting a binary pair's shared barycenter rather than either star individually
+// (real confirmed example: bodies named "AB 2"/"AB 4") has every star sharing that barycenter
+// listed.
 function groupBodiesByOrbit(bodies) {
   const groups = new Map();
   for (const b of bodies) {
-    const key = b.parentStars || '(unknown)';
-    if (!groups.has(key)) groups.set(key, { star: b.parentStars || '', bodies: [] });
+    const key = (b.parentStars || []).join(',') || '(unknown)';
+    if (!groups.has(key)) groups.set(key, { stars: b.parentStars || [], bodies: [] });
     groups.get(key).bodies.push(b);
   }
   const list = [...groups.values()];
@@ -502,17 +679,20 @@ function buildOrbitTree(bodies) {
   }));
 }
 
-function orbitTreeHtml(bodies) {
+function orbitTreeHtml(sys, bodies) {
   const columns = buildOrbitTree(bodies).map(col => {
-    const moonCards = col.moons.map(m => `<div class="tree-child">${bodyCard(m)}</div>`).join('');
-    return `<div class="tree-column">${bodyCard(col.body)}${moonCards}</div>`;
+    const moonCards = col.moons.map(m => `<div class="tree-child">${bodyCard(sys, m)}</div>`).join('');
+    return `<div class="tree-column">${bodyCard(sys, col.body)}${moonCards}</div>`;
   }).join('');
   return `<div class="orbit-tree">${columns}</div>`;
 }
 
-function orbitGroupLabel(sys, starName) {
-  if (!starName) return 'Orbiting an unknown body';
-  return `Orbiting <a class="orbit-link" href="#${starAnchorId(sys.name, starName)}">${escapeHtml(starName)}</a>`;
+function orbitGroupLabel(sys, stars) {
+  if (!stars.length) return 'Orbiting an unknown body';
+  const links = stars.map(name =>
+    `<a class="orbit-link" href="#${starAnchorId(sys.name, name)}">${escapeHtml(name)}</a>`
+  ).join(' + ');
+  return `Orbiting ${links}${stars.length > 1 ? ' (circumbinary)' : ''}`;
 }
 
 function systemStatsHtml(s) {
@@ -528,17 +708,52 @@ function systemStatsHtml(s) {
     '</div>';
 }
 
+function updateScrollShadowState(el) {
+  const maxScroll = el.scrollWidth - el.clientWidth;
+  el.classList.toggle('scroll-left', el.scrollLeft > 1);
+  el.classList.toggle('scroll-right', el.scrollLeft < maxScroll - 1);
+}
+function updateScrollShadows() {
+  document.querySelectorAll('.panel, .orbit-tree').forEach(updateScrollShadowState);
+}
+
 function render() {
   const list = sortedSystems();
   const tbody = document.getElementById('tbody');
   document.getElementById('emptyNote').style.display = list.length ? 'none' : 'block';
+  if (!list.length) {
+    // Distinguishes "you have no journal data yet" (nothing to filter in the first place -- e.g.
+    // a brand new commander, or this ran before ever undocking) from "your filters excluded
+    // everything" -- the fix for the first is "go play the game", not "try a different search".
+    document.getElementById('emptyNoteText').textContent = DATA.systems.length
+      ? 'No systems match your filters.'
+      : "No systems recorded yet -- undock and start exploring, then run this again.";
+  }
+
+  const indicatorEl = document.getElementById('distanceIndicator');
+  if (distanceFromSystem) {
+    indicatorEl.innerHTML = `<div class="distance-indicator">📍 Sorted by distance from <strong>${escapeHtml(distanceFromSystem)}</strong>
+      <button class="secondary" type="button" id="clearDistanceBtn" aria-label="Clear distance sorting">✕ Clear</button></div>`;
+    document.getElementById('clearDistanceBtn').addEventListener('click', () => {
+      distanceFromSystem = null;
+      sortKey = 'bioValue';
+      sortDir = -1;
+      render();
+    });
+  } else {
+    indicatorEl.innerHTML = '';
+  }
 
   tbody.innerHTML = list.map(s => {
     const isOpen = openSystem === s.name;
-    const row = `<tr class="system-row ${isOpen ? 'open' : ''}" data-name="${escapeHtml(s.name)}">
-      <td>${escapeHtml(s.name)}</td>
+    const distanceBadge = s.distance == null ? '' :
+      s.name === distanceFromSystem
+        ? ' <span class="muted" style="font-size:0.78rem">📍 reference</span>'
+        : ` <span class="muted" style="font-size:0.78rem">📍 ${s.distance.toLocaleString('en-US', {maximumFractionDigits: 1})} LY</span>`;
+    const row = `<tr class="system-row ${isOpen ? 'open' : ''}" data-name="${escapeHtml(s.name)}" tabindex="0" aria-expanded="${isOpen}">
+      <td>${escapeHtml(s.name)}${distanceBadge}</td>
       <td class="muted">${escapeHtml(s.region || '—')}</td>
-      <td class="num">${s.population.toLocaleString()}</td>
+      <td class="num">${s.population.toLocaleString('en-US')}</td>
       <td class="num">${s.recordedBodyCount}</td>
       <td class="num">${s.notableTotal > 0 ? `<strong>${s.notableTotal}</strong>` : '—'}</td>
       <td class="num">${s.firstDiscoveryCount > 0 ? s.firstDiscoveryCount : '—'}</td>
@@ -550,12 +765,12 @@ function render() {
       ? `<div class="section-label">Stars</div><div class="star-list">${s.stars.map(st => starChip(s, st)).join('')}</div>` : '';
     const bodiesHtml = s.bodies.length
       ? `<div class="section-label">Bodies</div>` + groupBodiesByOrbit(s.bodies).map(g =>
-          `<div class="orbit-group-label">${orbitGroupLabel(s, g.star)}</div>${orbitTreeHtml(g.bodies)}`
+          `<div class="orbit-group-label">${orbitGroupLabel(s, g.stars)}</div>${orbitTreeHtml(s, g.bodies)}`
         ).join('')
       : '<div class="muted">No individually-scanned bodies recorded for this system.</div>';
 
     const detail = `<tr class="detail-row"><td colspan="7"><div class="detail-wrap">
-      <div class="detail-header"><h3>${escapeHtml(s.name)}</h3>${copyBtn(s.name)}${discordCopyBtn(s.name)}${discordObjectiveCopyBtn(s.name)}${s.faction ? `<span class="muted">Controlled by ${escapeHtml(s.faction)}</span>` : ''}</div>
+      <div class="detail-header"><h3>${escapeHtml(s.name)}</h3>${copyBtn(s.name)}${discordCopyBtn(s.name)}${discordObjectiveCopyBtn(s.name)}<a class="ext-link" href="${edsmUrl(s.name)}" target="_blank" rel="noopener">EDSM ↗</a><a class="ext-link" href="${inaraUrl(s.name)}" target="_blank" rel="noopener">Inara ↗</a><a class="ext-link" href="${eventsSearchUrl(s.name)}" target="_blank" rel="noopener" title="Search the full journal for this system">Journal ↗</a><button class="nearest-btn" type="button" data-nearest-name="${escapeHtml(s.name)}" title="Sort every system in the table by distance from this one" aria-label="Sort every system in the table by distance from ${escapeHtml(s.name)}">📍 Nearest</button>${s.faction ? `<span class="muted">Controlled by ${escapeHtml(s.faction)}</span>` : ''}</div>
       ${systemStatsHtml(s)}
       ${starsHtml}
       ${bodiesHtml}
@@ -564,10 +779,24 @@ function render() {
   }).join('');
 
   tbody.querySelectorAll('tr.system-row').forEach(tr => {
-    tr.addEventListener('click', () => {
+    const toggle = () => {
       const name = tr.getAttribute('data-name');
       openSystem = openSystem === name ? null : name;
+      focusAfterRender = name;
+      // Deliberately location.hash (not history.replaceState) -- this page is opened via file://
+      // (see main.go's openBrowser), and replaceState's same-origin URL check is spec-ambiguous
+      // for file: URLs (confirmed hitting an inconsistent SecurityError under one real URL
+      // implementation during testing even for a same-path, hash-only change). Plain
+      // location.hash assignment has no such origin check and is the long-established mechanism
+      // for exactly this. Trade-off accepted: each open/close adds a browser-history entry
+      // (there's no hashchange listener here, so it doesn't cause any re-render loop) -- normal,
+      // expected behavior for hash-based state in a small single-page tool like this one.
+      location.hash = openSystem ? 'system=' + encodeURIComponent(openSystem) : '';
       render();
+    };
+    tr.addEventListener('click', toggle);
+    tr.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
     });
   });
 
@@ -590,20 +819,67 @@ function render() {
     });
   });
 
+  tbody.querySelectorAll('.nearest-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      distanceFromSystem = btn.getAttribute('data-nearest-name');
+      sortKey = 'distance';
+      sortDir = 1; // nearest first
+      render();
+    });
+  });
+
+  tbody.querySelectorAll('.body-card').forEach(card => {
+    const toggle = () => {
+      const key = card.getAttribute('data-body-key');
+      const opening = !openBodies.has(key);
+      if (opening) openBodies.add(key); else openBodies.delete(key);
+      focusAfterRenderBodyKey = key;
+      // Extends the system-level hash (see the system-row toggle above) with a body slug --
+      // key is "<system name>::<body name>" (see bodyKey), and the system name is already in the
+      // hash from having opened the system to see this card at all, so only the body half needs
+      // adding here.
+      const bodyName = key.slice(key.indexOf('::') + 2);
+      location.hash = 'system=' + encodeURIComponent(openSystem) + (opening ? '&body=' + encodeURIComponent(bodyName) : '');
+      render();
+    };
+    card.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggle(); }
+    });
+  });
+
   document.querySelectorAll('thead th[data-key]').forEach(th => {
     const isSorted = th.getAttribute('data-key') === sortKey;
     th.classList.toggle('sorted', isSorted);
+    th.setAttribute('aria-sort', isSorted ? (sortDir === 1 ? 'ascending' : 'descending') : 'none');
     const arrow = th.querySelector('.sort-arrow');
     if (arrow) arrow.textContent = isSorted ? (sortDir === 1 ? '▲' : '▼') : '';
   });
+
+  if (focusAfterRender) {
+    const match = [...tbody.querySelectorAll('tr.system-row')].find(tr => tr.getAttribute('data-name') === focusAfterRender);
+    if (match) match.focus();
+    focusAfterRender = null;
+  }
+  if (focusAfterRenderBodyKey) {
+    const match = [...tbody.querySelectorAll('.body-card')].find(el => el.getAttribute('data-body-key') === focusAfterRenderBodyKey);
+    if (match) match.focus();
+    focusAfterRenderBodyKey = null;
+  }
+  updateScrollShadows();
 }
 
 document.querySelectorAll('thead th[data-key]').forEach(th => {
   th.setAttribute('tabindex', '0');
-  th.addEventListener('click', () => {
+  const activateSort = () => {
     const key = th.getAttribute('data-key');
     if (sortKey === key) { sortDir *= -1; } else { sortKey = key; sortDir = key === 'name' || key === 'region' ? 1 : -1; }
     render();
+  };
+  th.addEventListener('click', activateSort);
+  th.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateSort(); }
   });
 });
 
@@ -613,12 +889,22 @@ document.getElementById('bioOnlyInput').addEventListener('change', e => { bioOnl
 
 document.getElementById('resetBtn').addEventListener('click', () => {
   filterText = ''; notableOnly = false; bioOnly = false; openSystem = null;
-  sortKey = 'bioValue'; sortDir = -1;
+  sortKey = 'bioValue'; sortDir = -1; distanceFromSystem = null;
   document.getElementById('filterInput').value = '';
   document.getElementById('notableOnlyInput').checked = false;
   document.getElementById('bioOnlyInput').checked = false;
   render();
 });
+
+// scroll doesn't bubble, but a capturing listener on document still sees it from any descendant
+// -- lets one listener cover both the static table panel and every dynamically-rendered
+// orbit-tree without wiring each one up individually.
+document.addEventListener('scroll', e => {
+  if (e.target.classList && (e.target.classList.contains('panel') || e.target.classList.contains('orbit-tree'))) {
+    updateScrollShadowState(e.target);
+  }
+}, true);
+window.addEventListener('resize', updateScrollShadows);
 
 function renderSummary() {
   const totalSystems = DATA.systems.length;
@@ -633,9 +919,9 @@ function renderSummary() {
   const totalNotable = Object.values(notableAgg).reduce((a, b) => a + b, 0);
 
   const cards = [
-    [totalSystems.toLocaleString(), 'Systems visited'],
-    [totalNotable.toLocaleString(), 'Notable finds'],
-    [totalFirstDiscoveries.toLocaleString(), 'First discoveries'],
+    [totalSystems.toLocaleString('en-US'), 'Systems visited'],
+    [totalNotable.toLocaleString('en-US'), 'Notable finds'],
+    [totalFirstDiscoveries.toLocaleString('en-US'), 'First discoveries'],
     [formatCredits(totalBio), 'Presumed bio value'],
   ];
   document.getElementById('summaryCards').innerHTML = cards.map(([num, label]) =>
@@ -648,14 +934,44 @@ function renderSummary() {
     .join('');
   document.querySelectorAll('.notable-chip').forEach(chip => {
     chip.setAttribute('tabindex', '0');
-    chip.addEventListener('click', () => {
+    const activateChip = () => {
       document.getElementById('filterInput').value = chip.getAttribute('data-label');
       filterText = chip.getAttribute('data-label');
       render();
+    };
+    chip.addEventListener('click', activateChip);
+    chip.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateChip(); }
     });
   });
 
-  document.getElementById('subtitle').textContent = `Generated ${DATA.generatedAt} — ${totalSystems} systems, no ExploData/BioScan/Pioneer dependency, parsed directly from your own journal.`;
+  document.getElementById('subtitle').textContent = `Generated ${DATA.generatedAt} — ${totalSystems} systems, parsed directly from your own journal.`;
+}
+
+// Lets another page (or a bookmark/shared link) jump straight to a specific system's detail
+// view, and optionally a specific body within it -- e.g. standalone_events.html's per-row system
+// links, or a link copied from this page's own address bar after opening a body (see the
+// body-card toggle handler above). Read once at load, not on hashchange: there's no hashchange
+// listener anywhere on this page, so a later in-page hash update (from opening/closing something)
+// has nothing to react to -- this only ever runs once, at initial load.
+function systemFromHash() {
+  const m = location.hash.match(/system=([^&]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function bodyNameFromHash() {
+  const m = location.hash.match(/body=([^&]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+const initialSystem = systemFromHash();
+if (initialSystem && DATA.systems.some(s => s.name === initialSystem)) {
+  openSystem = initialSystem;
+  focusAfterRender = initialSystem;
+  const initialBody = bodyNameFromHash();
+  if (initialBody) {
+    const key = `${initialSystem}::${initialBody}`;
+    openBodies.add(key);
+    focusAfterRenderBodyKey = key;
+  }
 }
 
 renderSummary();

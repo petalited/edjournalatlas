@@ -20,11 +20,20 @@ import (
 
 const defaultDBPath = "standalone.db"
 const defaultOutPath = "standalone_viewer.html"
+const defaultEventsOutPath = "standalone_events.html"
+const defaultSummaryOutPath = "standalone_summary.html"
+const defaultUnmodeledOutPath = "standalone_unmodeled.json"
 
 func main() {
 	journalDir := flag.String("journal-dir", "", "Directory containing Journal.*.log files (auto-detected if omitted)")
 	dbPath := flag.String("db", defaultDBPath, "Path to the local cache file")
 	outPath := flag.String("out", defaultOutPath, "Path to write the viewer HTML")
+	eventsOutPath := flag.String("events-out", defaultEventsOutPath, "Path to write the full-journal search page")
+	noEvents := flag.Bool("no-events", false, "Skip building the full-journal search page (it's the whole raw journal, so it's the slower/bigger of the two)")
+	summaryOutPath := flag.String("summary-out", defaultSummaryOutPath, "Path to write the career recap page")
+	noSummary := flag.Bool("no-summary", false, "Skip building the career recap page")
+	unmodeledOutPath := flag.String("unmodeled-out", defaultUnmodeledOutPath, "Path to write the unmodeled-event-types coverage report")
+	noUnmodeled := flag.Bool("no-unmodeled", false, "Skip building the unmodeled-event-types coverage report")
 	noOpen := flag.Bool("no-open", false, "Don't open the viewer in a browser automatically")
 	flag.Parse()
 
@@ -58,7 +67,17 @@ func main() {
 	}
 
 	if filesTouched == 0 {
-		fmt.Println("Up to date -- no new journal data since last time.")
+		// "Up to date" implies there WAS a previous successful parse -- misleading the first time
+		// this runs against a folder that genuinely has no Journal.*.log files in it yet (e.g. a
+		// brand new commander who hasn't undocked once). len(store.RawEvents) == 0 is the real
+		// signal for "nothing has ever been parsed into this store", not just "nothing changed
+		// since last time" -- distinct problems with distinct fixes, same reasoning as the
+		// empty-state messaging on the generated HTML pages themselves.
+		if len(store.RawEvents) == 0 {
+			fmt.Println("No journal activity found yet -- go play some Elite Dangerous, then run this again.")
+		} else {
+			fmt.Println("Up to date -- no new journal data since last time.")
+		}
 	} else {
 		fmt.Printf("Parsed %d new line(s) across %d file(s).\n", newLines, filesTouched)
 	}
@@ -81,6 +100,39 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("Wrote %s (%d systems)\n", *outPath, systemCount)
+
+	if !*noEvents {
+		eventsHTML, eventCount, err := RenderEvents(store)
+		if err != nil {
+			fmt.Println("Error building full-journal search page:", err)
+		} else if err := os.WriteFile(*eventsOutPath, []byte(eventsHTML), 0o644); err != nil {
+			fmt.Println("Error writing full-journal search page:", err)
+		} else {
+			fmt.Printf("Wrote %s (%d journal events, every event type -- open it separately to search your whole journal)\n", *eventsOutPath, eventCount)
+		}
+	}
+
+	if !*noSummary {
+		summaryHTML, err := RenderSummary(store)
+		if err != nil {
+			fmt.Println("Error building career recap page:", err)
+		} else if err := os.WriteFile(*summaryOutPath, []byte(summaryHTML), 0o644); err != nil {
+			fmt.Println("Error writing career recap page:", err)
+		} else {
+			fmt.Printf("Wrote %s (combat/trading/mining/ships recap)\n", *summaryOutPath)
+		}
+	}
+
+	if !*noUnmodeled {
+		unmodeledJSON, unmodeledCount, err := RenderUnmodeledReport(store)
+		if err != nil {
+			fmt.Println("Error building unmodeled-event coverage report:", err)
+		} else if err := os.WriteFile(*unmodeledOutPath, []byte(unmodeledJSON), 0o644); err != nil {
+			fmt.Println("Error writing unmodeled-event coverage report:", err)
+		} else if unmodeledCount > 0 {
+			fmt.Printf("Wrote %s (%d journal event types your recap doesn't summarize yet -- safe to share, only lists event/field names, never personal values)\n", *unmodeledOutPath, unmodeledCount)
+		}
+	}
 
 	if !*noOpen {
 		openBrowser(*outPath)
@@ -160,6 +212,30 @@ func processFileIncremental(store *Store, parser *Parser, path string) (int, err
 	return newLines, nil
 }
 
+func openBrowser(path string) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return
+	}
+	url := "file://" + abs
+
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	_ = cmd.Start() // best-effort -- never fail the whole run just because no browser opened
+}
+
+// Keeps a double-clicked console window open on Windows long enough to read the output
+// (Windows closes the console the instant a launched .exe exits) -- a no-op everywhere else,
+// AND a no-op if stdin isn't actually an interactive terminal (a real bug found while testing
+// this Windows build under Wine: blocking unconditionally on stdin hangs forever when stdin is
+// a pipe/redirected/non-interactive, e.g. run from a script or CI, not just when double-clicked).
 // resolveJournalDir is the first thing that happens on every run without --journal-dir: it asks
 // before it acts, rather than silently guessing and only presenting a choice once auto-detection
 // has already failed. When stdin isn't an interactive terminal (scripted/piped run), it falls
@@ -233,30 +309,6 @@ func isInteractiveStdin() bool {
 	return (info.Mode() & os.ModeCharDevice) != 0
 }
 
-func openBrowser(path string) {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return
-	}
-	url := "file://" + abs
-
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	default:
-		cmd = exec.Command("xdg-open", url)
-	}
-	_ = cmd.Start() // best-effort -- never fail the whole run just because no browser opened
-}
-
-// Keeps a double-clicked console window open on Windows long enough to read the output
-// (Windows closes the console the instant a launched .exe exits) -- a no-op everywhere else,
-// AND a no-op if stdin isn't actually an interactive terminal (a real bug found while testing
-// this Windows build under Wine: blocking unconditionally on stdin hangs forever when stdin is
-// a pipe/redirected/non-interactive, e.g. run from a script or CI, not just when double-clicked).
 func pauseOnWindows() {
 	if runtime.GOOS != "windows" || !isInteractiveStdin() {
 		return

@@ -18,9 +18,9 @@ var viewerTemplate string
 // Same notable-body-type mapping as the Python version's NOTABLE_BODY_TYPES.
 var notableBodyTypes = map[string]string{
 	"Earthlike body": "Earthlike world",
-	"Water world":     "Water world",
-	"Ammonia world":   "Ammonia world",
-	"Water giant":     "Water giant",
+	"Water world":    "Water world",
+	"Ammonia world":  "Ammonia world",
+	"Water giant":    "Water giant",
 }
 
 func classifyRareStarType(typeCode string) string {
@@ -48,6 +48,7 @@ func classifyRareStarType(typeCode string) string {
 type viewerFlora struct {
 	Genus            string `json:"genus"`
 	Species          string `json:"species"`
+	Variant          string `json:"variant,omitempty"`
 	Count            int    `json:"count"`
 	Value            *int64 `json:"value"`
 	BaseValue        int64  `json:"baseValue"`
@@ -55,6 +56,8 @@ type viewerFlora struct {
 	Lost             bool   `json:"lost"`
 	FootfallBonus    bool   `json:"footfallBonus"`
 	FirstLoggedBonus bool   `json:"firstLoggedBonus"`
+	WasLogged        *bool  `json:"wasLogged"`
+	ScannedAt        string `json:"scannedAt,omitempty"`
 }
 
 type viewerBody struct {
@@ -63,11 +66,17 @@ type viewerBody struct {
 	Landable       bool          `json:"landable"`
 	Mass           float64       `json:"mass"`
 	Distance       float64       `json:"distance"`
-	ParentStars    string        `json:"parentStars"`
+	ParentStars    []string      `json:"parentStars"`
 	Terraformable  bool          `json:"terraformable"`
+	TerraformState string        `json:"terraformState,omitempty"`
+	Atmosphere     string        `json:"atmosphere,omitempty"`
+	Gravity        float64       `json:"gravity"`
+	Temp           float64       `json:"temp"`
+	Pressure       float64       `json:"pressure"`
 	Discovered     bool          `json:"discovered"`
 	WasDiscovered  *bool         `json:"wasDiscovered"`
 	Mapped         bool          `json:"mapped"`
+	WasMapped      *bool         `json:"wasMapped"`
 	Efficient      bool          `json:"efficient"`
 	WasFootfalled  *bool         `json:"wasFootfalled"`
 	BioSignalCount int           `json:"bioSignalCount"`
@@ -81,26 +90,28 @@ type viewerStar struct {
 	Type          string  `json:"type"`
 	Subclass      int     `json:"subclass"`
 	Luminosity    string  `json:"luminosity"`
+	Mass          float64 `json:"mass"`
 	WasDiscovered *bool   `json:"wasDiscovered"`
+	WasFootfalled *bool   `json:"wasFootfalled"`
 	NotableLabel  string  `json:"notableLabel,omitempty"`
 }
 
 type viewerSystem struct {
-	Name               string            `json:"name"`
-	X                  float64           `json:"x"`
-	Y                  float64           `json:"y"`
-	Z                  float64           `json:"z"`
-	Region             string            `json:"region"`
-	Population         int64             `json:"population"`
-	Faction            string            `json:"faction"`
-	BodyCountTotal     int               `json:"bodyCountTotal"`
-	RecordedBodyCount  int               `json:"recordedBodyCount"`
-	ClaimedByCommander bool              `json:"claimedByCommander"`
-	NotableCounts      map[string]int    `json:"notableCounts"`
-	FirstDiscoveryCount int              `json:"firstDiscoveryCount"`
-	BioValue           int64             `json:"bioValue"`
-	Stars              []viewerStar      `json:"stars"`
-	Bodies             []viewerBody      `json:"bodies"`
+	Name                string         `json:"name"`
+	X                   float64        `json:"x"`
+	Y                   float64        `json:"y"`
+	Z                   float64        `json:"z"`
+	Region              string         `json:"region"`
+	Population          int64          `json:"population"`
+	Faction             string         `json:"faction"`
+	BodyCountTotal      int            `json:"bodyCountTotal"`
+	RecordedBodyCount   int            `json:"recordedBodyCount"`
+	ClaimedByCommander  bool           `json:"claimedByCommander"`
+	NotableCounts       map[string]int `json:"notableCounts"`
+	FirstDiscoveryCount int            `json:"firstDiscoveryCount"`
+	BioValue            int64          `json:"bioValue"`
+	Stars               []viewerStar   `json:"stars"`
+	Bodies              []viewerBody   `json:"bodies"`
 }
 
 type viewerData struct {
@@ -121,26 +132,40 @@ func Render(store *Store) (string, int, error) {
 	systems := []viewerSystem{}
 	for systemAddress, sys := range store.Systems {
 		starNameByBodyID := make(map[int]string)
+		// Which stars share the same immediate barycenter -- built from the SAME parent-ancestry
+		// resolution used for planets (see parentAncestry in parse.go), just run against each
+		// star's own Parents instead. Lets a circumbinary body whose only resolvable ancestor is
+		// a barycenter (not a single star) be attributed to every star sharing that barycenter,
+		// instead of falling into an unresolvable "unknown parent" bucket.
+		starsByBarycenter := make(map[int][]string)
 		stars := []viewerStar{}
 		for bodyID, st := range sys.Stars {
 			starNameByBodyID[bodyID] = st.Name
+			for _, bcID := range st.BarycenterIDs {
+				starsByBarycenter[bcID] = append(starsByBarycenter[bcID], st.Name)
+			}
 			stars = append(stars, viewerStar{
 				Name: st.Name, Distance: st.Distance, Type: st.Type, Subclass: st.Subclass,
-				Luminosity: st.Luminosity, WasDiscovered: st.WasDiscovered,
+				Luminosity: st.Luminosity, Mass: st.Mass,
+				WasDiscovered: st.WasDiscovered, WasFootfalled: st.WasFootfalled,
 				NotableLabel: classifyRareStarType(st.Type),
 			})
 		}
 		sort.Slice(stars, func(i, j int) bool { return stars[i].Distance < stars[j].Distance })
+		for id := range starsByBarycenter {
+			sort.Strings(starsByBarycenter[id])
+		}
 
 		bodies := []viewerBody{}
 		for _, pl := range sys.Planets {
 			flora := []viewerFlora{}
 			for _, fv := range floraByBody[systemAddress][pl.BodyID] {
 				vf := viewerFlora{
-					Genus: fv.GenusName, Species: fv.SpeciesName, Count: fv.Count,
+					Genus: fv.GenusName, Species: fv.SpeciesName, Variant: fv.Variant, Count: fv.Count,
 					BaseValue: fv.BaseValue,
 					Sold:      fv.Sold, Lost: fv.Lost,
 					FootfallBonus: fv.FootfallBonus, FirstLoggedBonus: fv.FirstLoggedBonus,
+					WasLogged: fv.WasLogged, ScannedAt: fv.ScannedAt,
 				}
 				if fv.HasValue {
 					v := fv.Value
@@ -148,16 +173,35 @@ func Render(store *Store) (string, int, error) {
 				}
 				flora = append(flora, vf)
 			}
-			parentStarName := ""
+			var parentStars []string
 			if pl.ParentStarBodyID != nil {
-				parentStarName = starNameByBodyID[*pl.ParentStarBodyID]
+				if name := starNameByBodyID[*pl.ParentStarBodyID]; name != "" {
+					parentStars = []string{name}
+				}
+			} else if len(pl.BarycenterIDs) > 0 {
+				// Union across every barycenter in this body's own chain (not just the nearest
+				// one) matched against every barycenter in each star's own chain -- see
+				// parentAncestry's comment in parse.go for why a single-entry match isn't enough.
+				seen := make(map[string]bool)
+				for _, bcID := range pl.BarycenterIDs {
+					for _, name := range starsByBarycenter[bcID] {
+						if !seen[name] {
+							seen[name] = true
+							parentStars = append(parentStars, name)
+						}
+					}
+				}
+				sort.Strings(parentStars)
 			}
 			bodies = append(bodies, viewerBody{
 				Name: pl.Name, Type: pl.Type, Landable: pl.Landable, Mass: pl.Mass,
-				Distance: pl.Distance, ParentStars: parentStarName,
-				Terraformable: pl.TerraformState == "Terraformable" || pl.TerraformState == "Terraforming" || pl.TerraformState == "Terraformed",
-				Discovered:    pl.Discovered, WasDiscovered: pl.WasDiscovered,
-				Mapped: pl.Mapped, Efficient: pl.Efficient, WasFootfalled: pl.WasFootfalled,
+				Distance: pl.Distance, ParentStars: parentStars,
+				Terraformable:  pl.TerraformState == "Terraformable" || pl.TerraformState == "Terraforming" || pl.TerraformState == "Terraformed",
+				TerraformState: pl.TerraformState, Atmosphere: pl.Atmosphere,
+				Gravity: pl.Gravity, Temp: pl.Temp, Pressure: pl.Pressure,
+				Discovered: pl.Discovered, WasDiscovered: pl.WasDiscovered,
+				Mapped: pl.Mapped, WasMapped: pl.WasMapped,
+				Efficient: pl.Efficient, WasFootfalled: pl.WasFootfalled,
 				BioSignalCount: pl.BioSignalCount, NotableLabel: notableBodyTypes[pl.Type],
 				Flora: flora,
 			})

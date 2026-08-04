@@ -28,6 +28,15 @@ type eventHead struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// genericHead pulls the handful of fields common enough across many otherwise-unrelated event
+// types (confirmed against real data: FSDJump/Location/Scan/ScanBaryCentre/CarrierLocation all
+// carry StarSystem+BodyID directly) to give every captured raw event best-effort system/body
+// context without needing a bespoke struct per event type.
+type genericHead struct {
+	StarSystem string `json:"StarSystem"`
+	BodyID     *int   `json:"BodyID"`
+}
+
 type commanderEntry struct {
 	Name      string `json:"Name"`
 	Commander string `json:"Commander"`
@@ -65,26 +74,26 @@ type colonisationClaimEntry struct {
 }
 
 type scanEntry struct {
-	SystemAddress         *int64            `json:"SystemAddress"`
-	BodyID                *int              `json:"BodyID"`
-	BodyName              string            `json:"BodyName"`
-	StarType              string            `json:"StarType"`
-	Subclass              *int              `json:"Subclass"`
-	StellarMass           *float64          `json:"StellarMass"`
-	Luminosity            string            `json:"Luminosity"`
-	DistanceFromArrivalLS *float64          `json:"DistanceFromArrivalLS"`
-	PlanetClass           string            `json:"PlanetClass"`
-	Landable              *bool             `json:"Landable"`
-	MassEM                *float64          `json:"MassEM"`
-	TerraformState        string            `json:"TerraformState"`
-	AtmosphereType        string            `json:"AtmosphereType"`
-	SurfaceGravity        *float64          `json:"SurfaceGravity"`
-	SurfaceTemperature    *float64          `json:"SurfaceTemperature"`
-	SurfacePressure       *float64          `json:"SurfacePressure"`
-	WasDiscovered         *bool             `json:"WasDiscovered"`
-	WasMapped             *bool             `json:"WasMapped"`
-	WasFootfalled         *bool             `json:"WasFootfalled"`
-	Parents               []map[string]int  `json:"Parents"`
+	SystemAddress         *int64           `json:"SystemAddress"`
+	BodyID                *int             `json:"BodyID"`
+	BodyName              string           `json:"BodyName"`
+	StarType              string           `json:"StarType"`
+	Subclass              *int             `json:"Subclass"`
+	StellarMass           *float64         `json:"StellarMass"`
+	Luminosity            string           `json:"Luminosity"`
+	DistanceFromArrivalLS *float64         `json:"DistanceFromArrivalLS"`
+	PlanetClass           string           `json:"PlanetClass"`
+	Landable              *bool            `json:"Landable"`
+	MassEM                *float64         `json:"MassEM"`
+	TerraformState        string           `json:"TerraformState"`
+	AtmosphereType        string           `json:"AtmosphereType"`
+	SurfaceGravity        *float64         `json:"SurfaceGravity"`
+	SurfaceTemperature    *float64         `json:"SurfaceTemperature"`
+	SurfacePressure       *float64         `json:"SurfacePressure"`
+	WasDiscovered         *bool            `json:"WasDiscovered"`
+	WasMapped             *bool            `json:"WasMapped"`
+	WasFootfalled         *bool            `json:"WasFootfalled"`
+	Parents               []map[string]int `json:"Parents"`
 }
 
 type saaScanCompleteEntry struct {
@@ -142,6 +151,7 @@ func (p *Parser) ProcessLine(line []byte) {
 	if err := json.Unmarshal(line, &head); err != nil {
 		return
 	}
+	p.recordRawEvent(head, line)
 	switch head.Event {
 	case "Commander", "LoadGame":
 		var e commanderEntry
@@ -203,6 +213,24 @@ func (p *Parser) ProcessLine(line []byte) {
 			p.onResurrect(&e, head.Timestamp)
 		}
 	}
+}
+
+// recordRawEvent captures every valid journal line unconditionally, regardless of whether any
+// case above recognizes its event type -- the foundation for "the whole journal, searchable",
+// not just the exploration-relevant subset every other part of this program cares about.
+func (p *Parser) recordRawEvent(head eventHead, line []byte) {
+	var g genericHead
+	json.Unmarshal(line, &g) // best-effort -- a decode failure here just means less context, not a dropped event
+	systemName := g.StarSystem
+	if systemName == "" {
+		systemName = p.currentSystemName
+	}
+	p.store.RawEvents = append(p.store.RawEvents, RawEvent{
+		// string(line) always copies -- safe even though the caller's scanner buffer backing
+		// `line` gets reused/overwritten on the next call.
+		Timestamp: head.Timestamp, Event: head.Event, SystemName: systemName, BodyID: g.BodyID,
+		Raw: string(line),
+	})
 }
 
 func (p *Parser) onCommander(e *commanderEntry) {
@@ -328,6 +356,7 @@ func (p *Parser) onScan(e *scanEntry, timestamp string) {
 		}
 		st.WasDiscovered = e.WasDiscovered
 		st.WasFootfalled = e.WasFootfalled
+		_, st.BarycenterIDs = parentAncestry(e.Parents)
 		st.UpdatedAt = timestamp
 	} else if e.PlanetClass != "" {
 		pl, ok := sys.Planets[*e.BodyID]
@@ -346,7 +375,7 @@ func (p *Parser) onScan(e *scanEntry, timestamp string) {
 		if e.DistanceFromArrivalLS != nil {
 			pl.Distance = *e.DistanceFromArrivalLS
 		}
-		pl.ParentStarBodyID = parentStarBodyID(e.Parents)
+		pl.ParentStarBodyID, pl.BarycenterIDs = parentAncestry(e.Parents)
 		pl.TerraformState = e.TerraformState
 		pl.Atmosphere = e.AtmosphereType
 		if e.SurfaceGravity != nil {
@@ -366,20 +395,46 @@ func (p *Parser) onScan(e *scanEntry, timestamp string) {
 	}
 }
 
-// parentStarBodyID: `Parents` is an ordered ancestor chain (closest first) keyed by BodyID,
-// e.g. [{"Star":1},{"Null":0}] -- 'Null' entries are barycenters, not real bodies. Returns the
-// first real 'Star' ancestor's BodyID, unresolved -- name resolution happens at render time
+// parentAncestry: `Parents` is an ordered ancestor chain (closest first) keyed by BodyID, e.g.
+// [{"Star":1},{"Null":0}] -- 'Null' entries are barycenters, not real bodies. Returns the first
+// real 'Star' ancestor's BodyID, unresolved -- name resolution happens at render time
 // (viewer.go), not here, since a planet's own Scan can fire before its parent star's own Scan
 // (confirmed against real data, see docs/StandaloneJournalParser.md), so a parse-time name
 // lookup could permanently miss it.
-func parentStarBodyID(parents []map[string]int) *int {
+//
+// A body genuinely orbiting a binary pair's shared barycenter (not either star individually --
+// real example confirmed against live data: bodies named "AB 2"/"AB 4") has no 'Star' entry
+// anywhere in its chain at all, only 'Null' ones. Those Nulls' own BodyIDs are the shared
+// identifiers that let viewer.go later find every star sharing any of the same barycenter
+// ancestry (this same function run against each star's own Parents), so they're returned as a
+// fallback rather than discarded -- discarding them (the previous behavior) is what silently
+// dropped every circumbinary body into an unresolvable "unknown parent" bucket instead of
+// grouping it correctly.
+//
+// ALL Nulls in the chain are kept, not just the closest one: confirmed against real data that
+// ED sometimes inserts an extra synthetic barycenter layer even for a plain two-star pair (e.g.
+// "AB 2" has chain [Null 27, Null 0] while stars A and B both sit directly on [Null 0] --
+// barycenter 27 isn't a third body, just a tighter orbital grouping that itself sits under the
+// same outer barycenter 0 the stars share). Matching on the full set rather than just the
+// nearest entry is what makes viewer.go correctly attribute "AB 2" to both A and B instead of
+// only the simpler "AB 4" (whose chain goes straight to Null 0). This can over-attribute in a
+// genuine three-or-more-star hierarchy where an inner pair's own barycenter chain happens to
+// pass through the same outer node as a third, unrelated star -- accepted as a rare edge case
+// with no real example confirmed in this project's data, versus the near-certain false negative
+// of the single-nearest-barycenter approach on any real binary.
+func parentAncestry(parents []map[string]int) (starID *int, barycenterIDs []int) {
 	for _, entry := range parents {
 		if id, ok := entry["Star"]; ok {
 			v := id
-			return &v
+			return &v, nil
 		}
 	}
-	return nil
+	for _, entry := range parents {
+		if id, ok := entry["Null"]; ok {
+			barycenterIDs = append(barycenterIDs, id)
+		}
+	}
+	return nil, barycenterIDs
 }
 
 func (p *Parser) onSAAScanComplete(e *saaScanCompleteEntry, timestamp string) {

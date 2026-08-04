@@ -1,28 +1,30 @@
 # edjournalatlas
 
-A local "explore what you've found" viewer for Elite Dangerous. It reads your own game journal
-files directly and builds a browsable page showing every system you've visited: region,
-population, how many bodies you've scanned, notable finds (Earthlike/water/ammonia worlds, rare
-star types, first discoveries), and a presumed credit value for anything biological you've
-scanned.
+A local "explore what you've found" viewer for Elite Dangerous — and, beyond just exploration, a
+whole-career recap and a full-journal search tool. It reads your own game journal files directly
+and builds three browsable pages: every system you've visited (region, population, bodies
+scanned, notable finds, presumed exobiology value), a searchable log of literally every journal
+event you've ever generated (combat, trading, missions, engineering, powerplay, crew — not just
+exploration), and a "wrapped"-style career recap (kills, favourite ship, biggest rival, trade
+profit, engineering, powerplay rank, fleet carrier, crime record, and more).
 
 **Nothing else has to be installed, no account needed, nothing is ever sent anywhere over the
 network** — it only reads files already on your own computer, and only ever writes its own small
 local cache file next to itself.
 
-Two implementations of the exact same tool are included, so pick whichever fits:
+Two implementations exist, but they're not equivalent anymore:
 
 - **`standalone-go/`** — a single ~3MB self-contained binary (Linux/Windows), no runtime
-  dependency of any kind. This is the one to grab if you just want to run it. No Mac build:
-  Elite Dangerous has no supported native Mac client anymore, so there's no realistic audience
-  with journal files to point one at.
-- **`standalone/`** — the original Python version. Same features, same output, no packages to
-  install (stdlib only) if running from source; also buildable into a double-click program via
-  PyInstaller, at the cost of a larger file (~11.6MB) and builds that only work on whatever OS
-  you build them from.
+  dependency of any kind. **This is the actively developed, full-featured version** — all three
+  pages above, plus a small coverage-report JSON file listing which journal event types aren't
+  summarized yet (safe to share: event names and field names only, never your actual data). No
+  Mac build: Elite Dangerous has no supported native Mac client anymore, so there's no realistic
+  audience with journal files to point one at.
+- **`standalone/`** — the original Python version. Still works, but only has the systems viewer
+  (no full-journal search, no career recap) — it's no longer being extended. Use it if you'd
+  rather run from source with just the stdlib, but the Go version is where new features land.
 
-Both keep their own local cache and viewer output, so it's fine to have both around, or to
-switch between them freely.
+Both keep their own local cache and output files, so it's fine to have both around.
 
 ## Running it (pre-built binary)
 
@@ -74,16 +76,39 @@ to run just one step (e.g. rebuild the viewer without re-checking the journal). 
 double-click program from it, see `standalone/build_executable.py` (uses PyInstaller; only
 produces a binary for whichever OS you run the build on).
 
-## What's in the viewer
+## The three pages (Go version)
 
-- A sortable/searchable table of every visited system: region, population, bodies scanned,
-  notable-find count, presumed exobiology value.
-- Click a system to expand it: stars, bodies grouped under whichever star they orbit (moons
-  nested under their parent planet), bonus/first-discovery badges, and — for anything with life
-  on it — what's been scanned, sold, or lost.
-- Filters for "only notable finds" / "only has bio value", a search box, and a reset-filters
-  button.
-- Copy-to-clipboard and Discord-formatted export buttons per system.
+Running the binary writes/updates all three every time — a small pill-tab bar at the top of each
+page switches between them.
+
+**`standalone_viewer.html` — systems explorer.** A sortable/searchable table of every visited
+system: region, population, bodies scanned, notable-find count, presumed exobiology value. Click
+a system to expand it: stars, bodies grouped under whichever star (or shared binary-star
+barycenter — circumbinary bodies are grouped correctly, not just attached to the nearest single
+star) they orbit, moons nested under their parent planet, click a body for full detail (mass,
+gravity, atmosphere, temperature, pressure, terraform state, full flora-scan history). Bonus/
+first-discovery badges, EDSM/Inara/full-journal-search links per system, a 📍 button to re-sort
+the whole table by distance from any system, copy-to-clipboard and Discord-formatted export
+buttons.
+
+**`standalone_events.html` — full journal search.** Every single journal event you've ever
+generated, not just exploration-relevant ones — combat, trading, missions, engineering, cargo,
+powerplay, crew, the works. Free-text search or filter by event type, each result expandable to
+pretty-printed raw JSON. This is a separate page from the systems viewer specifically because a
+real journal history can be tens of thousands of events — keeping it out of the main viewer keeps
+that page fast to open every time, even though this one can get large.
+
+**`standalone_summary.html` — career recap.** Stat cards across however many of these
+categories your own journal has real activity in (sections you have no data for just don't show
+up — nothing forced): Exploration, Rank, Combat, Crime, Wing, Powerplay, Trading, Mining,
+Materials, Engineering, Ships, Fleet Carrier, Crew, Colonization, Stations, Missions. A handful of
+narrative highlights get pulled out too (e.g. who last destroyed you, and what they were flying).
+Has its own Discord-export button for the whole recap.
+
+**`standalone_unmodeled.json`** — not really meant to be read directly. A small coverage
+report: which journal event types your data has that the recap doesn't summarize yet, with real
+counts and field *names* (never your actual data/values) — useful if you want to request/build
+support for something the recap doesn't cover.
 
 ## Honest limitations (not bugs — the game just doesn't record this)
 
