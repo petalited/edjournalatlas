@@ -82,6 +82,9 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 .engineer-chip.engineer-unlocked { border-color: var(--good); color: var(--good); background: var(--good-bg); }
 .engineer-chip.engineer-invited { border-color: var(--warning); color: var(--warning); background: var(--warning-bg); }
 .engineer-chip.engineer-unknown { opacity: 0.7; }
+.engineer-chip-clickable { cursor: pointer; transition: background var(--transition), color var(--transition), border-color var(--transition); }
+.engineer-chip-clickable:hover { border-color: var(--accent); color: var(--accent); }
+.engineer-chip-copied, .engineer-chip-copied:hover { border-color: var(--accent); color: #fff; background: var(--accent); }
 .blocked-note { font-size: 0.78rem; color: var(--warning); margin-top: var(--space-2); }
 .empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center; }
 .empty-note-icon { font-size: 1.6rem; margin-bottom: var(--space-2); opacity: 0.7; }
@@ -330,8 +333,46 @@ function materialsSummary() {
 function engineerChip(e) {
   const cls = e.progress === 'Unlocked' ? 'engineer-unlocked' : e.progress === 'Invited' ? 'engineer-invited' : 'engineer-unknown';
   const label = e.progress === 'Unlocked' && e.rank ? `${e.name} (Rank ${e.rank})` : e.progress ? `${e.name} (${e.progress})` : `${e.name} (no record)`;
+  if (e.system) {
+    return `<span class="engineer-chip ${cls} engineer-chip-clickable" data-system="${escapeHtml(e.system)}" data-label="${escapeHtml(label)}" title="Click to copy &quot;${escapeHtml(e.system)}&quot; -- paste into the galaxy map to plot a route">${escapeHtml(label)}</span>`;
+  }
   return `<span class="engineer-chip ${cls}">${escapeHtml(label)}</span>`;
 }
+
+// Copies via the modern Clipboard API when available, falling back to the classic hidden-
+// textarea + execCommand trick -- this page can be opened directly as a file:// document (no
+// server, no HTTPS), where navigator.clipboard isn't guaranteed to be available.
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
+  }
+  return Promise.resolve(legacyCopy(text));
+}
+function legacyCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) { /* best effort */ }
+  document.body.removeChild(ta);
+}
+
+document.getElementById('planSections').addEventListener('click', e => {
+  const chip = e.target.closest('.engineer-chip-clickable');
+  if (!chip) return;
+  const system = chip.dataset.system;
+  const label = chip.dataset.label;
+  copyToClipboard(system).then(() => {
+    chip.textContent = `Copied "${system}"`;
+    chip.classList.add('engineer-chip-copied');
+    setTimeout(() => {
+      chip.textContent = label;
+      chip.classList.remove('engineer-chip-copied');
+    }, 1400);
+  });
+});
 
 function engineerGroupHtml(title, engineers) {
   const hasUnlocked = engineers.some(e => e.progress === 'Unlocked');

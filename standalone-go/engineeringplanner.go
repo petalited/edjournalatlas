@@ -37,6 +37,18 @@ package main
 // applies regardless of which grade you rolled the base upgrade to, so it's a second, independent
 // pick in the UI (Type -> Upgrade -> Grade -> optional Effect), not a 4th column on the same row.
 //
+// Also vendors each engineer's real home system (owner: "clicking on an engineers name should
+// copy the name of the system theyre in so you can plot a route") -- source:
+// int-Frank/EDEPathFinder's EDEPaths.json (Apache 2.0 licensed,
+// https://github.com/int-Frank/EDEPathFinder/blob/master/EDEPaths.json, fetched 2026-08-04), a
+// small standalone "shortest path between engineers" tool with exactly this data already
+// structured. That source has some real name typos of its own ("Masha Hicks", "Lei Chung",
+// "Colonel Bris Decker", `Tod "The Blaster" Mcquinn`) -- the system values were kept but the
+// names were corrected to match this project's own already-established canonical 25-engineer
+// roster (the same list `blueprintCatalog`/`effectCatalog` reference), not trusted verbatim.
+// Spot-checked independently against well-known real game facts (Felicity Farseer/Deciat,
+// Ram Tah/Meene) rather than taken purely on this one source's say-so.
+//
 // Fully static/offline like every other vendored table here -- no live network calls, refreshed
 // by re-running the vendoring step against a newer copy of the upstream JSON.
 
@@ -146,8 +158,27 @@ func normalizeEngineerName(s string) string {
 	return string(out)
 }
 
+// engineerSystems: real home system per engineer, keyed by normalizeEngineerName(canonical
+// name) -- see this file's header comment for provenance and the name-typo corrections applied.
+var engineerSystems = map[string]string{
+	"billturner": "Alioth", "brootarquin": "Muang", "chloesedesi": "Shenve",
+	"colonelbrisdekker": "Sol", "didivatermann": "Leesti", "elviramartuuk": "Khun",
+	"etiennedorn": "Los", "felicityfarseer": "Deciat", "heratani": "Kuwemaki",
+	"juriishmaak": "Giryak", "leicheung": "Laksak", "lizryder": "Eurybia",
+	"lorijameson": "Shinrarta Dezhra", "marcoqwent": "Sirius", "marshahicks": "Tir",
+	"melbrandon": "Luchtaine", "petraolmanova": "Asura", "professorpalin": "Arque",
+	"ramtah": "Meene", "selenejean": "Kuk", "thedweller": "Wyrd",
+	"thesarge": "Beta-3 Tucani", "tianafortune": "Achenar", "todmcquinn": "Wolf 397",
+	"zacariahnemo": "Yoru",
+}
+
+func engineerSystem(name string) string {
+	return engineerSystems[normalizeEngineerName(name)]
+}
+
 type engineerStatusOut struct {
 	Name     string `json:"name"`               // the real journal name if this commander has any record of this engineer, else the vendored name as a fallback
+	System   string `json:"system,omitempty"`   // real home system, if known -- lets the UI offer "copy system name to plot a route"
 	Progress string `json:"progress,omitempty"` // "Unlocked" / "Invited" / "Known" -- "" (omitted) means no record at all in this commander's own EngineerProgress
 	Rank     int    `json:"rank,omitempty"`
 }
@@ -188,10 +219,11 @@ type plannerData struct {
 func resolveEngineers(names []string, engineerByKey map[string]engineerProgressEntry) []engineerStatusOut {
 	out := make([]engineerStatusOut, 0, len(names))
 	for _, eng := range names {
+		system := engineerSystem(eng)
 		if real, ok := engineerByKey[normalizeEngineerName(eng)]; ok {
-			out = append(out, engineerStatusOut{Name: real.Engineer, Progress: real.Progress, Rank: real.Rank})
+			out = append(out, engineerStatusOut{Name: real.Engineer, System: system, Progress: real.Progress, Rank: real.Rank})
 		} else {
-			out = append(out, engineerStatusOut{Name: eng})
+			out = append(out, engineerStatusOut{Name: eng, System: system})
 		}
 	}
 	return out
