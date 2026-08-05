@@ -19,12 +19,21 @@ package main
 // (every distinct real Item symbol this commander's own ships have ever used, pulled directly
 // from their `.db`) for guaranteed-correct entries, plus this author's own general knowledge of
 // Elite Dangerous for a handful of additional common module types not present in this one
-// commander's fleet (Plasma Accelerator, Fragment Cannon hardpoints) -- flagged inline where the
-// entry isn't independently verified against real data. Anything genuinely unrecognized falls
-// back to a plain prettified version of the raw symbol (underscores to spaces, title case) --
-// same "readable but honest" fallback already used elsewhere in this project
-// (materials.go's own prettifyKeyStandalone, summary.go's formatBlueprintName) -- never a raw,
-// ugly `int_whatever_size3_class2` string shown verbatim.
+// commander's fleet -- flagged inline where the entry isn't independently verified against real
+// data. Anything genuinely unrecognized falls back to a plain prettified version of the raw
+// symbol (underscores to spaces, title case) -- same "readable but honest" fallback already used
+// elsewhere in this project (materials.go's own prettifyKeyStandalone, summary.go's
+// formatBlueprintName) -- never a raw, ugly `int_whatever_size3_class2` string shown verbatim.
+//
+// Real bug, fixed: the first version of this file guessed "slugshot" -> Rail Gun purely from
+// memory, marked [known, not independently confirmed] -- wrong. A real owner report ("PE-24P has
+// fragment cannons not railguns") caught it: "hpt_slugshot_*" is genuinely Fragment Cannon's real
+// internal symbol, confirmed directly against EDCD/FDevIDs' own `outfitting.csv` (the same
+// trusted source already used for `material.csv`) and independently cross-checked against four
+// more unrelated community sources that all agree. The real Rail Gun symbol is the much more
+// literal "hpt_railgun_*". A concrete lesson from this: [known]-tagged entries in this file are a
+// real risk, not just a formality -- verify against an authoritative source before trusting
+// memory, the same discipline already applied everywhere else in this project.
 
 import (
 	"fmt"
@@ -66,7 +75,7 @@ var moduleTypeKeywords = map[string]string{
 	"beamlaser":                "Beam Laser",
 	"pulselaser":               "Pulse Laser",
 	"multicannon":              "Multi-cannon",
-	"slugshot":                 "Rail Gun",
+	"slugshot":                 "Fragment Cannon", // real bug, now fixed: this was wrongly mapped to "Rail Gun" (this author's own unverified guess, see git history) -- a real owner report ("PE-24P has fragment cannons not railguns") caught it. Verified directly against EDCD/FDevIDs' own outfitting.csv (the same trusted source already used for material.csv): "Hpt_Slugshot_*" is Fragment Cannon, full stop, cross-confirmed independently against four more unrelated community sources (EDDI, EDMarketConnector, an EDDN mapper, icarus's vendored Coriolis data) that all agree.
 	"advancedtorppylon":        "Torpedo Pylon",
 	"basicmissilerack":         "Missile Rack",
 	"dumbfiremissilerack":      "Missile Rack",
@@ -78,12 +87,11 @@ var moduleTypeKeywords = map[string]string{
 	"plasmapointdefence":       "Point Defence",
 	"crimescanner":             "Kill Warrant Scanner",
 	"mrascanner":               "Manifest Scanner",
-	"cannon":                   "Cannon", // must be checked after multicannon (longest-match-first)
+	"railgun":                  "Rail Gun", // the REAL Rail Gun symbol ("Hpt_Railgun_*"), confirmed via the same EDCD/FDevIDs cross-check above -- not present in this commander's own fleet to verify against directly, but independently confirmed authoritative
+	"cannon":                   "Cannon",   // must be checked after multicannon (longest-match-first)
 
 	// Hardpoints [known, not independently confirmed against this commander's own real fleet]
 	"plasmaaccelerator": "Plasma Accelerator",
-	"fragmentcannon":    "Fragment Cannon",
-	"railgun":           "Rail Gun", // alternate/older symbol form alongside "slugshot"
 }
 
 // engineKeyword is handled separately from moduleTypeKeywords: "engine" alone would also match

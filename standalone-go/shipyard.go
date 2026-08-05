@@ -160,6 +160,17 @@ func maxGradeFor(bpType, bpName string) int {
 	return max
 }
 
+// trimmedShipName: a real, confirmed journal quirk -- an unnamed ship's ShipName sometimes
+// arrives as a single space character rather than a genuinely empty string (confirmed against
+// this commander's own real data, ShipIdent "PE-24P"). Left un-trimmed, that space is truthy in
+// the client's own JS ("s.name ? ... : ..."), so the ship card showed a stray leading blank
+// before the ident badge instead of falling back to the ship type -- a real owner-reported bug
+// ("name rendering in the shipyard is weird"). Trimmed once here, at the one place ShipName ever
+// enters shipOut, rather than in the template -- keeps every consumer honest by construction.
+func trimmedShipName(raw string) string {
+	return strings.TrimSpace(raw)
+}
+
 func buildShipFromLoadout(v shipyardLoadoutEvent, active bool, system string) shipOut {
 	modules := make([]moduleOut, 0, len(v.Modules))
 	engineeredCount := 0
@@ -176,7 +187,7 @@ func buildShipFromLoadout(v shipyardLoadoutEvent, active bool, system string) sh
 		}
 	}
 	out := shipOut{
-		ShipID: v.ShipID, Type: v.Ship, Name: v.ShipName, Ident: v.ShipIdent,
+		ShipID: v.ShipID, Type: v.Ship, Name: trimmedShipName(v.ShipName), Ident: v.ShipIdent,
 		Active: active, System: system, Value: v.HullValue + v.ModulesValue,
 		HullHealth: v.HullHealth, Modules: modules, HasModules: true,
 		EngineeredCount: engineeredCount,
@@ -279,7 +290,7 @@ func BuildShipyardData(store *Store) shipyardData {
 				if name == "" {
 					name = prettifyKeyStandalone(s.ShipType)
 				}
-				out := shipOut{ShipID: s.ShipID, Type: s.ShipType, Name: s.Name, System: sys, Value: s.Value}
+				out := shipOut{ShipID: s.ShipID, Type: s.ShipType, Name: trimmedShipName(s.Name), System: sys, Value: s.Value}
 				// Recover this stored ship's last-known build -- only trust it if the ShipType
 				// the recovered Loadout itself reports still matches what StoredShips says is
 				// there NOW, guarding against the real, confirmed ShipID-reuse gotcha (see this
