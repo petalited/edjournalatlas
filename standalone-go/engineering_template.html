@@ -286,12 +286,31 @@ function basketTable() {
   </div>`;
 }
 
+// Real Elite Dangerous mechanic (owner: "grade5 at max engineer rank requires 5 attempts so 5x
+// the mats but also 4x grade4, 3x grade3, 2x grade2 and 1x grade1, you upgrade through the
+// levels") -- confirmed against community reference material: at maximum rank with an engineer,
+// each roll at grade G deterministically contributes 100/G% progress, so grade G takes exactly G
+// rolls, and you can't skip straight to a high grade -- you walk through every lower grade first.
+// So the real total cost of taking one module from unmodified to grade N is the SUM, for every
+// grade g from 1 to N, of that grade's per-roll ingredient cost times g (not just grade N's
+// per-roll cost once). Ingredients in DATA are the per-roll cost for that one grade (confirmed
+// from the vendored source, e.g. Dirty Drive Tuning grade 3 lists Chromium/Mechanical Components/
+// Legacy Firmware x1 each -- that's one roll's worth, not the full grade-3 total).
+function cumulativeIngredients(type, name, targetGrade) {
+  const byGrade = (bpIndex[type] || {})[name] || {};
+  const out = [];
+  for (let g = 1; g <= targetGrade; g++) {
+    const bp = byGrade[g];
+    if (!bp) continue;
+    bp.ingredients.forEach(ing => out.push({ key: ing.key, name: ing.name, count: ing.count * g }));
+  }
+  return out;
+}
+
 function materialsSummary() {
   const needed = {}; // key -> {name, count}
   basket.forEach(item => {
-    const bp = bpByKey[`${item.type}|${item.name}|${item.grade}`];
-    if (!bp) return;
-    bp.ingredients.forEach(ing => {
+    cumulativeIngredients(item.type, item.name, item.grade).forEach(ing => {
       if (!needed[ing.key]) needed[ing.key] = { name: ing.name, count: 0 };
       needed[ing.key].count += ing.count * item.qty;
     });
@@ -328,6 +347,7 @@ function materialsSummary() {
   return `<div class="section-block">
     <div class="section-title">Materials needed <span class="section-sub">held / needed, across your whole plan</span></div>
     <div class="need-grid">${cards}</div>
+    <p class="caveat">Assumes maximum rank with each engineer: grade N takes N rolls (1 for grade 1, up to 5 for grade 5), and reaching grade N means rolling every lower grade first too -- so a grade 5 upgrade totals 1+2+3+4+5 = 15 rolls' worth of materials, not just 5. If your rank with an engineer is below what a grade needs, real rolls (and materials) required will be higher and less predictable than shown here. Experimental Effects are a single roll regardless of grade.</p>
   </div>`;
 }
 
