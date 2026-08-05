@@ -1,12 +1,17 @@
 # edjournalatlas
 
 A local "explore what you've found" viewer for Elite Dangerous — and, beyond just exploration, a
-whole-career recap and a full-journal search tool. It reads your own game journal files directly
-and builds three browsable pages: every system you've visited (region, population, bodies
-scanned, notable finds, presumed exobiology value), a searchable log of literally every journal
-event you've ever generated (combat, trading, missions, engineering, powerplay, crew — not just
-exploration), and a "wrapped"-style career recap (kills, favourite ship, biggest rival, trade
-profit, engineering, powerplay rank, fleet carrier, crime record, and more).
+whole-career recap, a full-journal search tool, and an engineering assistant. It reads your own
+game journal files directly and builds five browsable pages: every system you've visited (region,
+population, bodies scanned, notable finds, presumed exobiology value), a searchable log of
+literally every journal event you've ever generated (combat, trading, missions, engineering,
+powerplay, crew — not just exploration), a "wrapped"-style career recap (kills, favourite ship,
+biggest rival, trade profit, engineering, powerplay rank, fleet carrier, crime record, and more),
+a current materials inventory (Raw/Manufactured/Encoded, grouped into the game's own engineering
+families), and an engineering upgrade planner (queue up blueprints/Experimental Effects, see what
+materials and engineers each one needs). A trade calculator ties the last two together — short on
+a material, click it to see what you could give up instead, and the nearest Material Trader (of
+the right type) you've actually used before.
 
 **Nothing else has to be installed, no account needed, nothing is ever sent anywhere over the
 network** — it only reads files already on your own computer, and only ever writes its own small
@@ -15,14 +20,15 @@ local cache file next to itself.
 Two implementations exist, but they're not equivalent anymore:
 
 - **`standalone-go/`** — a single ~3MB self-contained binary (Linux/Windows), no runtime
-  dependency of any kind. **This is the actively developed, full-featured version** — all three
+  dependency of any kind. **This is the actively developed, full-featured version** — all five
   pages above, plus a small coverage-report JSON file listing which journal event types aren't
   summarized yet (safe to share: event names and field names only, never your actual data). No
   Mac build: Elite Dangerous has no supported native Mac client anymore, so there's no realistic
   audience with journal files to point one at.
 - **`standalone/`** — the original Python version. Still works, but only has the systems viewer
-  (no full-journal search, no career recap) — it's no longer being extended. Use it if you'd
-  rather run from source with just the stdlib, but the Go version is where new features land.
+  (no full-journal search, no career recap, no materials/engineering pages) — it's no longer being
+  extended. Use it if you'd rather run from source with just the stdlib, but the Go version is
+  where new features land.
 
 Both keep their own local cache and output files, so it's fine to have both around.
 
@@ -76,17 +82,20 @@ to run just one step (e.g. rebuild the viewer without re-checking the journal). 
 double-click program from it, see `standalone/build_executable.py` (uses PyInstaller; only
 produces a binary for whichever OS you run the build on).
 
-## The three pages (Go version)
+## The five pages (Go version)
 
-Running the binary writes/updates all three every time — a small pill-tab bar at the top of each
-page switches between them.
+Running the binary writes/updates all five every time — a small pill-tab bar at the top of each
+page switches between them. Every page also has a light/dark toggle (top-right corner) that
+overrides your OS/browser preference and follows you across pages, in case the automatic
+light/dark detection isn't what you want.
 
 **`standalone_viewer.html` — systems explorer.** A sortable/searchable table of every visited
 system: region, population, bodies scanned, notable-find count, presumed exobiology value. Click
 a system to expand it: stars, bodies grouped under whichever star (or shared binary-star
 barycenter — circumbinary bodies are grouped correctly, not just attached to the nearest single
-star) they orbit, moons nested under their parent planet, click a body for full detail (mass,
-gravity, atmosphere, temperature, pressure, terraform state, full flora-scan history). Bonus/
+star) they orbit, moons nested under their parent planet (shown as a small connected tree, with
+each body's distance from the arrival star), click a body for full detail (mass, gravity,
+atmosphere, temperature, pressure, terraform state, full flora-scan history). Bonus/
 first-discovery badges, EDSM/Inara/full-journal-search links per system, a 📍 button to re-sort
 the whole table by distance from any system, copy-to-clipboard and Discord-formatted export
 buttons.
@@ -100,10 +109,37 @@ that page fast to open every time, even though this one can get large.
 
 **`standalone_summary.html` — career recap.** Stat cards across however many of these
 categories your own journal has real activity in (sections you have no data for just don't show
-up — nothing forced): Exploration, Rank, Combat, Crime, Wing, Powerplay, Trading, Mining,
-Materials, Engineering, Ships, Fleet Carrier, Crew, Colonization, Stations, Missions. A handful of
-narrative highlights get pulled out too (e.g. who last destroyed you, and what they were flying).
-Has its own Discord-export button for the whole recap.
+up — nothing forced): Career Earnings, Exploration, Rank, Combat, Crime, Wing, Powerplay, Trading,
+Mining, Materials, Engineering, Ships, Fleet Carrier, Crew, Colonization, Stations, Missions. A
+handful of narrative highlights get pulled out too (e.g. who last destroyed you, and what they
+were flying). Discord-export buttons for both the whole recap and individual sections.
+
+**`standalone_materials.html` — materials inventory.** Your current Engineering materials
+(Raw/Manufactured/Encoded) as of the last time the game reported them to the journal, shown either
+as a flat sorted/searchable list or a grid grouped into the game's own material families (one
+column per grade, so you can see the real shape of a family — what you hold, what's missing).
+Click any material to open the trade calculator (see below).
+
+**`standalone_engineering.html` — engineering upgrade planner.** Queue up a "basket" of
+engineering upgrades (module, grade, quantity, optional Experimental Effect) and see a combined
+summary of every material you'd need — correctly accounting for the real in-game mechanic that
+reaching grade N means rolling through every lower grade first (a grade 5 upgrade costs
+1+2+3+4+5 = 15 rolls' worth of materials at max engineer rank, not just grade 5's own cost) — held
+against your actual inventory, plus which of your unlocked engineers can provide each upgrade
+(click an engineer's name to copy their home system for route-plotting). Anything you're short on
+opens the same trade calculator a click away.
+
+**Trade calculator** (materials page and engineering planner). Click a tradeable material to see
+a family × grade grid of what you could give up instead, color-coded by how good a deal it is
+(cheap/plentiful, costly-but-possible, or — on the engineering planner — needed elsewhere in your
+own plan, so trading it away would just create a different shortfall), using the real Material
+Trader exchange-ratio mechanic (grade difference plus a cross-family penalty, worked out from
+community references and cross-checked against real trade examples — see
+`standalone-go/materialtrader.go`'s own header comment for the full derivation). A button inside
+shows the nearest known trader of the right type — sourced only from stations you've personally
+traded materials at before (the journal doesn't record trader *type* any other way, and this tool
+never makes a network call to guess), sorted by distance from wherever your journal last placed
+you.
 
 **`standalone_unmodeled.json`** — not really meant to be read directly. A small coverage
 report: which journal event types your data has that the recap doesn't summarize yet, with real
