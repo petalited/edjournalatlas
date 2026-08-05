@@ -25,6 +25,7 @@ const defaultSummaryOutPath = "standalone_summary.html"
 const defaultUnmodeledOutPath = "standalone_unmodeled.json"
 const defaultMaterialsOutPath = "standalone_materials.html"
 const defaultEngineeringOutPath = "standalone_engineering.html"
+const defaultShipyardOutPath = "standalone_shipyard.html"
 
 func main() {
 	journalDir := flag.String("journal-dir", "", "Directory containing Journal.*.log files (auto-detected if omitted)")
@@ -40,6 +41,8 @@ func main() {
 	noMaterials := flag.Bool("no-materials", false, "Skip building the materials inventory page")
 	engineeringOutPath := flag.String("engineering-out", defaultEngineeringOutPath, "Path to write the engineering upgrade planner page")
 	noEngineering := flag.Bool("no-engineering", false, "Skip building the engineering upgrade planner page")
+	shipyardOutPath := flag.String("shipyard-out", defaultShipyardOutPath, "Path to write the shipyard/fleet page")
+	noShipyard := flag.Bool("no-shipyard", false, "Skip building the shipyard/fleet page")
 	noOpen := flag.Bool("no-open", false, "Don't open the viewer in a browser automatically")
 	flag.Parse()
 
@@ -170,6 +173,17 @@ func main() {
 			fmt.Println("Error writing engineering planner page:", err)
 		} else {
 			fmt.Printf("Wrote %s (%d ship-module blueprints -- plan upgrades against your materials and engineers)\n", *engineeringOutPath, blueprintCount)
+		}
+	}
+
+	if !*noShipyard {
+		shipyardHTML, shipCount, err := RenderShipyard(store)
+		if err != nil {
+			fmt.Println("Error building shipyard page:", err)
+		} else if err := os.WriteFile(*shipyardOutPath, []byte(shipyardHTML), 0o644); err != nil {
+			fmt.Println("Error writing shipyard page:", err)
+		} else {
+			fmt.Printf("Wrote %s (%d ships -- your real fleet, fitted modules, and engineering completion)\n", *shipyardOutPath, shipCount)
 		}
 	}
 

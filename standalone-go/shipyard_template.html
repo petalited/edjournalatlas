@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var q=new URLSearchParams(location.search).get('theme');var t=(q==='light'||q==='dark')?q:localStorage.getItem('standalone_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);if(q)localStorage.setItem('standalone_theme',t);}}catch(e){}})();</script>
+<title>edjournalatlas -- shipyard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  color-scheme: light dark;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+  --transition: 160ms ease;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --good: #0ca30c; --good-bg: #e5f7e5; --warning: #b5710a; --warning-bg: #fdf1de;
+  --bonus-bg: #fdf1d3; --bonus-text: #7a5a00;
+  --notable-bg: #efe6fb; --notable-text: #6b3fb0;
+  --bad-bg: #fbe2df; --bad-text: #c22f2f;
+  --shadow: 0 1px 2px rgba(20,18,12,0.06), 0 6px 16px -8px rgba(20,18,12,0.16), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0d12; --panel: #15181d; --text: #f2f3f5; --muted: #b7bcc4; --muted-faint: #7c828b;
+    --border: #262a31; --border-strong: #343a43; --accent: #3987e5; --accent-weak: #17233a;
+    --good: #3ecf3e; --good-bg: #12291a; --warning: #e0a53c; --warning-bg: #2e2312;
+    --bonus-bg: #3d3110; --bonus-text: #f0c766;
+    --notable-bg: #2c2140; --notable-text: #caa9f7;
+    --bad-bg: #3a1f1f; --bad-text: #e66767;
+    --shadow: 0 1px 2px rgba(0,0,0,0.45), 0 8px 20px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.045);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+  --transition: 160ms ease;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --good: #0ca30c; --good-bg: #e5f7e5; --warning: #b5710a; --warning-bg: #fdf1de;
+  --bonus-bg: #fdf1d3; --bonus-text: #7a5a00;
+  --notable-bg: #efe6fb; --notable-text: #6b3fb0;
+  --bad-bg: #fbe2df; --bad-text: #c22f2f;
+  --shadow: 0 1px 2px rgba(20,18,12,0.06), 0 6px 16px -8px rgba(20,18,12,0.16), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0d12; --panel: #15181d; --text: #f2f3f5; --muted: #b7bcc4; --muted-faint: #7c828b;
+  --border: #262a31; --border-strong: #343a43; --accent: #3987e5; --accent-weak: #17233a;
+  --good: #3ecf3e; --good-bg: #12291a; --warning: #e0a53c; --warning-bg: #2e2312;
+  --bonus-bg: #3d3110; --bonus-text: #f0c766;
+  --notable-bg: #2c2140; --notable-text: #caa9f7;
+  --bad-bg: #3a1f1f; --bad-text: #e66767;
+  --shadow: 0 1px 2px rgba(0,0,0,0.45), 0 8px 20px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.045);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text); padding: var(--space-5); font-variant-numeric: tabular-nums; }
+.page-nav { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.page-nav-link { font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill); border: 1px solid var(--border); transition: border-color var(--transition), color var(--transition); }
+.page-nav-link:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); }
+.page-nav-link.page-nav-active { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); font-weight: 600;
+  box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--accent) 50%, transparent); }
+h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 2px; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 var(--space-5); max-width: 900px; }
+.empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center;
+  border: 1px dashed var(--border); border-radius: var(--radius-md); }
+.empty-note-icon { font-size: 1.9rem; margin-bottom: var(--space-2); opacity: 0.75; }
+.fleet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-4); }
+.ship-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); padding: var(--space-4); }
+.ship-card.ship-active { border-color: var(--accent); box-shadow: var(--shadow), 0 0 0 1px var(--accent); }
+.ship-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-1); }
+.ship-title { font-size: 1.05rem; font-weight: 700; }
+.ship-ident { font-size: 0.78rem; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.ship-active-badge { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--accent); background: var(--accent-weak); border-radius: var(--radius-pill); padding: 2px 8px; white-space: nowrap; }
+.ship-sub { font-size: 0.8rem; color: var(--muted); margin-bottom: var(--space-3); }
+.ship-value { font-weight: 700; }
+.completion-row { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.completion-bar { flex: 1; height: 8px; border-radius: var(--radius-pill); background: var(--border); overflow: hidden; }
+.completion-bar-fill { height: 100%; background: var(--accent); border-radius: var(--radius-pill); transition: width var(--transition); }
+.completion-label { font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+.module-list { display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto; }
+.module-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  padding: 6px var(--space-2); border-radius: var(--radius-sm); font-size: 0.82rem; }
+.module-row-engineered { background: var(--accent-weak); }
+.module-name { font-weight: 600; }
+.module-off { opacity: 0.5; text-decoration: line-through; }
+.module-detail { font-size: 0.72rem; color: var(--muted); }
+.module-grade-badge { font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: var(--radius-pill);
+  color: var(--accent); background: var(--panel); border: 1px solid var(--accent); white-space: nowrap; }
+.module-grade-badge.module-grade-max { color: var(--good); border-color: var(--good); background: var(--good-bg); }
+.push-grade-btn { font-size: 0.68rem; padding: 2px 8px; border-radius: var(--radius-pill); cursor: pointer;
+  background: var(--accent); color: #fff; border: 1px solid var(--accent); white-space: nowrap;
+  transition: background var(--transition); }
+.push-grade-btn:hover { background: color-mix(in srgb, var(--accent) 85%, black); }
+.push-grade-btn.push-grade-added { background: var(--good); border-color: var(--good); }
+.no-modules-note { font-size: 0.82rem; color: var(--muted); font-style: italic; }
+.snapshot-note { font-size: 0.76rem; color: var(--muted-faint); margin-top: var(--space-3); }
+
+/* Trade calculator: click a "short by X" material-needed card to see what you could give up from
+   what you already hold to cover it, plus the nearest known trader of the right type from your
+   own real journal history. See materialtrader.go/docs/MaterialTraderMechanics.md. */
+.theme-toggle { position: fixed; top: var(--space-4); right: var(--space-4); z-index: 20;
+  display: flex; align-items: center; justify-content: center; width: 38px; height: 38px;
+  cursor: pointer; font-size: 1.05rem; line-height: 1; background: var(--panel);
+  border: 1px solid var(--border); border-radius: var(--radius-pill); box-shadow: var(--shadow);
+  transition: border-color var(--transition), transform var(--transition); }
+.theme-toggle:hover { border-color: var(--accent); transform: translateY(-1px); }
+a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm);
+}
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+  <a class="page-nav-link" href="standalone_viewer.html">🗺️ Systems</a>
+  <a class="page-nav-link" href="standalone_events.html">🔍 Journal search</a>
+  <a class="page-nav-link" href="standalone_summary.html">📊 Recap</a>
+  <a class="page-nav-link" href="standalone_materials.html">🧪 Materials</a>
+  <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
+  <a class="page-nav-link page-nav-active" href="standalone_shipyard.html">🚀 Shipyard</a>
+</nav>
+<button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
+
+<h1>standalone -- shipyard</h1>
+<p class="subtitle" id="subtitle"></p>
+
+<div id="fleetSection"></div>
+
+<script id="shipyard-data" type="application/json">__DATA_JSON__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('shipyard-data').textContent);
+const STORAGE_KEY = 'standalone_engineering_basket';
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function formatCredits(n) {
+  if (n == null) return '';
+  return n.toLocaleString('en-US') + ' cr';
+}
+
+// Manual light/dark override -- see the other five pages for the same pattern/comment.
+function currentTheme() {
+  const forced = document.documentElement.getAttribute('data-theme');
+  if (forced === 'light' || forced === 'dark') return forced;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function updateThemeToggleLabel() {
+  const btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  const dark = currentTheme() === 'dark';
+  btn.textContent = dark ? '🌙' : '☀️';
+  btn.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
+}
+function propagateThemeToNavLinks(theme) {
+  document.querySelectorAll('.page-nav-link[href]').forEach(a => {
+    const base = a.getAttribute('href').split('?')[0];
+    a.setAttribute('href', theme ? base + '?theme=' + theme : base);
+  });
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('standalone_theme', theme); } catch (e) { /* storage unavailable */ }
+  updateThemeToggleLabel();
+  propagateThemeToNavLinks(theme);
+}
+const themeToggleBtn = document.getElementById('themeToggle');
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener('click', () => applyTheme(currentTheme() === 'dark' ? 'light' : 'dark'));
+}
+updateThemeToggleLabel();
+propagateThemeToNavLinks(document.documentElement.getAttribute('data-theme'));
+
+document.getElementById('subtitle').textContent = DATA.hasFleetData
+  ? `Generated ${DATA.generatedAt} -- your active ship is always current; the rest of your fleet reflects your last Shipyard visit${DATA.snapshotAt ? ` (${DATA.snapshotAt.replace('T', ' ').replace('Z', '')} UTC)` : ''}.`
+  : `Generated ${DATA.generatedAt}.`;
+
+// Owner: "i wanna be able to plan builds against current materials yk?" -- pushes this real
+// fitted module's blueprint one grade higher straight into the SAME basket the engineering
+// planner already reads/writes (standalone_engineering_basket), rather than a second, separate
+// planning system. See docs/ShipyardPlanner.md for why this is scoped to real fitted modules'
+// own engineering only, not hypothetical module swaps.
+function loadBasket() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+function pushModuleToGrade(type, name, grade) {
+  const basket = loadBasket();
+  const existing = basket.find(b => b.type === type && b.name === name && b.grade === grade && !b.effect);
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    basket.push({ type, name, grade, effect: null, qty: 1 });
+  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(basket)); } catch (e) { /* storage unavailable or full */ }
+}
+
+function moduleRow(m) {
+  const nameCls = m.on === false ? 'module-name module-off' : 'module-name';
+  const badges = [];
+  if (m.engineered) {
+    const atMax = m.maxGrade && m.grade >= m.maxGrade;
+    badges.push(`<span class="module-grade-badge${atMax ? ' module-grade-max' : ''}">G${m.grade}${m.maxGrade ? '/' + m.maxGrade : ''}</span>`);
+  }
+  let pushBtn = '';
+  if (m.engineered && m.maxGrade && m.grade < m.maxGrade && m.blueprintType && m.blueprintName) {
+    const nextGrade = m.grade + 1;
+    pushBtn = `<button type="button" class="push-grade-btn" data-bp-type="${escapeHtml(m.blueprintType)}" data-bp-name="${escapeHtml(m.blueprintName)}" data-bp-grade="${nextGrade}" title="Add Grade ${nextGrade} ${escapeHtml(m.blueprintType)} -- ${escapeHtml(m.blueprintName)} to your engineering plan">+ Plan G${nextGrade}</button>`;
+  }
+  const detailBits = [];
+  if (m.engineered) {
+    if (m.blueprintName) detailBits.push(escapeHtml(m.blueprintName));
+    if (m.engineer) detailBits.push('by ' + escapeHtml(m.engineer));
+    if (m.effect) detailBits.push('✨ ' + escapeHtml(m.effect));
+  }
+  const detail = detailBits.length ? `<div class="module-detail">${detailBits.join(' · ')}</div>` : '';
+  return `<div class="module-row${m.engineered ? ' module-row-engineered' : ''}">
+    <div>
+      <span class="${nameCls}">${escapeHtml(m.name)}</span>
+      ${detail}
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">${badges.join('')}${pushBtn}</div>
+  </div>`;
+}
+
+function shipCard(s) {
+  const title = s.name ? `${escapeHtml(s.name)} <span class="ship-ident">${escapeHtml(s.ident || '')}</span>` : escapeHtml(s.type);
+  const activeBadge = s.active ? '<span class="ship-active-badge">Active</span>' : '';
+  const subBits = [escapeHtml(s.type)];
+  if (s.system) subBits.push(escapeHtml(s.system));
+  subBits.push(formatCredits(s.value));
+  let completionHtml = '';
+  if (s.hasModules && s.engineeredCount > 0 && s.completionPct != null) {
+    completionHtml = `<div class="completion-row">
+      <div class="completion-bar"><div class="completion-bar-fill" style="width:${Math.min(100, s.completionPct).toFixed(0)}%"></div></div>
+      <span class="completion-label">${s.completionPct.toFixed(0)}% engineered</span>
+    </div>`;
+  }
+  let bodyHtml;
+  if (!s.hasModules) {
+    bodyHtml = `<p class="no-modules-note">Build not recorded yet -- this ship's module loadout hasn't been independently confirmed since it was last flown (or its slot number may have been reused by a different ship since). Fly it once to refresh.</p>`;
+  } else {
+    bodyHtml = `<div class="module-list">${s.modules.map(moduleRow).join('')}</div>`;
+    if (!s.active && s.loadoutAt) {
+      bodyHtml += `<p class="snapshot-note">Build as of ${escapeHtml(s.loadoutAt.replace('T', ' ').replace('Z', ''))} UTC -- the last time this ship was flown.</p>`;
+    }
+  }
+  return `<div class="ship-card${s.active ? ' ship-active' : ''}">
+    <div class="ship-head">
+      <div class="ship-title">${title}</div>
+      ${activeBadge}
+    </div>
+    <div class="ship-sub">${subBits.join(' · ')}</div>
+    ${completionHtml}
+    ${bodyHtml}
+  </div>`;
+}
+
+function render() {
+  if (!DATA.hasFleetData) {
+    document.getElementById('fleetSection').innerHTML =
+      `<div class="empty-note"><div class="empty-note-icon">🚀</div>No fleet data captured yet -- log in-game once (and open the Shipyard service at least once, to capture your stored ships too), then re-run this tool.</div>`;
+    return;
+  }
+  document.getElementById('fleetSection').innerHTML = `<div class="fleet-grid">${DATA.ships.map(shipCard).join('')}</div>`;
+}
+
+document.getElementById('fleetSection').addEventListener('click', e => {
+  const btn = e.target.closest('.push-grade-btn');
+  if (!btn) return;
+  pushModuleToGrade(btn.dataset.bpType, btn.dataset.bpName, Number(btn.dataset.bpGrade));
+  btn.textContent = '✓ Added';
+  btn.classList.add('push-grade-added');
+  btn.disabled = true;
+});
+
+render();
+</script>
+</body>
+</html>
