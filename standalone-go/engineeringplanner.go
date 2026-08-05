@@ -214,6 +214,7 @@ type plannerData struct {
 	HasSnapshot     bool                  `json:"hasSnapshot"`
 	SnapshotAt      string                `json:"snapshotAt,omitempty"`
 	HasEngineerData bool                  `json:"hasEngineerData"`
+	Trading         traderData            `json:"trading"` // see materialtrader.go -- powers the trade calculator
 }
 
 func resolveEngineers(names []string, engineerByKey map[string]engineerProgressEntry) []engineerStatusOut {
@@ -277,6 +278,7 @@ func BuildPlannerData(store *Store) plannerData {
 		HeldMaterials:   held,
 		HasSnapshot:     hasSnapshot,
 		HasEngineerData: hasEngineerData,
+		Trading:         BuildTraderData(store),
 	}
 	if hasSnapshot {
 		data.SnapshotAt = snapshotTS

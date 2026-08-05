@@ -62,6 +62,7 @@ type engineeringUsage struct {
 }
 
 type materialOut struct {
+	Key    string            `json:"key"` // normalized key -- lets the client cross-reference this material against Trading.MaterialCatalog/heldMaterials
 	Name   string            `json:"name"`
 	Grade  int               `json:"grade,omitempty"`
 	Family string            `json:"family,omitempty"` // "" means not part of a named family -- Guardian/Thargoid/Unknown-* materials, see materialgrades.go
@@ -74,6 +75,7 @@ type materialOut struct {
 // so the grid shows the true shape of the family (what's held, what's missing), not just a list
 // of what happens to be in the inventory right now.
 type gridCellOut struct {
+	Key   string            `json:"key"` // normalized key -- lets the client cross-reference this cell against Trading.MaterialCatalog/heldMaterials
 	Grade int               `json:"grade"`
 	Name  string            `json:"name"`
 	Count int64             `json:"count"`
@@ -100,6 +102,7 @@ type materialsData struct {
 	Manufactured []materialOut `json:"manufactured"`
 	Encoded      []materialOut `json:"encoded"`
 	Grid         materialsGrid `json:"grid"`
+	Trading      traderData    `json:"trading"` // see materialtrader.go -- powers the trade calculator
 }
 
 // latestMaterialsSnapshot scans every RawEvent for "Materials" and keeps whichever has the
@@ -197,7 +200,7 @@ func toMaterialOut(entries []materialEntry, usage map[string]*engineeringUsage) 
 		if name == "" {
 			name = prettifyKeyStandalone(m.Name) // confirmed real: Raw entries never carry Name_Localised
 		}
-		mo := materialOut{Name: name, Grade: materialGrade(m.Name), Family: materialFamily(m.Name), Count: m.Count}
+		mo := materialOut{Key: normalizeMaterialKey(m.Name), Name: name, Grade: materialGrade(m.Name), Family: materialFamily(m.Name), Count: m.Count}
 		if u, ok := usage[name]; ok {
 			mo.Usage = u
 		}
@@ -235,7 +238,7 @@ func buildMaterialGrid(snapshot materialsSnapshotEvent, usage map[string]*engine
 		famOut := gridFamilyOut{Name: fam.Name, Cells: make([]gridCellOut, 0, len(fam.Slots))}
 		for i, slot := range fam.Slots {
 			name := slot.Display
-			cell := gridCellOut{Grade: i + 1}
+			cell := gridCellOut{Key: slot.Key, Grade: i + 1}
 			if entry, ok := owned[slot.Key]; ok {
 				cell.Held = true
 				cell.Count = entry.Count
@@ -268,6 +271,7 @@ func BuildMaterialsData(store *Store) materialsData {
 	data := materialsData{
 		GeneratedAt: time.Now().UTC().Format("2006-01-02 15:04 MST"),
 		HasSnapshot: found,
+		Trading:     BuildTraderData(store),
 	}
 	if found {
 		data.SnapshotAt = snapshotTS
