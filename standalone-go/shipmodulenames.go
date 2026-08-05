@@ -54,8 +54,8 @@ var moduleTypeKeywords = map[string]string{
 	"lifesupport":      "Life Support",
 	"powerdistributor": "Power Distributor",
 	"sensors":          "Sensors",
-	// "engine" is checked last among internals (see resolveModuleType) since it's also a
-	// substring of "dronecontrol"-style symbols -- kept separate rather than in this map.
+	// Thrusters are handled separately (see engineItemInfix/resolveModuleType) since a bare
+	// "engine" keyword would false-match cosmetic "enginecustomisation_white"-style symbols.
 
 	// Optional internals [real]
 	"shieldgenerator":             "Shield Generator",
@@ -86,19 +86,52 @@ var moduleTypeKeywords = map[string]string{
 	"shieldbooster":            "Shield Booster",
 	"plasmapointdefence":       "Point Defence",
 	"crimescanner":             "Kill Warrant Scanner",
-	"mrascanner":               "Manifest Scanner",
-	"railgun":                  "Rail Gun", // the REAL Rail Gun symbol ("Hpt_Railgun_*"), confirmed via the same EDCD/FDevIDs cross-check above -- not present in this commander's own fleet to verify against directly, but independently confirmed authoritative
-	"cannon":                   "Cannon",   // must be checked after multicannon (longest-match-first)
+	"cargoscanner":             "Manifest Scanner", // real bug, now fixed: this project previously had NO entry for Manifest Scanner's actual symbol at all -- it had wrongly assumed "mrascanner" (see below) meant Manifest Scanner, which left the real symbol ("hpt_cargoscanner_*") completely unmapped. Confirmed directly against EDCD/FDevIDs' own outfitting.csv.
+	"railgun":                  "Rail Gun",         // the REAL Rail Gun symbol ("Hpt_Railgun_*"), confirmed via the same EDCD/FDevIDs cross-check above -- not present in this commander's own fleet to verify against directly, but independently confirmed authoritative
+	"cannon":                   "Cannon",           // must be checked after multicannon (longest-match-first)
 
 	// Hardpoints [known, not independently confirmed against this commander's own real fleet]
 	"plasmaaccelerator": "Plasma Accelerator",
 }
 
-// engineKeyword is handled separately from moduleTypeKeywords: "engine" alone would also match
-// inside "dronecontrol"-adjacent or other compound symbols if included in the same longest-
-// match-first scan, so it's checked only against the MainEngines-shaped `int_engine_...` prefix
-// specifically.
-const engineItemPrefix = "int_engine_"
+// nonEngineerableItemPrefixes: real module symbols that, despite superficially matching a
+// moduleTypeKeywords substring (e.g. "hpt_mkiiplasmashockautocannon_..." contains "cannon"),
+// are genuinely NOT part of this project's engineerable catalog -- checked BEFORE the keyword
+// scan in resolveModuleType so they never get misattributed to a real Type, however close the
+// substring match looks. Two real, confirmed cases (owner report, "PE-24P has fragment cannons
+// not railguns" prompted a full audit of all 323 distinct real Item symbols this commander's
+// fleet has ever used against EDCD/EDDI's authoritative ModuleDefinitions.cs):
+//   - "hpt_mrascanner_*" is the Pulse Wave Analyser (a Guardian-ruin detection utility),
+//     confirmed via EDCD/FDevIDs' outfitting.csv -- NOT Manifest Scanner, which this project had
+//     wrongly assumed. Pulse Wave Analyser isn't in this project's vendored blueprint catalog at
+//     all (checked directly) -- not a standard-engineerable module, so this correctly resolves
+//     to no Type; it still gets a real cosmetic display name via cosmeticModuleKeywords below.
+//   - "hpt_mkiiplasmashockautocannon_*" (the Mandalay's MkII Plasma Shock Accelerator) is
+//     confirmed, directly researched and not engineerable at all as of this writing -- Shock
+//     Cannon-family weapons have no engineering blueprints in the real game yet, so offering a
+//     "push to next grade" button for one would be actively wrong, not just imprecise.
+//
+// The rest of the 323-symbol audit (Pack-Hound/"drunkmissilerack", Advanced Missile Rack/
+// "dumbfiremissilerack_..._advanced", Pacifier Frag Cannon/"slugshot_..._large_range", Bi-Weave
+// shields, Enhanced Performance/Gravity Optimised thrusters) all independently confirmed to
+// share their base weapon/module type's standard engineering blueprints -- correctly already
+// resolving via the ordinary keyword match, no exclusion needed.
+var nonEngineerableItemPrefixes = []string{
+	"hpt_mrascanner_",
+	"hpt_mkiiplasmashockautocannon_",
+}
+
+// engineItemInfix is checked as a substring (not just a prefix) rather than folded into
+// moduleTypeKeywords, since a bare "engine" keyword would also false-match cosmetic
+// "enginecustomisation_white"-style symbols. "_engine_" (underscore-bounded) is the real,
+// confirmed-safe discriminator: verified against all ~990 real hpt_/int_ symbols in EDCD/EDDI's
+// own module data that every single one containing "_engine_" is a genuine Thrusters-family
+// module (including real special variants like Mandalay's "int_mkiiagileboost_engine_..." --
+// confirmed via research to share standard Thrusters engineering, same as Enhanced Performance/
+// Gravity Optimised variants), with zero false positives from anything else. A real, live gap
+// this fixed: the old strict-prefix check (`HasPrefix(item, "int_engine_")`) missed exactly this
+// Mandalay module, which fell through to a raw ugly symbol string in the UI instead of "Thrusters".
+const engineItemInfix = "_engine_"
 
 // moduleTypeSortedKeywords: moduleTypeKeywords' keys, longest first, computed once -- so a
 // symbol containing both "cannon" and "multicannon" resolves to the more specific match.
@@ -119,7 +152,12 @@ var moduleTypeSortedKeywords = func() []string {
 // symbol, or "" if it's not a recognized engineerable module type (cosmetic items, fuel tanks,
 // cargo racks, and any module type not yet in moduleTypeKeywords all correctly return "").
 func resolveModuleType(item string) string {
-	if strings.HasPrefix(item, engineItemPrefix) {
+	for _, prefix := range nonEngineerableItemPrefixes {
+		if strings.HasPrefix(item, prefix) {
+			return ""
+		}
+	}
+	if strings.Contains(item, engineItemInfix) {
 		return "Thrusters"
 	}
 	for _, kw := range moduleTypeSortedKeywords {
@@ -199,20 +237,22 @@ func atoiSafe(s string) int {
 // shipyard page doesn't show a raw symbol for the majority of a ship's non-combat loadout either.
 // Not exhaustive -- anything missing here still gets the honest raw-symbol fallback.
 var cosmeticModuleKeywords = map[string]string{
-	"largecargorack":           "Cargo Rack",
-	"cargorack":                "Cargo Rack",
-	"fueltank":                 "Fuel Tank",
-	"cockpit":                  "Cockpit",
-	"armour_grade":             "Armour",
-	"dockingcomputer_advanced": "Advanced Docking Computer",
-	"detailedsurfacescanner":   "Detailed Surface Scanner",
-	"planetapproachsuite":      "Planetary Approach Suite",
-	"guardianfsdbooster":       "Guardian FSD Booster",
-	"supercruiseassist":        "Supercruise Assist",
-	"modulereinforcement":      "Module Reinforcement Package",
-	"passengercabin":           "Passenger Cabin",
-	"buggybay":                 "Planetary Vehicle Hangar",
-	"fighterbay":               "Fighter Hangar",
+	"largecargorack":            "Cargo Rack",
+	"cargorack":                 "Cargo Rack",
+	"fueltank":                  "Fuel Tank",
+	"cockpit":                   "Cockpit",
+	"armour_grade":              "Armour",
+	"dockingcomputer_advanced":  "Advanced Docking Computer",
+	"detailedsurfacescanner":    "Detailed Surface Scanner",
+	"planetapproachsuite":       "Planetary Approach Suite",
+	"guardianfsdbooster":        "Guardian FSD Booster",
+	"supercruiseassist":         "Supercruise Assist",
+	"modulereinforcement":       "Module Reinforcement Package",
+	"passengercabin":            "Passenger Cabin",
+	"buggybay":                  "Planetary Vehicle Hangar",
+	"fighterbay":                "Fighter Hangar",
+	"mrascanner":                "Pulse Wave Analyser",           // real, not engineerable -- see nonEngineerableItemPrefixes above
+	"mkiiplasmashockautocannon": "MkII Plasma Shock Accelerator", // real, not engineerable -- see nonEngineerableItemPrefixes above
 }
 
 var cosmeticModuleSortedKeywords = func() []string {

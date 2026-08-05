@@ -72,10 +72,15 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
   box-shadow: var(--shadow); padding: var(--space-4); }
 .ship-card.ship-active { border-color: var(--accent); box-shadow: var(--shadow), 0 0 0 1px var(--accent); }
 .ship-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-1); }
+.ship-head-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
 .ship-title { font-size: 1.05rem; font-weight: 700; }
 .ship-ident { font-size: 0.78rem; color: var(--muted); font-weight: 400; margin-left: 6px; }
 .ship-active-badge { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
   color: var(--accent); background: var(--accent-weak); border-radius: var(--radius-pill); padding: 2px 8px; white-space: nowrap; }
+.engineer-ship-btn { font-size: 0.72rem; padding: 3px 10px; border-radius: var(--radius-pill); cursor: pointer;
+  background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); white-space: nowrap;
+  transition: border-color var(--transition), color var(--transition); }
+.engineer-ship-btn:hover { border-color: var(--accent); color: var(--accent); }
 .ship-sub { font-size: 0.8rem; color: var(--muted); margin-bottom: var(--space-3); }
 .ship-value { font-weight: 700; }
 .completion-row { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
@@ -92,13 +97,104 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .module-grade-badge { font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: var(--radius-pill);
   color: var(--accent); background: var(--panel); border: 1px solid var(--accent); white-space: nowrap; }
 .module-grade-badge.module-grade-max { color: var(--good); border-color: var(--good); background: var(--good-bg); }
-.push-grade-btn { font-size: 0.68rem; padding: 2px 8px; border-radius: var(--radius-pill); cursor: pointer;
-  background: var(--accent); color: #fff; border: 1px solid var(--accent); white-space: nowrap;
-  transition: background var(--transition); }
-.push-grade-btn:hover { background: color-mix(in srgb, var(--accent) 85%, black); }
-.push-grade-btn.push-grade-added { background: var(--good); border-color: var(--good); }
 .no-modules-note { font-size: 0.82rem; color: var(--muted); font-style: italic; }
 .snapshot-note { font-size: 0.76rem; color: var(--muted-faint); margin-top: var(--space-3); }
+
+/* "⚙️ Engineer" modal -- owner: "add an engineer button to top right that lets you quickly add
+   engineering changes to your engineering planner with a whole window". Same modal-overlay
+   visual language as the trade calculator on the materials/engineering pages, kept as its own
+   independent class names since this is a separate self-contained embedded file. */
+.engineer-modal-overlay { position: fixed; inset: 0; background: rgba(10,10,10,0.55); display: flex;
+  align-items: center; justify-content: center; z-index: 100; padding: var(--space-4); }
+.engineer-modal-overlay[hidden] { display: none; }
+.engineer-modal { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); max-width: 1100px; width: 100%; max-height: 85vh; overflow-y: auto;
+  padding: var(--space-5); }
+.engineer-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.engineer-modal-title { font-size: 1.1rem; font-weight: 700; }
+.engineer-modal-sub { font-size: 0.8rem; color: var(--muted); margin-top: 2px; max-width: 560px; }
+.engineer-modal-close { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: var(--muted); line-height: 1; padding: 4px; }
+.engineer-modal-close:hover { color: var(--text); }
+.engineer-modal-body { display: flex; flex-direction: column; gap: var(--space-2); }
+.engineer-module-row { border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-3); }
+.engineer-module-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-2); }
+.engineer-module-name { font-weight: 600; font-size: 0.9rem; }
+.engineer-module-state { font-size: 0.76rem; color: var(--muted); }
+.engineer-module-controls { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.engineer-module-controls select { background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); font-size: 0.85rem; font: inherit;
+  transition: border-color var(--transition); }
+.engineer-module-controls select:hover { border-color: var(--border-strong); }
+.engineer-name-select { min-width: 180px; flex: 1; }
+.engineer-grade-select { min-width: 90px; }
+.engineer-effect-select { min-width: 160px; }
+.engineer-add-btn { font-size: 0.82rem; padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm); cursor: pointer;
+  background: var(--accent); color: #fff; border: 1px solid var(--accent); white-space: nowrap;
+  transition: background var(--transition); }
+.engineer-add-btn:hover { background: color-mix(in srgb, var(--accent) 85%, black); }
+.engineer-add-btn.engineer-add-added { background: var(--good); border-color: var(--good); }
+.goal-clear-btn { font-size: 0.78rem; padding: var(--space-2) 10px; border-radius: var(--radius-sm); cursor: pointer;
+  background: transparent; color: var(--muted); border: 1px solid var(--border-strong); white-space: nowrap;
+  transition: border-color var(--transition), color var(--transition); }
+.goal-clear-btn:hover { border-color: var(--bad-text); color: var(--bad-text); }
+
+/* "Current Ship" / "Goal Ship" comparison -- owner: "each ship should when you edit it kinda
+   duplicate the window and show a Current ship window and Goal ship window ... so you know how
+   far you are from finishing your ship". Real bug, fixed: the first version rendered two fully
+   independent stacked lists (map+join per column) -- the goal cell is taller than the current
+   cell (badge + 3 selects + buttons vs. 2-3 lines of text), so row N's height differed between
+   columns and every row below it drifted out of alignment. Fixed by emitting ONE flat grid whose
+   children alternate current-cell, goal-cell per module (title cells first) -- with the default
+   grid `align-items: stretch` (no override here), each same-row pair is locked to a shared row
+   track sized to the taller of the two, so pairs can never drift apart regardless of content
+   height, and the current cell is asked to fill that same height rather than floating short. */
+.compare-columns { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--space-4); row-gap: var(--space-2); }
+.compare-column-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted); margin-bottom: var(--space-1); padding-bottom: var(--space-2); border-bottom: 1px solid var(--border); }
+.compare-module-row { border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3); box-sizing: border-box; height: 100%;
+  display: flex; flex-direction: column; justify-content: center; }
+.engineer-module-row.compare-goal-cell { box-sizing: border-box; height: 100%; }
+.compare-module-name { font-weight: 600; font-size: 0.85rem; }
+.compare-module-state { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+.compare-module-detail { font-size: 0.72rem; color: var(--muted-faint); margin-top: 2px; }
+.goal-badge { font-size: 0.76rem; font-weight: 600; color: var(--accent); background: var(--accent-weak);
+  border-radius: var(--radius-sm); padding: 3px var(--space-2); margin-bottom: var(--space-2); display: inline-block; }
+.goal-badge.goal-badge-unset { color: var(--muted); background: var(--bg); font-weight: 400; font-style: italic; }
+
+/* Self-contained "Materials Needed" panel -- owner: "open a side window with materials needed
+   if you cant [add across pages]". Reuses the exact same modal-overlay visual language as the
+   Engineer modal above (same class names -- this IS a second modal on the same page, not a
+   separate visual system, so sharing them is intentional here, unlike the deliberately
+   independent naming this page uses versus OTHER pages' own trade-calculator modal). */
+.materials-needed-btn { position: fixed; top: var(--space-4); right: 66px; z-index: 20;
+  font-size: 0.82rem; padding: var(--space-2) var(--space-4); border-radius: var(--radius-pill); cursor: pointer;
+  background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); box-shadow: var(--shadow);
+  transition: border-color var(--transition), color var(--transition); }
+.materials-needed-btn:hover { border-color: var(--accent); color: var(--accent); }
+.materials-needed-btn:disabled { opacity: 0.55; cursor: default; }
+.plan-list { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
+.plan-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.plan-row-name { font-weight: 600; font-size: 0.88rem; }
+.plan-row-detail { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+.plan-remove-btn { font-size: 0.76rem; padding: 3px 10px; border-radius: var(--radius-pill); cursor: pointer;
+  background: transparent; color: var(--muted); border: 1px solid var(--border-strong); white-space: nowrap;
+  transition: border-color var(--transition), color var(--transition); }
+.plan-remove-btn:hover { border-color: var(--bad-text); color: var(--bad-text); }
+.materials-section-title { font-size: 0.95rem; font-weight: 700; margin: 0 0 var(--space-3); padding-top: var(--space-3);
+  border-top: 1px solid var(--border); display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+.materials-section-sub { font-size: 0.78rem; color: var(--muted); font-weight: 400; }
+.need-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3); }
+.need-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3); box-shadow: var(--shadow); }
+.need-card.need-short { border-color: var(--warning); background: var(--warning-bg); box-shadow: var(--shadow), inset 3px 0 0 var(--warning); }
+.need-card.need-met { border-color: var(--good); background: var(--good-bg); box-shadow: var(--shadow), inset 3px 0 0 var(--good); }
+.need-name { font-weight: 600; font-size: 0.9rem; }
+.need-amounts { font-size: 1.05rem; font-weight: 800; margin-top: 3px; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.need-status { font-size: 0.75rem; margin-top: 3px; font-weight: 600; }
+.need-short .need-status { color: var(--warning); }
+.need-met .need-status { color: var(--good); }
 
 /* Trade calculator: click a "short by X" material-needed card to see what you could give up from
    what you already hold to cover it, plus the nearest known trader of the right type from your
@@ -125,16 +221,42 @@ a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible
   <a class="page-nav-link page-nav-active" href="standalone_shipyard.html">🚀 Shipyard</a>
 </nav>
 <button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
+<button class="materials-needed-btn" type="button" id="materialsNeededBtn" disabled title="See combined materials needed across everything you've added to your engineering plan">🧰 Materials Needed</button>
 
 <h1>standalone -- shipyard</h1>
 <p class="subtitle" id="subtitle"></p>
 
 <div id="fleetSection"></div>
 
+<div class="engineer-modal-overlay" id="materialsModalOverlay" hidden>
+  <div class="engineer-modal" role="dialog" aria-modal="true" aria-labelledby="materialsModalTitle">
+    <div class="engineer-modal-head">
+      <div>
+        <div class="engineer-modal-title" id="materialsModalTitle">🧰 Materials Needed</div>
+        <div class="engineer-modal-sub">Everything you've added via ⚙️ Engineer, and what it'll cost across your whole plan.</div>
+      </div>
+      <button type="button" class="engineer-modal-close" id="materialsModalClose" aria-label="Close">✕</button>
+    </div>
+    <div class="engineer-modal-body" id="materialsModalBody"></div>
+  </div>
+</div>
+
+<div class="engineer-modal-overlay" id="engineerModalOverlay" hidden>
+  <div class="engineer-modal" role="dialog" aria-modal="true" aria-labelledby="engineerModalTitle">
+    <div class="engineer-modal-head">
+      <div>
+        <div class="engineer-modal-title" id="engineerModalTitle"></div>
+        <div class="engineer-modal-sub" id="engineerModalSub"></div>
+      </div>
+      <button type="button" class="engineer-modal-close" id="engineerModalClose" aria-label="Close">✕</button>
+    </div>
+    <div class="engineer-modal-body" id="engineerModalBody"></div>
+  </div>
+</div>
+
 <script id="shipyard-data" type="application/json">__DATA_JSON__</script>
 <script>
 const DATA = JSON.parse(document.getElementById('shipyard-data').textContent);
-const STORAGE_KEY = 'standalone_engineering_basket';
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -180,29 +302,186 @@ document.getElementById('subtitle').textContent = DATA.hasFleetData
   ? `Generated ${DATA.generatedAt} -- your active ship is always current; the rest of your fleet reflects your last Shipyard visit${DATA.snapshotAt ? ` (${DATA.snapshotAt.replace('T', ' ').replace('Z', '')} UTC)` : ''}.`
   : `Generated ${DATA.generatedAt}.`;
 
-// Owner: "i wanna be able to plan builds against current materials yk?" -- pushes this real
-// fitted module's blueprint one grade higher straight into the SAME basket the engineering
-// planner already reads/writes (standalone_engineering_basket), rather than a second, separate
-// planning system. See docs/ShipyardPlanner.md for why this is scoped to real fitted modules'
-// own engineering only, not hypothetical module swaps.
-function loadBasket() {
+// Owner: "i wanna be able to plan builds against current materials yk?" -- originally wrote
+// straight into the SAME basket the engineering planner page reads (standalone_engineering_
+// basket), on the assumption a saved localStorage value would just be there when you later open
+// that other page. Real owner report: "pressing add doesnt add it to the engineering planner i
+// guess because its not on the same page" -- confirmed real: this project already learned,
+// building the theme toggle earlier this session, that separate file:// pages can't reliably
+// share localStorage (some browsers isolate storage per exact file path, not per directory).
+// That's exactly what broke here too. Fix, per the owner's own suggestion ("open a side window
+// with materials needed if you cant"): the shipyard page now keeps its own self-contained plan
+// (own storage key, own materials-needed panel below) that never depends on navigating anywhere
+// else -- see docs/ShipyardPlanner.md.
+//
+// Real follow-up ask: "each ship should when you edit it kinda duplicate the window and show a
+// Current ship window and Goal ship window with your engineering stuff changed so you know how
+// far you are from finishing your ship" -- the Engineer modal now shows both side by side per
+// module slot, which needed a real reshape from a flat qty-based plan (fine for a cross-fleet
+// materials total, but with no sense of "this ship's goal state") to per-SLOT goal overrides --
+// one entry per real module slot the commander has actually set a goal for, keyed by the ship's
+// real ShipID + that module's real Slot name (NOT array index -- confirmed real risk: ship list
+// order isn't stable across tool re-runs, e.g. after selling a ship, so an index-keyed goal could
+// silently attach to the wrong ship/module next time the report is regenerated). One real,
+// accepted limitation: ShipID itself can be reused after a ship is sold (documented in
+// shipyard.go's own header) -- a goal set on a slot could in principle survive to misleadingly
+// apply to a *different*, later ship reusing the same ID+slot combo. Rare, and the fix is just
+// "clear the stale goal," not worth more complexity to prevent given how narrow the window is.
+//
+// fromGrade is the real, additional piece the old cross-page basket never had a way to express:
+// "account for less materials from partial upgrades" -- pushing an ALREADY grade-3 module to
+// grade 5 only actually costs grades 4+5 worth of materials (real game mechanic: each roll only
+// pays for the grade it's currently completing), not the full 1-through-5 a from-scratch pick
+// would need. Every goal override carries its own real fromGrade (0 for a never-engineered
+// module, or the module's actual current grade when continuing the SAME blueprint it already
+// has -- switching to a genuinely different blueprint name always starts over at 0, since Elite
+// Dangerous blueprint progress doesn't carry across different upgrade names on the same module).
+const GOALS_STORAGE_KEY = 'standalone_shipyard_goals';
+function loadGoals() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw = localStorage.getItem(GOALS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
   } catch (e) {
-    return [];
+    return {};
   }
 }
-function pushModuleToGrade(type, name, grade) {
-  const basket = loadBasket();
-  const existing = basket.find(b => b.type === type && b.name === name && b.grade === grade && !b.effect);
-  if (existing) {
-    existing.qty += 1;
-  } else {
-    basket.push({ type, name, grade, effect: null, qty: 1 });
-  }
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(basket)); } catch (e) { /* storage unavailable or full */ }
+function saveGoals(goals) {
+  try { localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals)); } catch (e) { /* storage unavailable or full */ }
 }
+let goals = loadGoals(); // key -> { shipLabel, moduleName, type, name, toGrade, fromGrade, effect }
+function goalKey(ship, m) { return `${ship.shipId}::${m.slot}`; }
+function setGoal(ship, m, moduleIndex, type, name, toGrade, effect, fromGrade) {
+  goals[goalKey(ship, m)] = { shipLabel: ship.name || ship.type, moduleName: m.name, type, name, toGrade, fromGrade, effect: effect || null };
+  saveGoals(goals);
+  updateMaterialsBtn();
+}
+function clearGoalByKey(key) {
+  delete goals[key];
+  saveGoals(goals);
+  updateMaterialsBtn();
+}
+
+// bpIndex/effectIndex: type -> name -> grade -> ingredients, same shape/purpose as the
+// engineering planner's own client-side index (engineering_template.html) -- built once here
+// from the per-grade blueprint/effect data this page now embeds for exactly this reason.
+const bpIndex = {};
+(DATA.blueprints || []).forEach(bp => {
+  bpIndex[bp.type] = bpIndex[bp.type] || {};
+  bpIndex[bp.type][bp.name] = bpIndex[bp.type][bp.name] || {};
+  bpIndex[bp.type][bp.name][bp.grade] = bp;
+});
+const effectIndex = {};
+(DATA.effects || []).forEach(ef => {
+  effectIndex[ef.type] = effectIndex[ef.type] || {};
+  effectIndex[ef.type][ef.name] = ef;
+});
+
+// cumulativeIngredients: real Elite Dangerous mechanic (same one this project's engineering
+// planner already accounts for, extended here with a real fromGrade lower bound) -- at max
+// engineer rank, grade N takes N rolls, and reaching grade N means rolling every lower grade
+// first. Owner: "account for less materials from partial upgrades" -- a module already at grade
+// fromGrade has already paid for grades 1..fromGrade, so only fromGrade+1..toGrade still needs
+// summing, not the full 1..toGrade a from-scratch pick would need.
+function cumulativeIngredients(type, name, fromGrade, toGrade) {
+  const byGrade = (bpIndex[type] || {})[name] || {};
+  const out = [];
+  for (let g = fromGrade + 1; g <= toGrade; g++) {
+    const bp = byGrade[g];
+    if (!bp) continue;
+    bp.ingredients.forEach(ing => out.push({ key: ing.key, name: ing.name, count: ing.count * g }));
+  }
+  return out;
+}
+
+function updateMaterialsBtn() {
+  const btn = document.getElementById('materialsNeededBtn');
+  if (!btn) return;
+  const count = Object.keys(goals).length;
+  btn.textContent = `🧰 Materials Needed${count ? ` (${count})` : ''}`;
+  btn.disabled = count === 0;
+}
+
+function planRow(key, g) {
+  const range = g.fromGrade > 0 ? `Grade ${g.fromGrade} → ${g.toGrade}` : `Grade ${g.toGrade}`;
+  return `<div class="plan-row">
+    <div>
+      <span class="plan-row-name">${escapeHtml(g.shipLabel)} -- ${escapeHtml(g.moduleName)}</span>
+      <div class="plan-row-detail">${escapeHtml(g.type)} -- ${escapeHtml(g.name)}, ${escapeHtml(range)}${g.effect ? ' · ✨ ' + escapeHtml(g.effect) : ''}</div>
+    </div>
+    <button type="button" class="plan-remove-btn" data-goal-key="${escapeHtml(key)}">Remove</button>
+  </div>`;
+}
+
+function materialsGrid() {
+  const needed = {}; // key -> {name, count}
+  Object.values(goals).forEach(g => {
+    cumulativeIngredients(g.type, g.name, g.fromGrade, g.toGrade).forEach(ing => {
+      if (!needed[ing.key]) needed[ing.key] = { name: ing.name, count: 0 };
+      needed[ing.key].count += ing.count;
+    });
+    if (g.effect) {
+      const ef = (effectIndex[g.type] || {})[g.effect];
+      if (ef) {
+        ef.ingredients.forEach(ing => {
+          if (!needed[ing.key]) needed[ing.key] = { name: ing.name, count: 0 };
+          needed[ing.key].count += ing.count;
+        });
+      }
+    }
+  });
+  const rows = Object.entries(needed).map(([key, v]) => ({ key, ...v }));
+  if (!rows.length) return `<p class="empty-note">Nothing needs any materials yet -- every queued goal is already fully covered by grades already rolled.</p>`;
+  rows.sort((a, b) => {
+    const shortA = a.count - (DATA.heldMaterials[a.key] || 0);
+    const shortB = b.count - (DATA.heldMaterials[b.key] || 0);
+    return shortB - shortA || a.name.localeCompare(b.name);
+  });
+  const cards = rows.map(m => {
+    const held = DATA.heldMaterials[m.key] || 0;
+    const short = m.count - held;
+    const cls = short > 0 ? 'need-short' : 'need-met';
+    const status = short > 0 ? `Short by ${short.toLocaleString('en-US')}` : 'You have enough';
+    return `<div class="need-card ${cls}">
+      <div class="need-name">${escapeHtml(m.name)}</div>
+      <div class="need-amounts">${held.toLocaleString('en-US')} / ${m.count.toLocaleString('en-US')}</div>
+      <div class="need-status">${status}</div>
+    </div>`;
+  }).join('');
+  return `<div class="need-grid">${cards}</div>`;
+}
+
+function renderMaterialsPanel() {
+  const entries = Object.entries(goals);
+  const planHtml = entries.length
+    ? entries.map(([key, g]) => planRow(key, g)).join('')
+    : '<p class="empty-note">Nothing in your plan yet -- use ⚙️ Engineer on a ship to set a goal.</p>';
+  document.getElementById('materialsModalBody').innerHTML = `
+    <div class="plan-list">${planHtml}</div>
+    <div class="materials-section-title">Materials needed <span class="materials-section-sub">held / needed, across every ship's goals</span></div>
+    ${materialsGrid()}
+  `;
+}
+function openMaterialsPanel() {
+  renderMaterialsPanel();
+  document.getElementById('materialsModalOverlay').hidden = false;
+}
+function closeMaterialsPanel() {
+  document.getElementById('materialsModalOverlay').hidden = true;
+}
+document.getElementById('materialsNeededBtn').addEventListener('click', openMaterialsPanel);
+document.getElementById('materialsModalClose').addEventListener('click', closeMaterialsPanel);
+document.getElementById('materialsModalOverlay').addEventListener('click', e => {
+  if (e.target.id === 'materialsModalOverlay') closeMaterialsPanel();
+});
+document.getElementById('materialsModalBody').addEventListener('click', e => {
+  const btn = e.target.closest('.plan-remove-btn');
+  if (!btn) return;
+  clearGoalByKey(btn.dataset.goalKey);
+  renderMaterialsPanel();
+  // If the Engineer modal is open on the ship this goal belonged to, refresh it too so the Goal
+  // column immediately reflects the removal instead of showing a stale state.
+  if (engineerModalShipIndex != null) openEngineerModal(engineerModalShipIndex);
+});
 
 function moduleRow(m) {
   const nameCls = m.on === false ? 'module-name module-off' : 'module-name';
@@ -210,11 +489,6 @@ function moduleRow(m) {
   if (m.engineered) {
     const atMax = m.maxGrade && m.grade >= m.maxGrade;
     badges.push(`<span class="module-grade-badge${atMax ? ' module-grade-max' : ''}">G${m.grade}${m.maxGrade ? '/' + m.maxGrade : ''}</span>`);
-  }
-  let pushBtn = '';
-  if (m.engineered && m.maxGrade && m.grade < m.maxGrade && m.blueprintType && m.blueprintName) {
-    const nextGrade = m.grade + 1;
-    pushBtn = `<button type="button" class="push-grade-btn" data-bp-type="${escapeHtml(m.blueprintType)}" data-bp-name="${escapeHtml(m.blueprintName)}" data-bp-grade="${nextGrade}" title="Add Grade ${nextGrade} ${escapeHtml(m.blueprintType)} -- ${escapeHtml(m.blueprintName)} to your engineering plan">+ Plan G${nextGrade}</button>`;
   }
   const detailBits = [];
   if (m.engineered) {
@@ -228,13 +502,17 @@ function moduleRow(m) {
       <span class="${nameCls}">${escapeHtml(m.name)}</span>
       ${detail}
     </div>
-    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">${badges.join('')}${pushBtn}</div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">${badges.join('')}</div>
   </div>`;
 }
 
-function shipCard(s) {
+function shipCard(s, shipIndex) {
   const title = s.name ? `${escapeHtml(s.name)} <span class="ship-ident">${escapeHtml(s.ident || '')}</span>` : escapeHtml(s.type);
   const activeBadge = s.active ? '<span class="ship-active-badge">Active</span>' : '';
+  const engineerableCount = s.hasModules ? s.modules.filter(m => m.engineerableType).length : 0;
+  const engineerBtn = engineerableCount
+    ? `<button type="button" class="engineer-ship-btn" data-ship-index="${shipIndex}" title="Plan engineering changes for this ship">⚙️ Engineer</button>`
+    : '';
   const subBits = [escapeHtml(s.type)];
   if (s.system) subBits.push(escapeHtml(s.system));
   subBits.push(formatCredits(s.value));
@@ -257,7 +535,7 @@ function shipCard(s) {
   return `<div class="ship-card${s.active ? ' ship-active' : ''}">
     <div class="ship-head">
       <div class="ship-title">${title}</div>
-      ${activeBadge}
+      <div class="ship-head-actions">${activeBadge}${engineerBtn}</div>
     </div>
     <div class="ship-sub">${subBits.join(' · ')}</div>
     ${completionHtml}
@@ -274,16 +552,196 @@ function render() {
   document.getElementById('fleetSection').innerHTML = `<div class="fleet-grid">${DATA.ships.map(shipCard).join('')}</div>`;
 }
 
-document.getElementById('fleetSection').addEventListener('click', e => {
-  const btn = e.target.closest('.push-grade-btn');
+// ---- "⚙️ Engineer" modal -- owner: "add an engineer button to top right that lets you quickly
+// add engineering changes to your engineering planner with a whole window". Replaces the old
+// per-module inline "+ Plan G_" buttons (real owner feedback: "the upgrade button is weird") --
+// one deliberate action per ship instead of a button scattered into every module row.
+//
+// Real follow-up: "each ship should when you edit it kinda duplicate the window and show a
+// Current ship window and Goal ship window with your engineering stuff changed so you know how
+// far you are from finishing your ship". Now shows two columns side by side, same module order
+// in both so they line up: "Current Ship" (read-only, real state) and "Goal Ship" (editable --
+// shows whatever goal has been set for that slot, or lets you set one), plus a header comparing
+// the ship's real completion % against what it would be once every set goal is done.
+let engineerModalShipIndex = null;
+
+function gradeOptionsHtml(maxGrade, selected) {
+  const opts = [];
+  for (let g = 1; g <= maxGrade; g++) opts.push(`<option value="${g}"${g === selected ? ' selected' : ''}>Grade ${g}</option>`);
+  return opts.join('');
+}
+function maxGradeForType(type, name) {
+  const opt = (DATA.blueprintsByType[type] || []).find(o => o.name === name);
+  return opt ? opt.maxGrade : 0;
+}
+
+// goalCompletionPct: same gradeSum/maxSum formula the backend already uses for a ship's real
+// completionPct (shipyard.go), recomputed here with each slot's GOAL grade substituted in where
+// one has been set -- a slot with no goal still counts using its real current grade/max (same as
+// today), so "finishing your ship" means completing every goal you've actually set, not every
+// module that could theoretically be touched.
+function goalCompletionPct(ship) {
+  let gradeSum = 0, maxSum = 0;
+  ship.modules.forEach(m => {
+    if (!m.engineerableType) return;
+    const g = goals[goalKey(ship, m)];
+    if (g) {
+      const maxGrade = maxGradeForType(g.type, g.name);
+      if (maxGrade > 0) { gradeSum += g.toGrade; maxSum += maxGrade; }
+    } else if (m.engineered && m.maxGrade > 0) {
+      gradeSum += m.grade; maxSum += m.maxGrade;
+    }
+  });
+  return maxSum > 0 ? (gradeSum / maxSum * 100) : null;
+}
+
+// Left column: read-only, exactly the ship's real state -- no controls, just for comparison.
+function currentModuleRow(m) {
+  const state = m.engineered ? `Grade ${m.grade}${m.maxGrade ? '/' + m.maxGrade : ''}` : 'Not engineered';
+  const detailBits = [];
+  if (m.engineered) {
+    if (m.blueprintName) detailBits.push(escapeHtml(m.blueprintName));
+    if (m.effect) detailBits.push('✨ ' + escapeHtml(m.effect));
+  }
+  return `<div class="compare-module-row">
+    <div class="compare-module-name">${escapeHtml(m.name)}</div>
+    <div class="compare-module-state">${escapeHtml(state)}</div>
+    ${detailBits.length ? `<div class="compare-module-detail">${detailBits.join(' · ')}</div>` : ''}
+  </div>`;
+}
+
+// Right column: shows the current goal for this slot (if any) as a highlighted badge, plus the
+// picker to set/change/clear it. Pre-fills to the EXISTING goal when one's already set (so
+// re-opening shows what you picked, not a reset default), otherwise the same "current+1, or max
+// if starting fresh" default the old single-column version already used.
+function goalModuleRow(ship, m, moduleIndex) {
+  const options = (DATA.blueprintsByType[m.engineerableType] || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+  if (!options.length) {
+    // Always emit a paired cell (never '') so the current/goal grid alternation for every
+    // module after this one doesn't shift out of alignment.
+    return `<div class="compare-module-row"><div class="compare-module-name">${escapeHtml(m.name)}</div>
+      <div class="compare-module-state">No engineering blueprints known for this module type.</div></div>`;
+  }
+  const key = goalKey(ship, m);
+  const existingGoal = goals[key];
+  const selectedName = existingGoal ? existingGoal.name
+    : (m.blueprintName && options.some(o => o.name === m.blueprintName) ? m.blueprintName : options[0].name);
+  const selectedOpt = options.find(o => o.name === selectedName) || options[0];
+  const defaultGrade = existingGoal ? existingGoal.toGrade
+    : ((m.engineered && m.blueprintName === selectedName && m.grade < selectedOpt.maxGrade) ? m.grade + 1 : selectedOpt.maxGrade);
+  const effects = (DATA.effectsByType[m.engineerableType] || []).slice().sort((a, b) => a.localeCompare(b));
+  const defaultEffect = existingGoal ? (existingGoal.effect || '') : (m.effect || '');
+  const badge = existingGoal
+    ? `<div class="goal-badge">🎯 Goal: Grade ${existingGoal.toGrade} ${escapeHtml(existingGoal.name)}${existingGoal.effect ? ' · ✨ ' + escapeHtml(existingGoal.effect) : ''}</div>`
+    : '<div class="goal-badge goal-badge-unset">No goal set yet</div>';
+  return `<div class="engineer-module-row compare-goal-cell" data-module-index="${moduleIndex}" data-goal-key="${escapeHtml(key)}">
+    <div class="engineer-module-head">
+      <span class="engineer-module-name">${escapeHtml(m.name)}</span>
+    </div>
+    ${badge}
+    <div class="engineer-module-controls">
+      <select class="engineer-name-select" data-module-index="${moduleIndex}">
+        ${options.map(o => `<option value="${escapeHtml(o.name)}" data-max-grade="${o.maxGrade}"${o.name === selectedName ? ' selected' : ''}>${escapeHtml(o.name)}</option>`).join('')}
+      </select>
+      <select class="engineer-grade-select" data-module-index="${moduleIndex}">
+        ${gradeOptionsHtml(selectedOpt.maxGrade, defaultGrade)}
+      </select>
+      <select class="engineer-effect-select" data-module-index="${moduleIndex}">
+        <option value="">No effect</option>
+        ${effects.map(e => `<option value="${escapeHtml(e)}"${defaultEffect === e ? ' selected' : ''}>${escapeHtml(e)}</option>`).join('')}
+      </select>
+      <button type="button" class="engineer-add-btn" data-module-index="${moduleIndex}" data-type="${escapeHtml(m.engineerableType)}"
+        data-current-name="${escapeHtml(m.blueprintName || '')}" data-current-grade="${m.engineered ? m.grade : 0}">${existingGoal ? 'Update Goal' : 'Set Goal'}</button>
+      ${existingGoal ? `<button type="button" class="goal-clear-btn" data-goal-key="${escapeHtml(key)}" title="Clear this goal">✕</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function openEngineerModal(shipIndex) {
+  const ship = DATA.ships[shipIndex];
+  if (!ship || !ship.hasModules) return;
+  engineerModalShipIndex = shipIndex;
+  const engineerable = ship.modules.map((m, i) => ({ m, i })).filter(x => x.m.engineerableType);
+  document.getElementById('engineerModalTitle').textContent = `⚙️ Engineer -- ${ship.name || ship.type}`;
+  const curPct = ship.completionPct != null ? ship.completionPct.toFixed(0) : null;
+  const goalPct = goalCompletionPct(ship);
+  const pctText = curPct != null || goalPct != null
+    ? ` Current ${curPct != null ? curPct : '0'}% engineered → Goal ${goalPct != null ? goalPct.toFixed(0) : '0'}% engineered.`
+    : '';
+  document.getElementById('engineerModalSub').textContent = `${ship.type} -- compare your real build against what it'll be once your goals are done.${pctText}`;
+  if (!engineerable.length) {
+    document.getElementById('engineerModalBody').innerHTML = `<p class="empty-note">No engineerable modules found on this ship.</p>`;
+  } else {
+    // One flat grid, alternating current-cell/goal-cell per module (titles first) -- NOT two
+    // independent stacked columns -- so each module's pair shares a grid row and can never drift
+    // out of alignment regardless of which cell is taller. See .compare-columns comment above.
+    document.getElementById('engineerModalBody').innerHTML = `
+      <div class="compare-columns">
+        <div class="compare-column-title">Current Ship</div>
+        <div class="compare-column-title">Goal Ship</div>
+        ${engineerable.map(x => currentModuleRow(x.m) + goalModuleRow(ship, x.m, x.i)).join('')}
+      </div>`;
+  }
+  document.getElementById('engineerModalOverlay').hidden = false;
+}
+function closeEngineerModal() {
+  document.getElementById('engineerModalOverlay').hidden = true;
+  engineerModalShipIndex = null;
+}
+document.getElementById('engineerModalClose').addEventListener('click', closeEngineerModal);
+document.getElementById('engineerModalOverlay').addEventListener('click', e => {
+  if (e.target.id === 'engineerModalOverlay') closeEngineerModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  closeEngineerModal();
+  closeMaterialsPanel();
+});
+
+// Name select changing re-populates that same row's Grade select (cascading, same pattern as the
+// engineering planner's own Type/Name -> Grade picker) -- delegated since rows are rebuilt often.
+document.getElementById('engineerModalBody').addEventListener('change', e => {
+  if (!e.target.classList.contains('engineer-name-select')) return;
+  const idx = e.target.dataset.moduleIndex;
+  const selectedOption = e.target.selectedOptions[0];
+  const maxGrade = Number(selectedOption.dataset.maxGrade);
+  const gradeSelect = document.querySelector(`.engineer-grade-select[data-module-index="${idx}"]`);
+  gradeSelect.innerHTML = gradeOptionsHtml(maxGrade, maxGrade);
+});
+
+document.getElementById('engineerModalBody').addEventListener('click', e => {
+  const clearBtn = e.target.closest('.goal-clear-btn');
+  if (clearBtn) {
+    clearGoalByKey(clearBtn.dataset.goalKey);
+    openEngineerModal(engineerModalShipIndex); // refresh both columns + the header % immediately
+    return;
+  }
+  const btn = e.target.closest('.engineer-add-btn');
   if (!btn) return;
-  pushModuleToGrade(btn.dataset.bpType, btn.dataset.bpName, Number(btn.dataset.bpGrade));
-  btn.textContent = '✓ Added';
-  btn.classList.add('push-grade-added');
-  btn.disabled = true;
+  const idx = btn.dataset.moduleIndex;
+  const type = btn.dataset.type;
+  const name = document.querySelector(`.engineer-name-select[data-module-index="${idx}"]`).value;
+  const grade = Number(document.querySelector(`.engineer-grade-select[data-module-index="${idx}"]`).value);
+  const effect = document.querySelector(`.engineer-effect-select[data-module-index="${idx}"]`).value;
+  // Real game mechanic: switching to a DIFFERENT blueprint than what's currently applied starts
+  // that blueprint's own progression from scratch, even if the module already has some other
+  // engineering on it -- only sticking with the SAME currently-applied blueprint carries its
+  // current grade forward. See the goals/GOALS_STORAGE_KEY comment above for why this matters.
+  const fromGrade = (btn.dataset.currentName === name) ? Number(btn.dataset.currentGrade) : 0;
+  const ship = DATA.ships[engineerModalShipIndex];
+  const m = ship.modules[Number(idx)];
+  setGoal(ship, m, Number(idx), type, name, grade, effect, fromGrade);
+  openEngineerModal(engineerModalShipIndex); // refresh both columns + the header % immediately
+});
+
+document.getElementById('fleetSection').addEventListener('click', e => {
+  const btn = e.target.closest('.engineer-ship-btn');
+  if (!btn) return;
+  openEngineerModal(Number(btn.dataset.shipIndex));
 });
 
 render();
+updateMaterialsBtn();
 </script>
 </body>
 </html>

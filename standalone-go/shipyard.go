@@ -82,9 +82,14 @@ type moduleOut struct {
 	Grade         int     `json:"grade,omitempty"`
 	Quality       float64 `json:"quality,omitempty"`
 	Effect        string  `json:"effect,omitempty"`
-	MaxGrade      int     `json:"maxGrade,omitempty"`      // 0 if this module's blueprint symbol didn't resolve -- no "push to next grade" possible
-	BlueprintType string  `json:"blueprintType,omitempty"` // resolved catalog Type, only set when MaxGrade > 0 -- what the client needs to build a basket entry
-	BlueprintName string  `json:"blueprintName,omitempty"`
+	MaxGrade      int     `json:"maxGrade,omitempty"`      // the CURRENTLY applied blueprint's real max grade, 0 if not currently engineered or its symbol didn't resolve
+	BlueprintType string  `json:"blueprintType,omitempty"` // resolved catalog Type of the CURRENTLY applied blueprint, if any
+	BlueprintName string  `json:"blueprintName,omitempty"` // resolved catalog Name of the CURRENTLY applied blueprint, if any
+	// EngineerableType is set whenever this module's slot COULD take engineering at all (via
+	// resolveModuleType on its real Item symbol), regardless of whether it currently has any --
+	// what the "Engineer" modal (shipyard_template.html) needs to offer "start engineering this
+	// stock module" as well as "push this already-engineered one further".
+	EngineerableType string `json:"engineerableType,omitempty"`
 }
 
 type shipOut struct {
@@ -104,10 +109,66 @@ type shipOut struct {
 }
 
 type shipyardData struct {
-	GeneratedAt  string    `json:"generatedAt"`
-	Ships        []shipOut `json:"ships"`
-	SnapshotAt   string    `json:"snapshotAt,omitempty"` // the StoredShips event this fleet listing is based on
-	HasFleetData bool      `json:"hasFleetData"`
+	GeneratedAt      string                    `json:"generatedAt"`
+	Ships            []shipOut                 `json:"ships"`
+	SnapshotAt       string                    `json:"snapshotAt,omitempty"` // the StoredShips event this fleet listing is based on
+	HasFleetData     bool                      `json:"hasFleetData"`
+	EffectsByType    map[string][]string       `json:"effectsByType"`    // catalog Type -> real Experimental Effect names for that Type, for the "Engineer" modal's effect picker
+	BlueprintsByType map[string][]blueprintOpt `json:"blueprintsByType"` // catalog Type -> every real blueprint Name (+ real max grade) for that Type, for the modal's Name/Grade pickers -- lets it offer "start engineering this stock module", not just "push an already-started one further"
+	// Blueprints/Effects/HeldMaterials power a self-contained "Materials Needed" panel on this
+	// page itself -- real owner report: "pressing add doesnt add it to the engineering planner i
+	// guess because its not on the same page" (confirmed real: this project already learned,
+	// building the theme toggle earlier this session, that separate file:// pages can't reliably
+	// share localStorage -- the exact same limitation applies here, and the shared-basket
+	// cross-page handoff was never reliable in the first place). Rather than depend on that again,
+	// the shipyard page now tracks its own plan and computes materials needed without ever
+	// leaving the page -- the owner's own suggested fix ("open a side window with materials
+	// needed if you cant"). Per-grade ingredient data (needed to sum a range of grades, not just
+	// look one up) isn't otherwise exposed to this page, so it's embedded here the same way
+	// engineeringplanner.go already does for its own page.
+	Blueprints    []plannerBlueprintOut `json:"blueprints"`
+	Effects       []plannerEffectOut    `json:"effects"`
+	HeldMaterials map[string]int64      `json:"heldMaterials"`
+}
+
+type blueprintOpt struct {
+	Name     string `json:"name"`
+	MaxGrade int    `json:"maxGrade"`
+}
+
+// effectsByType groups the existing vendored effectCatalog (engineeringplanner.go) by Type,
+// exactly the same real data the engineering planner's own picker already offers -- just
+// reshaped for the shipyard page's per-ship "Engineer" modal, which needs to scope the effect
+// choices to whichever module Type is being engineered.
+func effectsByType() map[string][]string {
+	out := map[string][]string{}
+	for _, ef := range effectCatalog {
+		out[ef.Type] = append(out[ef.Type], ef.Name)
+	}
+	return out
+}
+
+// blueprintsByType groups the existing vendored blueprintCatalog by Type, collapsing each
+// (Type, Name) group's real grade rows down to just that blueprint's real max grade (155 of 160
+// real blueprint groups cap at 5, a handful of utility upgrades cap lower -- see
+// docs/ShipyardPlanner.md, already relied on by maxGradeFor).
+func blueprintsByType() map[string][]blueprintOpt {
+	seen := map[string]map[string]int{} // Type -> Name -> max grade seen so far
+	for _, b := range blueprintCatalog {
+		if seen[b.Type] == nil {
+			seen[b.Type] = map[string]int{}
+		}
+		if b.Grade > seen[b.Type][b.Name] {
+			seen[b.Type][b.Name] = b.Grade
+		}
+	}
+	out := map[string][]blueprintOpt{}
+	for t, names := range seen {
+		for n, maxGrade := range names {
+			out[t] = append(out[t], blueprintOpt{Name: n, MaxGrade: maxGrade})
+		}
+	}
+	return out
 }
 
 // engineeredModuleOut/effectiveGrade helpers: resolve a fitted module's real engineering state
@@ -120,6 +181,8 @@ func buildModuleOut(m shipyardLoadoutModule) moduleOut {
 		On:     m.On,
 		Health: m.Health,
 	}
+	slotType := resolveModuleType(m.Item)
+	out.EngineerableType = slotType // set regardless of current engineering state -- lets the "Engineer" modal offer stock modules too, not just ones already started
 	if m.Engineering == nil {
 		return out
 	}
@@ -133,7 +196,6 @@ func buildModuleOut(m shipyardLoadoutModule) moduleOut {
 		out.Effect = prettifyKeyStandalone(strings.ReplaceAll(m.Engineering.ExperimentalEffect, "_", " "))
 	}
 
-	slotType := resolveModuleType(m.Item)
 	bpType, bpName, ok := resolveBlueprintSymbol(m.Engineering.BlueprintName, slotType)
 	if !ok {
 		return out
@@ -171,7 +233,7 @@ func trimmedShipName(raw string) string {
 	return strings.TrimSpace(raw)
 }
 
-func buildShipFromLoadout(v shipyardLoadoutEvent, active bool, system string) shipOut {
+func buildShipFromLoadout(v shipyardLoadoutEvent, active bool, system string, localCaptured map[string]string) shipOut {
 	modules := make([]moduleOut, 0, len(v.Modules))
 	engineeredCount := 0
 	gradeSum, maxSum := 0, 0
@@ -187,7 +249,7 @@ func buildShipFromLoadout(v shipyardLoadoutEvent, active bool, system string) sh
 		}
 	}
 	out := shipOut{
-		ShipID: v.ShipID, Type: v.Ship, Name: trimmedShipName(v.ShipName), Ident: v.ShipIdent,
+		ShipID: v.ShipID, Type: shipTypeName(v.Ship, localCaptured), Name: trimmedShipName(v.ShipName), Ident: v.ShipIdent,
 		Active: active, System: system, Value: v.HullValue + v.ModulesValue,
 		HullHealth: v.HullHealth, Modules: modules, HasModules: true,
 		EngineeredCount: engineeredCount,
@@ -227,7 +289,41 @@ func latestLoadoutFor(store *Store, shipID int, atOrBefore string) (shipyardLoad
 }
 
 func BuildShipyardData(store *Store) shipyardData {
-	data := shipyardData{GeneratedAt: time.Now().UTC().Format("2006-01-02 15:04 MST")}
+	// Per-grade ingredient data for the self-contained materials-needed panel -- same shape and
+	// resolution as engineeringplanner.go's own BuildPlannerData, engineer status omitted (not
+	// needed here, this page already shows real per-module engineer/grade state directly from
+	// the journal on each ship card).
+	blueprints := make([]plannerBlueprintOut, 0, len(blueprintCatalog))
+	for _, bp := range blueprintCatalog {
+		blueprints = append(blueprints, plannerBlueprintOut{
+			Type: bp.Type, Name: bp.Name, Grade: bp.Grade,
+			Ingredients: resolveIngredients(bp.Ingredients),
+		})
+	}
+	effects := make([]plannerEffectOut, 0, len(effectCatalog))
+	for _, ef := range effectCatalog {
+		effects = append(effects, plannerEffectOut{
+			Type: ef.Type, Name: ef.Name,
+			Ingredients: resolveIngredients(ef.Ingredients),
+		})
+	}
+	held := map[string]int64{}
+	if snapshot, _, ok := latestMaterialsSnapshot(store); ok {
+		for _, cat := range [][]materialEntry{snapshot.Raw, snapshot.Manufactured, snapshot.Encoded} {
+			for _, m := range cat {
+				held[normalizeMaterialKey(m.Name)] += m.Count
+			}
+		}
+	}
+
+	data := shipyardData{
+		GeneratedAt:      time.Now().UTC().Format("2006-01-02 15:04 MST"),
+		EffectsByType:    effectsByType(),
+		BlueprintsByType: blueprintsByType(),
+		Blueprints:       blueprints,
+		Effects:          effects,
+		HeldMaterials:    held,
+	}
 
 	// Active ship: the true latest real Loadout, full detail, no staleness concern -- this is
 	// always exactly current, since the game only sends Loadout for the ship you're actually in.
@@ -251,8 +347,9 @@ func BuildShipyardData(store *Store) shipyardData {
 		return data
 	}
 
+	localCaptured := captureRealShipTypeNames(store)
 	activeSystem, _, _, _, _ := currentPosition(store)
-	ships := []shipOut{buildShipFromLoadout(trueLatestLoadout, true, activeSystem)}
+	ships := []shipOut{buildShipFromLoadout(trueLatestLoadout, true, activeSystem, localCaptured)}
 
 	// Stored fleet: the most recent StoredShips snapshot -- ShipsHere (docked at whatever station
 	// that snapshot was taken at) + ShipsRemote (everywhere else, each with its own StarSystem).
@@ -286,17 +383,22 @@ func BuildShipyardData(store *Store) shipyardData {
 				if sys == "" {
 					sys = fallbackSystem
 				}
+				// StoredShips carries its own real ShipType_Localised directly -- preferred over
+				// the general shipTypeName resolver when present, since it's the most current
+				// real name for exactly this stored ship (real bug fixed here: this field was
+				// previously computed and then silently never used at all).
 				name := s.ShipTypeLoc
 				if name == "" {
-					name = prettifyKeyStandalone(s.ShipType)
+					name = shipTypeName(s.ShipType, localCaptured)
 				}
-				out := shipOut{ShipID: s.ShipID, Type: s.ShipType, Name: trimmedShipName(s.Name), System: sys, Value: s.Value}
+				out := shipOut{ShipID: s.ShipID, Type: name, Name: trimmedShipName(s.Name), System: sys, Value: s.Value}
 				// Recover this stored ship's last-known build -- only trust it if the ShipType
 				// the recovered Loadout itself reports still matches what StoredShips says is
 				// there NOW, guarding against the real, confirmed ShipID-reuse gotcha (see this
 				// file's header).
 				if lo, ts, ok := latestLoadoutFor(store, s.ShipID, latestStoredTS); ok && strings.EqualFold(lo.Ship, s.ShipType) {
-					built := buildShipFromLoadout(lo, false, sys)
+					built := buildShipFromLoadout(lo, false, sys, localCaptured)
+					built.Type = name     // StoredShips' own real name (or the resolver) wins over Loadout's raw symbol
 					built.Value = s.Value // StoredShips' own Value is more current than a possibly-stale Loadout's
 					built.LoadoutAt = ts
 					ships = append(ships, built)
