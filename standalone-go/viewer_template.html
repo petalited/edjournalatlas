@@ -441,9 +441,10 @@ function appendBodyLines(lines, bodies, lineForBody) {
   if (remaining > 0) lines.push(`  _+${remaining} more_`);
 }
 
-// Two Discord export variants: a commander's own bonuses (first footfall, first-logged) are
-// one-time opportunities -- once claimed, they're gone for whoever else visits, so they don't
-// belong in a number meant to represent what's genuinely still "available" to share/compare.
+// Two Discord export variants: a commander's own
+// bonuses (first footfall, first-logged) are one-time opportunities -- once claimed, they're
+// gone for whoever else visits, so they don't belong in a number meant to represent what's
+// genuinely still "available" to share/compare.
 //   - Personal ("your progress"): actual bonus-inclusive value, first-discovery bragging.
 //   - Objective ("what's available"): baseValue only (pre-bonus, from the value table) --
 //     what's guaranteed to be there for anyone.
@@ -604,7 +605,7 @@ function formatCamel(s) {
 // -- surfaced in full once a body is clicked open, per the user's explicit "show me everything
 // already captured" request rather than just the summary badges.
 function bodyDetailRows(b) {
-  const rows = [[`Distance from arrival`, `${b.distance.toLocaleString('en-US', {maximumFractionDigits: 1})} ls`]];
+  const rows = [];
   if (b.mass) rows.push(['Mass', `${b.mass.toLocaleString('en-US', {maximumFractionDigits: 3})} Earth masses`]);
   const gravity = formatGravity(b.gravity);
   if (gravity) rows.push(['Gravity', gravity]);
@@ -670,9 +671,10 @@ function bodyCard(sys, b) {
         `<li><span>${escapeHtml(label)}</span><span>${escapeHtml(value)}</span></li>`
       ).join('')}</ul>`
     : '';
+  const lsLabel = `${b.distance.toLocaleString('en-US', {maximumFractionDigits: 1})} ls`;
   return `<div class="body-card${isOpen ? ' body-card-open' : ''}" data-body-key="${escapeHtml(key)}" tabindex="0" aria-expanded="${isOpen}">
     <div class="body-title"><span class="body-name">${escapeHtml(b.name)}</span><span class="body-type">${escapeHtml(b.type)}</span></div>
-    ${b.bioSignalCount > 0 ? `<div class="muted" style="font-size:0.8rem;margin-top:2px">${b.bioSignalCount} bio signal${b.bioSignalCount===1?'':'s'}</div>` : ''}
+    <div class="muted" style="font-size:0.8rem;margin-top:2px">${lsLabel}${b.bioSignalCount > 0 ? ` · ${b.bioSignalCount} bio signal${b.bioSignalCount===1?'':'s'}` : ''}</div>
     ${badges.length ? `<div class="body-badges">${badges.join('')}</div>` : ''}
     ${detailHtml}
     ${floraHtml}
