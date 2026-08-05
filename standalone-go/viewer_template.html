@@ -127,9 +127,17 @@ td.num, th.num { text-align: right; }
 .orbit-tree { display: flex; flex-direction: row; align-items: flex-start; gap: 18px;
   overflow-x: auto; padding: var(--space-1) 2px var(--space-3); position: relative; }
 .tree-column { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
-.tree-child { position: relative; margin-left: 20px; margin-top: var(--space-3); padding-left: var(--space-4);
-  border-left: 2px solid var(--border); }
-.tree-child::before { content: ''; position: absolute; left: -2px; top: 50%; width: 16px;
+.tree-child { position: relative; margin-left: 20px; margin-top: var(--space-3); padding-left: var(--space-4); }
+/* Vertical trunk: full box height by default, so it visually continues down into the next
+   sibling moon below -- shortened to just the top half (stopping at the horizontal branch) on
+   the LAST moon in a column via .tree-child-last, so the tree terminates in an L shape instead
+   of continuing to draw a sideways-T past a branch with nothing below it (real bug report: "the
+   tree symbol for bodies orbiting other bodies always shows the sideways T even if it's the
+   end"). */
+.tree-child::before { content: ''; position: absolute; left: -2px; top: 0; width: 2px; height: 100%;
+  background: var(--border); }
+.tree-child.tree-child-last::before { height: 50%; }
+.tree-child::after { content: ''; position: absolute; left: -2px; top: 50%; width: 16px;
   border-top: 2px solid var(--border); }
 .orbit-group-label { font-size: 0.78rem; color: var(--muted); margin: var(--space-3) 0 2px;
   display: flex; align-items: center; gap: 4px; }
@@ -743,7 +751,10 @@ function buildOrbitTree(bodies) {
 
 function orbitTreeHtml(sys, bodies) {
   const columns = buildOrbitTree(bodies).map(col => {
-    const moonCards = col.moons.map(m => `<div class="tree-child">${bodyCard(sys, m)}</div>`).join('');
+    const moonCards = col.moons.map((m, i) => {
+      const isLast = i === col.moons.length - 1;
+      return `<div class="tree-child${isLast ? ' tree-child-last' : ''}">${bodyCard(sys, m)}</div>`;
+    }).join('');
     return `<div class="tree-column">${bodyCard(sys, col.body)}${moonCards}</div>`;
   }).join('');
   return `<div class="orbit-tree">${columns}</div>`;
