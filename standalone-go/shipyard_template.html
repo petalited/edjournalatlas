@@ -67,14 +67,48 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center;
   border: 1px dashed var(--border); border-radius: var(--radius-md); }
 .empty-note-icon { font-size: 1.9rem; margin-bottom: var(--space-2); opacity: 0.75; }
+/* Owner: "shipyard should probably be a 16:9 grid" -- this is only viable now because the module
+   list stopped living inline in the card (moved to hover-preview/click-modal, previous round): a
+   card's visible content height no longer varies with how many modules a ship has, so every card
+   can share the same 16:9 box without wildly differing amounts of leftover/cramped space. */
 .fleet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-4); }
 .ship-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow); padding: var(--space-4); }
+  box-shadow: var(--shadow); padding: var(--space-4); position: relative;
+  aspect-ratio: 16 / 9; }
 .ship-card.ship-active { border-color: var(--accent); box-shadow: var(--shadow), 0 0 0 1px var(--accent); }
+/* Owner: "the whole box background to be a lightly distented ascii art of the ship" -- a faint
+   monospace watermark stretched to fill the ENTIRE card (not just a small corner), sitting behind
+   the card's real content (z-index 0 vs. .ship-card-fg's 1). .ship-ascii-wrap clips to the card's
+   rounded corners and is the stretch target; the inner <pre> is scaled to it via a per-card
+   `transform: scale(x,y)` computed in JS (fitShipAscii) since its natural rendered size varies
+   with each art string's own width/height -- unequal x/y scale is expected and is exactly the
+   "lightly distorted" look asked for, a natural side effect of stretching monospace text to fill
+   an arbitrary box rather than a deliberate additional effect on top. Tinted off var(--muted-faint)
+   rather than a literal hardcoded light grey so it still reads as a subtle blend-in in dark theme
+   too, not a stark light-grey block on a dark background. Text-only, zero image assets, so it stays
+   as lightweight as the rest of this page. Populated from SHIP_ASCII below, keyed by the exact real
+   ship type display name -- unknown types just render no art rather than guessing at a shape that
+   might not match the real hull.
+   Real bug, fixed: `.ship-card` itself used to carry `overflow: hidden` (to keep this wrap's
+   square corners from peeking past the card's own rounded ones) -- but that also clipped anything
+   ELSE absolutely positioned inside the card that needed to escape its bounds, including the
+   module hover preview opening upward past the top edge ("the top of the window... is kinda cut
+   off once it goes over the top of the ships box"). Fixed by giving the clipping job to this wrap
+   alone (`border-radius: inherit` + its own `overflow: hidden`, so it still clips to the same
+   rounded shape) and removing `overflow: hidden` from `.ship-card` entirely -- now nothing inside
+   the card is forced to stay within its box unless it specifically needs to. */
+.ship-ascii-wrap { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; z-index: 0; pointer-events: none; }
+.ship-ascii { margin: 0; transform-origin: top left;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 9px; line-height: 1.05;
+  color: var(--muted-faint); opacity: 0.22; white-space: pre; user-select: none; }
+.ship-card-fg { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; }
+.ship-info-row { display: flex; flex-wrap: wrap; gap: 4px var(--space-3); font-size: 0.78rem; color: var(--muted); margin-bottom: var(--space-2); }
+.ship-info-row strong { color: var(--text); font-weight: 600; }
+.ship-card-spacer { flex: 1; }
 .ship-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-1); }
 .ship-head-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
 .ship-title { font-size: 1.05rem; font-weight: 700; }
-.ship-ident { font-size: 0.78rem; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.ship-tag { font-size: 0.78rem; color: var(--muted); font-weight: 400; margin-left: 6px; }
 .ship-active-badge { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
   color: var(--accent); background: var(--accent-weak); border-radius: var(--radius-pill); padding: 2px 8px; white-space: nowrap; }
 .engineer-ship-btn { font-size: 0.72rem; padding: 3px 10px; border-radius: var(--radius-pill); cursor: pointer;
@@ -87,6 +121,31 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .completion-bar { flex: 1; height: 8px; border-radius: var(--radius-pill); background: var(--border); overflow: hidden; }
 .completion-bar-fill { height: 100%; background: var(--accent); border-radius: var(--radius-pill); transition: width var(--transition); }
 .completion-label { font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+/* Owner tried the <details>/<summary> expand-button version and said it "makes the page look
+   weird" -- replaced with "hovering show info and clicking open stuff": a plain text hint (no
+   button chrome) that reveals a small hover preview (CSS shows/hides it, no JS needed for that
+   part), while an actual click opens the full list in a modal (#shipModulesModalOverlay).
+   Real bug, fixed: this hint sits at the BOTTOM of each 16:9 card (pushed there by
+   .ship-card-spacer), so the preview's default "open downward" position could land partly or
+   fully below the viewport, especially for cards in a lower grid row -- "opens a list out of
+   view". Default direction flipped to open upward (toward the card's own body, which is already
+   on-screen) as the common case, with positionModuleHoverPreview (JS, on hover) flipping back to
+   downward -- and clamping horizontally -- only when there's genuinely more room that way, so it
+   can never land off-screen regardless of where the card sits in the grid.
+   Second real bug, fixed: the label and the preview had a 4px margin gap between them -- moving
+   the mouse from the label toward the preview crossed a strip of page that belongs to neither
+   box, ending the CSS :hover match (and the preview's own `:hover` self-keep-open rule can't save
+   it if it already went display:none before the cursor arrives) -- "too far away... if you move
+   to it it disappears before you can scroll". Margin dropped to 0 in both CSS and JS so the two
+   boxes touch directly -- the cursor is always over one or the other, no gap left to cross. */
+.module-hint { position: relative; margin-top: var(--space-2); font-size: 0.8rem; color: var(--muted); }
+.module-hint-label { cursor: pointer; }
+.module-hint-label:hover { color: var(--accent); }
+.module-hover-preview { display: none; position: absolute; left: 0; bottom: 100%; margin: 0; z-index: 15;
+  width: 300px; max-width: 80vw; max-height: 320px; overflow-y: auto; text-align: left;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  box-shadow: var(--shadow); padding: var(--space-2); }
+.module-hint-label:hover + .module-hover-preview, .module-hover-preview:hover { display: block; }
 .module-list { display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto; }
 .module-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   padding: 6px var(--space-2); border-radius: var(--radius-sm); font-size: 0.82rem; }
@@ -137,6 +196,32 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
   background: transparent; color: var(--muted); border: 1px solid var(--border-strong); white-space: nowrap;
   transition: border-color var(--transition), color var(--transition); }
 .goal-clear-btn:hover { border-color: var(--bad-text); color: var(--bad-text); }
+
+/* Export/Import -- user: "have export ship to edsy / coriolis buttons where it copies a url for
+   said sites however they format their outfitting and engineering", then "add an import thing,
+   so you can paste a cori / edsy link and press confirm and itll update goal ship to that". See
+   the export/import JS functions below for the real, verified encoding this is built on (raw
+   journal Loadout JSON, deflate-compressed, base64 -- the same mechanism both Coriolis's own real
+   `shipFromLoadoutJSON` importer and EDSY's own real Journal-import path already accept). */
+.engineer-export-row { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.export-btn { font-size: 0.8rem; padding: var(--space-2) var(--space-3); border-radius: var(--radius-pill); cursor: pointer;
+  background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); white-space: nowrap;
+  transition: border-color var(--transition), color var(--transition); }
+.export-btn:hover { border-color: var(--accent); color: var(--accent); }
+.export-btn.copied { color: #fff; background: var(--accent); border-color: var(--accent); }
+.export-btn.copy-failed { color: #fff; background: var(--bad-text); border-color: var(--bad-text); }
+.engineer-import-row { display: flex; gap: var(--space-2); margin-bottom: var(--space-2); flex-wrap: wrap; }
+.engineer-import-input { flex: 1; min-width: 220px; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); font-size: 0.85rem; font: inherit; }
+.engineer-import-btn { font-size: 0.85rem; padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm); cursor: pointer;
+  background: var(--accent); color: #fff; border: 1px solid var(--accent); white-space: nowrap; }
+.engineer-import-btn:hover { background: color-mix(in srgb, var(--accent) 85%, black); }
+.import-result { font-size: 0.8rem; margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm); display: none; }
+.import-result.import-visible { display: block; }
+.import-result.import-ok { background: var(--good-bg); color: var(--good); border: 1px solid var(--good); }
+.import-result.import-partial { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning); }
+.import-result.import-error { background: var(--bad-bg); color: var(--bad-text); border: 1px solid var(--bad-text); }
 
 /* "Current Ship" / "Goal Ship" comparison -- owner: "each ship should when you edit it kinda
    duplicate the window and show a Current ship window and Goal ship window ... so you know how
@@ -196,9 +281,64 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .need-short .need-status { color: var(--warning); }
 .need-met .need-status { color: var(--good); }
 
-/* Trade calculator: click a "short by X" material-needed card to see what you could give up from
-   what you already hold to cover it, plus the nearest known trader of the right type from your
-   own real journal history. See materialtrader.go/docs/MaterialTraderMechanics.md. */
+/* Trade calculator -- user: "materials needed needss to be feeature matched with engineering
+   planner ... have stuff for trades and a;; that". Ported verbatim (same classes, same JS logic)
+   from engineering_template.html/materials_template.html's own trade calculator: click a
+   "short by X" material-needed card to see what you could give up from what you already hold to
+   cover it, plus the nearest known trader of the right type from your own real journal history.
+   See materialtrader.go/docs/MaterialTraderMechanics.md for the underlying ratio mechanic. */
+.need-card.trade-trigger { cursor: pointer; transition: transform var(--transition); }
+.need-card.trade-trigger:hover { transform: translateY(-1px); }
+.trade-modal-overlay { position: fixed; inset: 0; background: rgba(10,10,10,0.55); display: flex;
+  align-items: center; justify-content: center; z-index: 100; padding: var(--space-4); }
+.trade-modal-overlay[hidden] { display: none; }
+.trade-modal { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); max-width: 820px; width: 100%; max-height: 85vh; overflow-y: auto;
+  padding: var(--space-5); }
+.trade-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: 2px; }
+.trade-modal-title { font-size: 1.1rem; font-weight: 700; }
+.trade-modal-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: var(--space-4); }
+.trade-modal-close { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: var(--muted); line-height: 1; padding: 4px; }
+.trade-modal-close:hover { color: var(--text); }
+.trade-section-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+  margin: var(--space-4) 0 var(--space-2); font-weight: 700; }
+.trade-legend { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-bottom: var(--space-3); font-size: 0.76rem; color: var(--muted); }
+.trade-legend-item { display: flex; align-items: center; gap: 5px; }
+.trade-legend-swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; border: 1px solid var(--border); }
+.trade-legend-swatch-blue { border-color: var(--accent); background: var(--accent-weak); }
+.trade-legend-swatch-yellow { border-color: var(--warning); background: var(--warning-bg); }
+.trade-legend-swatch-red { border-color: var(--bad-text); background: var(--bad-bg); }
+.grid-families { display: flex; flex-direction: column; gap: var(--space-3); }
+.grid-family { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3); }
+.grid-family-name { font-weight: 700; font-size: 0.76rem; margin-bottom: var(--space-2); color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em; }
+.grid-family-cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-2); }
+.trade-grid-cell { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2);
+  transition: border-color var(--transition), background-color var(--transition); }
+.grid-cell-grade { font-size: 0.63rem; font-weight: 700; color: var(--muted); letter-spacing: 0.05em; }
+.grid-cell-name { font-size: 0.78rem; font-weight: 600; margin-top: 1px; line-height: 1.2; }
+.grid-cell-count { font-size: 0.85rem; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.trade-grid-cell-ratio { font-size: 1.05rem; font-weight: 800; color: var(--text); margin-top: 4px;
+  letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.trade-grid-cell-max { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.trade-grid-cell-target { background: var(--accent-weak); border-color: var(--accent); }
+.trade-grid-cell-target .trade-grid-cell-label { font-size: 0.68rem; font-weight: 700; color: var(--accent); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+.trade-grid-cell-empty { opacity: 0.4; }
+.trade-grid-cell-red { border-color: var(--bad-text); background: var(--bad-bg); }
+.trade-grid-cell-yellow { border-color: var(--warning); background: var(--warning-bg); }
+.trade-grid-cell-blue { border-color: var(--accent); background: var(--accent-weak); }
+.trade-show-traders-btn { margin-bottom: var(--space-3); font-size: 0.85rem; }
+.trader-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: var(--space-2); }
+.trade-candidate-name { font-weight: 600; font-size: 0.9rem; }
+.trade-candidate-detail { font-size: 0.76rem; color: var(--muted); }
+.copy-btn-small { background: transparent; color: var(--muted); border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+  padding: 2px var(--space-3); font-size: 0.72rem; font-weight: 400; cursor: pointer; white-space: nowrap;
+  transition: background-color var(--transition), color var(--transition), border-color var(--transition); }
+.copy-btn-small:hover { color: var(--accent); border-color: var(--accent); }
+.copy-btn-small.copied { color: #fff; background: var(--accent); border-color: var(--accent); }
+.copy-btn-small.copy-failed { color: #fff; background: var(--bad-text); border-color: var(--bad-text); }
 .theme-toggle { position: fixed; top: var(--space-4); right: var(--space-4); z-index: 20;
   display: flex; align-items: center; justify-content: center; width: 38px; height: 38px;
   cursor: pointer; font-size: 1.05rem; line-height: 1; background: var(--panel);
@@ -250,7 +390,39 @@ a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible
       </div>
       <button type="button" class="engineer-modal-close" id="engineerModalClose" aria-label="Close">✕</button>
     </div>
+    <div class="engineer-export-row" id="engineerExportRow"></div>
+    <div class="engineer-import-row">
+      <input type="text" class="engineer-import-input" id="engineerImportInput" placeholder="Paste a Coriolis or EDSY build link...">
+      <button type="button" class="engineer-import-btn" id="engineerImportBtn">Import as Goal</button>
+    </div>
+    <div id="engineerImportResult"></div>
     <div class="engineer-modal-body" id="engineerModalBody"></div>
+  </div>
+</div>
+
+<div class="engineer-modal-overlay" id="shipModulesModalOverlay" hidden>
+  <div class="engineer-modal" style="max-width: 560px" role="dialog" aria-modal="true" aria-labelledby="shipModulesModalTitle">
+    <div class="engineer-modal-head">
+      <div>
+        <div class="engineer-modal-title" id="shipModulesModalTitle"></div>
+        <div class="engineer-modal-sub" id="shipModulesModalSub"></div>
+      </div>
+      <button type="button" class="engineer-modal-close" id="shipModulesModalClose" aria-label="Close">✕</button>
+    </div>
+    <div class="engineer-modal-body" id="shipModulesModalBody"></div>
+  </div>
+</div>
+
+<div class="trade-modal-overlay" id="tradeModalOverlay" hidden>
+  <div class="trade-modal" role="dialog" aria-modal="true" aria-labelledby="tradeModalTitle">
+    <div class="trade-modal-head">
+      <div>
+        <div class="trade-modal-title" id="tradeModalTitle"></div>
+        <div class="trade-modal-sub" id="tradeModalSub"></div>
+      </div>
+      <button type="button" class="trade-modal-close" id="tradeModalClose" aria-label="Close">✕</button>
+    </div>
+    <div id="tradeModalBody"></div>
   </div>
 </div>
 
@@ -264,6 +436,165 @@ function escapeHtml(s) {
 function formatCredits(n) {
   if (n == null) return '';
   return n.toLocaleString('en-US') + ' cr';
+}
+
+// Trade calculator -- ported verbatim (same classes/JS logic) from engineering_template.html so
+// this page's Materials Needed panel feature-matches the engineering planner's own: click a
+// "short by X" material-needed card to see what you could give up from what you already hold to
+// cover it, plus the nearest known trader of the right type. Ratio math and family/type rules are
+// the real Material Trader mechanic -- see docs/MaterialTraderMechanics.md for full derivation.
+function tradeQuantities(giveGrade, giveFamily, getGrade, getFamily) {
+  let give = 1, get = 1;
+  if (getGrade > giveGrade) give = Math.pow(6, getGrade - giveGrade);
+  else if (getGrade < giveGrade) get = Math.pow(3, giveGrade - getGrade);
+  if (giveFamily !== getFamily) give *= 6;
+  return { give, get };
+}
+const tradeCatalogByKey = {};
+((DATA.trading && DATA.trading.materialCatalog) || []).forEach(m => { tradeCatalogByKey[m.key] = m; });
+function heldCountFor(key) { return (DATA.heldMaterials && DATA.heldMaterials[key]) || 0; }
+function traderTypeLabel(t) {
+  return t === 'raw' ? 'Raw' : t === 'manufactured' ? 'Manufactured' : t === 'encoded' ? 'Encoded' : t;
+}
+function tradersForType(type) {
+  return ((DATA.trading && DATA.trading.traders) || []).filter(t => t.type === type);
+}
+function formatDistance(t) {
+  return t.distanceLy == null ? '' : ` -- ${t.distanceLy.toLocaleString('en-US', { maximumFractionDigits: 1 })} ly`;
+}
+function familyGroupsForType(type) {
+  const order = [];
+  const byName = {};
+  ((DATA.trading && DATA.trading.materialCatalog) || []).forEach(m => {
+    if (m.type !== type) return;
+    if (!byName[m.family]) { byName[m.family] = []; order.push(m.family); }
+    byName[m.family].push(m);
+  });
+  order.forEach(fam => byName[fam].sort((a, b) => a.grade - b.grade));
+  return order.map(fam => ({ name: fam, materials: byName[fam] }));
+}
+function classifyTradeCell(held, maxObtainable, ratioCostPerUnit, neededElsewhere) {
+  if (held <= 0 || maxObtainable <= 0) return 'empty';
+  if (neededElsewhere > 0) return 'red';
+  if (ratioCostPerUnit <= 1 || maxObtainable >= 10) return 'blue';
+  return 'yellow';
+}
+function tradeGridCell(m, target, neededElsewhereMap) {
+  if (m.key === target.key) {
+    return `<div class="trade-grid-cell trade-grid-cell-target">
+      <div class="grid-cell-grade">Grade ${m.grade}</div>
+      <div class="grid-cell-name">${escapeHtml(m.name)}</div>
+      <div class="trade-grid-cell-label">Target</div>
+    </div>`;
+  }
+  const held = heldCountFor(m.key);
+  const { give, get } = tradeQuantities(m.grade, m.family, target.grade, target.family);
+  const maxObtainable = held >= give ? Math.floor(held / give) * get : 0;
+  const neededElsewhere = (neededElsewhereMap && neededElsewhereMap[m.key] && neededElsewhereMap[m.key].count) || 0;
+  const cls = classifyTradeCell(held, maxObtainable, give / get, neededElsewhere);
+  const title = cls === 'red'
+    ? `Needed elsewhere in your plan (need ${neededElsewhere.toLocaleString('en-US')}, hold ${held.toLocaleString('en-US')}) -- trading this away could leave you short there.`
+    : cls === 'empty'
+    ? (held > 0
+        ? `You hold ${held.toLocaleString('en-US')} ${m.name}, but a trade needs ${give.toLocaleString('en-US')} -- not enough for even one.`
+        : `You don't currently hold any ${m.name}.`)
+    : `Give ${give.toLocaleString('en-US')} ${m.name} to get ${get.toLocaleString('en-US')} ${target.name} -- up to ${maxObtainable.toLocaleString('en-US')} total from what you hold.`;
+  return `<div class="trade-grid-cell trade-grid-cell-${cls}" title="${escapeHtml(title)}">
+    <div class="grid-cell-grade">Grade ${m.grade}</div>
+    <div class="grid-cell-name">${escapeHtml(m.name)}</div>
+    <div class="grid-cell-count">${held ? held.toLocaleString('en-US') + ' held' : '—'}</div>
+    ${maxObtainable > 0 ? `<div class="trade-grid-cell-ratio">${give.toLocaleString('en-US')} → ${get.toLocaleString('en-US')}</div><div class="trade-grid-cell-max">up to ${maxObtainable.toLocaleString('en-US')} total</div>` : ''}
+  </div>`;
+}
+function tradeGridHtml(target, neededElsewhereMap) {
+  const groups = familyGroupsForType(target.type);
+  return `<div class="grid-families">${groups.map(g => `<div class="grid-family">
+    <div class="grid-family-name">${escapeHtml(g.name)}</div>
+    <div class="grid-family-cells">${g.materials.map(m => tradeGridCell(m, target, neededElsewhereMap)).join('')}</div>
+  </div>`).join('')}</div>`;
+}
+function tradersSectionHtml(target) {
+  const traders = tradersForType(target.type);
+  return traders.length
+    ? traders.map(t => `<div class="trader-row">
+        <div>
+          <div class="trade-candidate-name">${escapeHtml(t.station)}</div>
+          <div class="trade-candidate-detail">${escapeHtml(t.system)}${formatDistance(t)} · last traded ${escapeHtml((t.lastUsedAt || '').slice(0, 10))}</div>
+        </div>
+        <button type="button" class="copy-btn-small trader-copy-btn" data-system="${escapeHtml(t.system)}">Copy system</button>
+      </div>`).join('')
+    : `<p class="empty-note">No known ${traderTypeLabel(target.type).toLowerCase()} material trader in your journal history yet -- visit one and complete any trade there to have it remembered here.</p>`;
+}
+function tradeModalHtml(target, neededElsewhereMap) {
+  return `
+    <button type="button" class="trade-show-traders-btn" id="tradeShowTradersBtn">📍 Show nearby ${traderTypeLabel(target.type)} traders</button>
+    <div id="tradeTradersSection" hidden>
+      <div class="trade-section-title">Nearest known ${traderTypeLabel(target.type)} trader${DATA.trading && DATA.trading.currentSystem ? ` (from ${escapeHtml(DATA.trading.currentSystem)})` : ''}</div>
+      ${tradersSectionHtml(target)}
+    </div>
+    <div class="trade-legend">
+      <span class="trade-legend-item"><span class="trade-legend-swatch trade-legend-swatch-blue"></span>Efficient or plentiful</span>
+      <span class="trade-legend-item"><span class="trade-legend-swatch trade-legend-swatch-yellow"></span>Costly but possible</span>
+      <span class="trade-legend-item"><span class="trade-legend-swatch trade-legend-swatch-red"></span>Needed elsewhere in your plan</span>
+    </div>
+    ${tradeGridHtml(target, neededElsewhereMap)}
+  `;
+}
+let currentTradeTarget = null;
+function openTradeModal(targetKey, neededQty) {
+  const target = tradeCatalogByKey[targetKey];
+  if (!target) return;
+  currentTradeTarget = target;
+  document.getElementById('tradeModalTitle').textContent = `🔄 Trade for ${target.name}`;
+  document.getElementById('tradeModalSub').textContent = neededQty != null
+    ? `Grade ${target.grade} · ${target.family} · you're short ${neededQty.toLocaleString('en-US')}`
+    : `Grade ${target.grade} · ${target.family}`;
+  document.getElementById('tradeModalBody').innerHTML = tradeModalHtml(target, computeNeededMap());
+  document.getElementById('tradeModalOverlay').hidden = false;
+}
+function closeTradeModal() {
+  document.getElementById('tradeModalOverlay').hidden = true;
+}
+document.getElementById('tradeModalClose').addEventListener('click', closeTradeModal);
+document.getElementById('tradeModalOverlay').addEventListener('click', e => {
+  if (e.target.id === 'tradeModalOverlay') closeTradeModal();
+});
+document.getElementById('tradeModalBody').addEventListener('click', e => {
+  const showBtn = e.target.closest('#tradeShowTradersBtn');
+  if (showBtn) {
+    const section = document.getElementById('tradeTradersSection');
+    section.hidden = !section.hidden;
+    const label = currentTradeTarget ? traderTypeLabel(currentTradeTarget.type) : '';
+    showBtn.textContent = section.hidden ? `📍 Show nearby ${label} traders` : `📍 Hide nearby traders`;
+    return;
+  }
+  const btn = e.target.closest('.trader-copy-btn');
+  if (!btn) return;
+  copyToClipboard(btn.dataset.system).then(ok => {
+    const original = btn.textContent;
+    btn.textContent = ok ? '✓ Copied' : '✗ Failed';
+    btn.classList.add(ok ? 'copied' : 'copy-failed');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove(ok ? 'copied' : 'copy-failed'); }, ok ? 1200 : 2500);
+  });
+});
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(() => true, () => legacyCopy(text));
+  }
+  return Promise.resolve(legacyCopy(text));
+}
+function legacyCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* best effort */ }
+  document.body.removeChild(ta);
+  return ok;
 }
 
 // Manual light/dark override -- see the other five pages for the same pattern/comment.
@@ -412,7 +743,12 @@ function planRow(key, g) {
   </div>`;
 }
 
-function materialsGrid() {
+// Shared by materialsGrid (the visible cards) and the trade grid (which needs to know, for ANY
+// material in the same category as whatever's being traded FOR, whether the plan already needs it
+// elsewhere too, see tradeGridCell's "red" case) -- same split the engineering planner's own
+// computeNeededMap/materialsSummary use, just built from this page's per-slot `goals` instead of a
+// flat basket array.
+function computeNeededMap() {
   const needed = {}; // key -> {name, count}
   Object.values(goals).forEach(g => {
     cumulativeIngredients(g.type, g.name, g.fromGrade, g.toGrade).forEach(ing => {
@@ -429,6 +765,11 @@ function materialsGrid() {
       }
     }
   });
+  return needed;
+}
+
+function materialsGrid() {
+  const needed = computeNeededMap();
   const rows = Object.entries(needed).map(([key, v]) => ({ key, ...v }));
   if (!rows.length) return `<p class="empty-note">Nothing needs any materials yet -- every queued goal is already fully covered by grades already rolled.</p>`;
   rows.sort((a, b) => {
@@ -436,12 +777,19 @@ function materialsGrid() {
     const shortB = b.count - (DATA.heldMaterials[b.key] || 0);
     return shortB - shortA || a.name.localeCompare(b.name);
   });
+  // User: "materials needed needss to be feeature matched with engineering planner ... have stuff
+  // for trades and a;; that" -- same trade-trigger pattern as the engineering planner's own
+  // materialsSummary: only short cards get it, and only if the material is actually tradeable
+  // (belongs to a named family -- Guardian/Thargoid materials aren't tradeable at any Material
+  // Trader, see docs/MaterialTraderMechanics.md).
   const cards = rows.map(m => {
     const held = DATA.heldMaterials[m.key] || 0;
     const short = m.count - held;
     const cls = short > 0 ? 'need-short' : 'need-met';
     const status = short > 0 ? `Short by ${short.toLocaleString('en-US')}` : 'You have enough';
-    return `<div class="need-card ${cls}">
+    const tradeable = short > 0 && !!tradeCatalogByKey[m.key];
+    const tradeAttrs = tradeable ? ` data-material-key="${escapeHtml(m.key)}" data-short="${short}" title="Click to see trade options to cover this shortfall"` : '';
+    return `<div class="need-card ${cls}${tradeable ? ' trade-trigger' : ''}"${tradeAttrs}>
       <div class="need-name">${escapeHtml(m.name)}</div>
       <div class="need-amounts">${held.toLocaleString('en-US')} / ${m.count.toLocaleString('en-US')}</div>
       <div class="need-status">${status}</div>
@@ -474,6 +822,11 @@ document.getElementById('materialsModalOverlay').addEventListener('click', e => 
   if (e.target.id === 'materialsModalOverlay') closeMaterialsPanel();
 });
 document.getElementById('materialsModalBody').addEventListener('click', e => {
+  const trigger = e.target.closest('.trade-trigger');
+  if (trigger && trigger.dataset.materialKey) {
+    openTradeModal(trigger.dataset.materialKey, trigger.dataset.short ? Number(trigger.dataset.short) : undefined);
+    return;
+  }
   const btn = e.target.closest('.plan-remove-btn');
   if (!btn) return;
   clearGoalByKey(btn.dataset.goalKey);
@@ -506,8 +859,32 @@ function moduleRow(m) {
   </div>`;
 }
 
+// Owner: "light grey blending into the background ascii art of each ship shown so you can
+// identify them". This is the plumbing for that -- a lookup keyed by the exact real ship type
+// display name (shipTypeName's output, e.g. "Python", "Anaconda", "Mandalay"), rendered as a faint
+// monospace watermark behind each card (see .ship-ascii above). Left deliberately EMPTY for now --
+// owner doesn't have real reference screenshots on hand yet (see docs/ShipyardPlanner.md for the
+// full discussion of why it should be their own in-game screenshots, not Frontier's official
+// site's renders). All the rendering/stretch-to-fill plumbing (.ship-ascii-wrap, fitShipAscii)
+// stays fully in place and just quietly does nothing until entries land here -- drop in
+// `'Python': '...'` etc. keyed by ship type and it'll show up with no other code changes needed.
+const SHIP_ASCII = {};
+function shipAsciiArt(type) {
+  return SHIP_ASCII[type] || '';
+}
+
+// Owner: "distance from you" per ship. Backend (shipyard.go) leaves distanceLy null when either
+// your current position or that ship's system's coordinates aren't independently known --
+// reported honestly here rather than guessed at.
+function distanceLabel(s) {
+  if (s.distanceLy == null) return 'distance unknown';
+  if (s.distanceLy < 0.05) return 'here';
+  return `${s.distanceLy.toFixed(1)} ly away`;
+}
+
 function shipCard(s, shipIndex) {
-  const title = s.name ? `${escapeHtml(s.name)} <span class="ship-ident">${escapeHtml(s.ident || '')}</span>` : escapeHtml(s.type);
+  const displayName = escapeHtml(s.name || s.type);
+  const tag = s.ident ? `<span class="ship-tag">${escapeHtml(s.ident)}</span>` : '';
   const activeBadge = s.active ? '<span class="ship-active-badge">Active</span>' : '';
   const engineerableCount = s.hasModules ? s.modules.filter(m => m.engineerableType).length : 0;
   const engineerBtn = engineerableCount
@@ -515,7 +892,14 @@ function shipCard(s, shipIndex) {
     : '';
   const subBits = [escapeHtml(s.type)];
   if (s.system) subBits.push(escapeHtml(s.system));
+  subBits.push(distanceLabel(s));
   subBits.push(formatCredits(s.value));
+  // Owner: "list some more info about ships, like jump range or something if needed" -- only
+  // present when a real Loadout was recovered for this ship (0/omitted for an unrecovered stored
+  // ship), so this just doesn't render rather than showing a fake "0.0 ly".
+  const infoHtml = s.maxJumpRange
+    ? `<div class="ship-info-row"><span>Jump range: <strong>${s.maxJumpRange.toFixed(1)} ly</strong></span></div>`
+    : '';
   let completionHtml = '';
   if (s.hasModules && s.engineeredCount > 0 && s.completionPct != null) {
     completionHtml = `<div class="completion-row">
@@ -523,24 +907,86 @@ function shipCard(s, shipIndex) {
       <span class="completion-label">${s.completionPct.toFixed(0)}% engineered</span>
     </div>`;
   }
+  // Owner tried the earlier <details>/<summary> "Modules (N)" expand button and said it "makes
+  // the page look weird" -- replaced with a plain text hint: hovering shows a quick CSS-only
+  // preview (.module-hover-preview), clicking opens the full list in a modal (openShipModulesModal).
   let bodyHtml;
   if (!s.hasModules) {
     bodyHtml = `<p class="no-modules-note">Build not recorded yet -- this ship's module loadout hasn't been independently confirmed since it was last flown (or its slot number may have been reused by a different ship since). Fly it once to refresh.</p>`;
   } else {
-    bodyHtml = `<div class="module-list">${s.modules.map(moduleRow).join('')}</div>`;
-    if (!s.active && s.loadoutAt) {
-      bodyHtml += `<p class="snapshot-note">Build as of ${escapeHtml(s.loadoutAt.replace('T', ' ').replace('Z', ''))} UTC -- the last time this ship was flown.</p>`;
-    }
+    const modulesInner = `<div class="module-list">${s.modules.map(moduleRow).join('')}</div>`;
+    const snapshotNote = (!s.active && s.loadoutAt)
+      ? `<p class="snapshot-note">Build as of ${escapeHtml(s.loadoutAt.replace('T', ' ').replace('Z', ''))} UTC -- the last time this ship was flown.</p>`
+      : '';
+    bodyHtml = `<div class="module-hint" data-ship-index="${shipIndex}">
+      <span class="module-hint-label">🛠️ ${s.modules.length} modules</span>
+      <div class="module-hover-preview">${modulesInner}${snapshotNote}</div>
+    </div>`;
   }
+  const ascii = shipAsciiArt(s.type);
+  const asciiHtml = ascii
+    ? `<div class="ship-ascii-wrap"><pre class="ship-ascii" aria-hidden="true">${escapeHtml(ascii)}</pre></div>`
+    : '';
   return `<div class="ship-card${s.active ? ' ship-active' : ''}">
-    <div class="ship-head">
-      <div class="ship-title">${title}</div>
-      <div class="ship-head-actions">${activeBadge}${engineerBtn}</div>
+    ${asciiHtml}
+    <div class="ship-card-fg">
+      <div class="ship-head">
+        <div class="ship-title">${displayName}${tag}</div>
+        <div class="ship-head-actions">${activeBadge}${engineerBtn}</div>
+      </div>
+      <div class="ship-sub">${subBits.join(' · ')}</div>
+      ${infoHtml}
+      ${completionHtml}
+      <div class="ship-card-spacer"></div>
+      ${bodyHtml}
     </div>
-    <div class="ship-sub">${subBits.join(' · ')}</div>
-    ${completionHtml}
-    ${bodyHtml}
   </div>`;
+}
+
+// Stretches each card's ASCII watermark (if any) to fill the whole card -- owner: "the whole box
+// background to be a lightly distented ascii art of the ship". Natural rendered size varies per
+// art string, so the fill scale has to be computed per card rather than a single fixed CSS value;
+// unequal x/y scale factors are expected (that's the "distorted" look asked for), not a bug.
+function fitShipAscii() {
+  document.querySelectorAll('.ship-ascii-wrap').forEach(wrap => {
+    const pre = wrap.querySelector('.ship-ascii');
+    if (!pre) return;
+    pre.style.transform = 'none';
+    const naturalW = pre.scrollWidth, naturalH = pre.scrollHeight;
+    if (!naturalW || !naturalH) return;
+    const scaleX = wrap.clientWidth / naturalW;
+    const scaleY = wrap.clientHeight / naturalH;
+    pre.style.transform = `scale(${scaleX}, ${scaleY})`;
+  });
+}
+
+// Real bug, fixed: the module-count hint sits at the bottom of each 16:9 card, and the hover
+// preview's CSS default (see .module-hover-preview comment above) now opens upward to stay
+// on-card in the common case -- but a card near the very TOP of the page (or window) can still run
+// out of room upward, and a card in the right-most grid column can run the preview past the
+// viewport's right edge. This measures actual available space on hover and flips/clamps only when
+// the CSS default would genuinely go off-screen, so the preview can never land out of view
+// regardless of where its card sits in the grid.
+function positionModuleHoverPreview(hint) {
+  const preview = hint.querySelector('.module-hover-preview');
+  if (!preview) return;
+  const hintRect = hint.getBoundingClientRect();
+  const previewRect = preview.getBoundingClientRect(); // already reflects the CSS :hover state by the time this runs (see rAF below)
+  const spaceAbove = hintRect.top;
+  const spaceBelow = window.innerHeight - hintRect.bottom;
+  if (spaceAbove < previewRect.height && spaceBelow > spaceAbove) {
+    preview.style.bottom = 'auto';
+    preview.style.top = '100%';
+  } else {
+    preview.style.top = 'auto';
+    preview.style.bottom = '100%';
+  }
+  preview.style.left = '0';
+  const afterRect = preview.getBoundingClientRect();
+  let shift = 0;
+  if (afterRect.right > window.innerWidth) shift = window.innerWidth - afterRect.right - 8;
+  if (afterRect.left + shift < 0) shift = -afterRect.left + 8;
+  preview.style.left = `${shift}px`;
 }
 
 function render() {
@@ -550,7 +996,40 @@ function render() {
     return;
   }
   document.getElementById('fleetSection').innerHTML = `<div class="fleet-grid">${DATA.ships.map(shipCard).join('')}</div>`;
+  fitShipAscii();
+  document.querySelectorAll('.module-hint').forEach(hint => {
+    hint.addEventListener('mouseenter', () => requestAnimationFrame(() => positionModuleHoverPreview(hint)));
+  });
 }
+
+function openShipModulesModal(shipIndex) {
+  const ship = DATA.ships[shipIndex];
+  if (!ship) return;
+  document.getElementById('shipModulesModalTitle').textContent = `${ship.name || ship.type} -- modules`;
+  document.getElementById('shipModulesModalSub').textContent = ship.type + (ship.ident ? ` -- ${ship.ident}` : '');
+  if (!ship.hasModules) {
+    document.getElementById('shipModulesModalBody').innerHTML = `<p class="no-modules-note">Build not recorded yet -- this ship's module loadout hasn't been independently confirmed since it was last flown (or its slot number may have been reused by a different ship since). Fly it once to refresh.</p>`;
+  } else {
+    const snapshotNote = (!ship.active && ship.loadoutAt)
+      ? `<p class="snapshot-note">Build as of ${escapeHtml(ship.loadoutAt.replace('T', ' ').replace('Z', ''))} UTC -- the last time this ship was flown.</p>`
+      : '';
+    document.getElementById('shipModulesModalBody').innerHTML = `<div class="module-list" style="max-height:60vh">${ship.modules.map(moduleRow).join('')}</div>${snapshotNote}`;
+  }
+  document.getElementById('shipModulesModalOverlay').hidden = false;
+}
+function closeShipModulesModal() {
+  document.getElementById('shipModulesModalOverlay').hidden = true;
+}
+document.getElementById('shipModulesModalClose').addEventListener('click', closeShipModulesModal);
+document.getElementById('shipModulesModalOverlay').addEventListener('click', e => {
+  if (e.target.id === 'shipModulesModalOverlay') closeShipModulesModal();
+});
+document.getElementById('fleetSection').addEventListener('click', e => {
+  const label = e.target.closest('.module-hint-label');
+  if (!label) return;
+  openShipModulesModal(Number(label.closest('.module-hint').dataset.shipIndex));
+});
+window.addEventListener('resize', fitShipAscii);
 
 // ---- "⚙️ Engineer" modal -- owner: "add an engineer button to top right that lets you quickly
 // add engineering changes to your engineering planner with a whole window". Replaces the old
@@ -657,11 +1136,273 @@ function goalModuleRow(ship, m, moduleIndex) {
   </div>`;
 }
 
+// Export to Coriolis/EDSY -- user: "have export ship to edsy / coriolis buttons where it copies a
+// url for said sites however they format their outfitting and engineering". Verified directly
+// against each site's own real open-source code (not guessed): EDCD/coriolis's Coriolis.jsx
+// registers a real '/import/:data' route whose handler, when the decoded JSON has a real
+// `Modules` array (a real journal Loadout shape, not Coriolis's own separate "SLEF"/Companion-API
+// shapes), calls JournalUtils.shipFromLoadoutJSON(json) directly -- i.e. Coriolis's own official
+// importer already knows how to parse the EXACT raw Loadout event JSON this project already has,
+// no translation needed. taleden/EDSY's own real 'import' handler documents the same thing --
+// among its accepted inputs is "Journal JSONL data with 'Loadout' events" -- via an `import` query
+// parameter carrying zlib-deflate-compressed, base64 data. Both sites expect zlib-format deflate
+// (RFC1950), which is exactly what the browser's native CompressionStream('deflate') produces --
+// no external compression library needed, in keeping with this page's "no dependencies" bar.
+async function deflateToBase64(text) {
+  const cs = new CompressionStream('deflate');
+  const writer = cs.writable.getWriter();
+  writer.write(new TextEncoder().encode(text));
+  writer.close();
+  const buf = await new Response(cs.readable).arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+function normalizeBase64(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  return s;
+}
+async function inflateFromBase64(b64) {
+  const binary = atob(normalizeBase64(b64));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const ds = new DecompressionStream('deflate');
+  const writer = ds.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const buf = await new Response(ds.readable).arrayBuffer();
+  return new TextDecoder().decode(buf);
+}
+function exportButtonsHtml(ship) {
+  if (!ship.rawLoadoutJson || typeof CompressionStream === 'undefined') return '';
+  return `<button type="button" class="export-btn" data-export-site="coriolis">🚀 Export to Coriolis</button>
+    <button type="button" class="export-btn" data-export-site="edsy">🚀 Export to EDSY</button>`;
+}
+document.getElementById('engineerExportRow').addEventListener('click', async e => {
+  const btn = e.target.closest('.export-btn');
+  if (!btn) return;
+  const ship = DATA.ships[engineerModalShipIndex];
+  if (!ship || !ship.rawLoadoutJson) return;
+  const site = btn.dataset.exportSite;
+  const original = btn.textContent;
+  let url;
+  try {
+    const b64 = await deflateToBase64(ship.rawLoadoutJson);
+    if (site === 'coriolis') {
+      // Real bug, fixed: the previous version used '/import/<data>' (data as a raw PATH segment).
+      // Standard base64 can contain '/', and even percent-encoded as %2F, some client-side routers
+      // decode the full path before splitting on '/' -- silently truncating the data and 404ing (a
+      // real user report: "cor export doesnt work, 404s on the linnk"). Coriolis's own router also
+      // registers a bare '/import' route (confirmed in its real source), which reads the same data
+      // from a query string instead -- avoids the whole path-segment ambiguity, so used here.
+      url = `https://coriolis.io/import?data=${encodeURIComponent(b64)}`;
+    } else {
+      const urlSafe = b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      url = `https://edsy.org/import?import=${encodeURIComponent(urlSafe)}`;
+    }
+  } catch (err) {
+    btn.textContent = '✗ Failed';
+    setTimeout(() => { btn.textContent = original; }, 2000);
+    return;
+  }
+  copyToClipboard(url).then(ok => {
+    btn.textContent = ok ? '✓ Copied' : '✗ Failed';
+    btn.classList.add(ok ? 'copied' : 'copy-failed');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove(ok ? 'copied' : 'copy-failed'); }, ok ? 1400 : 2500);
+  });
+});
+
+// Import from Coriolis/EDSY -- user: "add an import thing, so you can paste a cori / edsy link and
+// press confirm and itll update goal ship to that ... itd make it easier to track builds and work
+// towards them". Decodes the SAME '/import/'-deep-link shape the Export buttons above produce --
+// deliberately NOT each site's own compact build-share code (Coriolis's '/outfit/:ship/:code',
+// EDSY's own equivalent native code), since those depend on each site's own large internal
+// per-module ID catalog that isn't loaded here and would risk silently mismapping a module if
+// guessed at. A real, honest limitation, not an oversight -- see docs/ShipyardPlanner.md.
+// Real bug, fixed: a user reported pasting their own real Coriolis/EDSY build links (Coriolis's
+// own '/outfit/:ship?code=...' share format, EDSY's own '#/L=...' share format -- their NORMAL
+// "share this build" links, not the /import/ deep-link this page's own Export buttons produce)
+// and getting a misleading "not recognized" message, as if the link were garbage. It's a real,
+// valid link -- just in a different, much more complex format (each site's own internal
+// per-module ID/bit-packing scheme, backed by a large separate data catalog neither site
+// publishes as a simple lookup table) that isn't safely decodable here without risking a silently
+// wrong result. Now recognized (and clearly explained) as "real link, unsupported format" rather
+// than lumped in with actually-invalid input.
+function parseExportedUrl(raw) {
+  const s = (raw || '').trim();
+  let m = s.match(/coriolis\.io\/import\?(?:.*[?&])?data=([^&#]+)/i);
+  if (m) return { site: 'Coriolis', data: decodeURIComponent(m[1]), urlSafe: false };
+  m = s.match(/coriolis\.io\/import\/([^/?#]+)/i);
+  if (m) return { site: 'Coriolis', data: decodeURIComponent(m[1]), urlSafe: false };
+  m = s.match(/edsy\.org\/(?:dev\/)?import\?(?:.*[?&])?import=([^&#]+)/i);
+  if (m) return { site: 'EDSY', data: decodeURIComponent(m[1]), urlSafe: true };
+  // Coriolis's own compact share format puts the ship type right in the URL PATH as a plain
+  // slug (e.g. "/outfit/panthermkii?code=..."), readable with no decoding at all -- pure URL
+  // parsing, not the site's actual proprietary bit-packed module encoding (which this project
+  // still doesn't attempt, see docs/ShipyardPlanner.md for why). Surfaced so an import attempt on
+  // a compact link can at least confirm/deny "this build is for the right kind of ship" for free.
+  m = s.match(/coriolis\.io\/outfit\/([a-z0-9_-]+)/i);
+  if (m) return { site: 'Coriolis', compact: true, shipSlug: m[1] };
+  if (/edsy\.org\/.*#\/?L=/i.test(s) || /edsy\.org\/#/i.test(s)) return { site: 'EDSY', compact: true };
+  return null;
+}
+
+// resolveModuleTypeJS: JS port of shipmodulenames.go's resolveModuleType, driven by the SAME
+// keyword table (DATA.moduleTypeKeywords/nonEngineerableItemPrefixes/engineItemInfix) rather than
+// a second hand-maintained copy -- this project generates fully static HTML with no live backend,
+// so a pasted build's real Item symbols (which may be types this commander's own fleet has never
+// used) need this resolution available client-side too. Same HasPrefix/Contains logic, same
+// longest-keyword-first ordering, no case-folding (real journal Item symbols are already
+// consistently lowercase, matching the Go side's own assumption).
+const moduleTypeSortedKeywordsJS = Object.keys(DATA.moduleTypeKeywords || {}).sort((a, b) => b.length - a.length);
+function resolveModuleTypeJS(item) {
+  if (!item) return '';
+  for (const prefix of (DATA.nonEngineerableItemPrefixes || [])) {
+    if (item.startsWith(prefix)) return '';
+  }
+  if (DATA.engineItemInfix && item.includes(DATA.engineItemInfix)) return 'Thrusters';
+  for (const kw of moduleTypeSortedKeywordsJS) {
+    if (item.includes(kw)) return DATA.moduleTypeKeywords[kw];
+  }
+  return '';
+}
+
+// resolveBlueprintSymbolJS/resolveExperimentalEffectSymbolJS: JS ports of
+// shipmodulemaps.go's resolveBlueprintSymbol/resolveExperimentalEffectSymbol. Real bug caught
+// during verification: a pasted build's raw Engineering.BlueprintName/ExperimentalEffect are the
+// game's own internal symbols ("FSD_LongRange", "special_armour_chunky"), NOT this project's own
+// display names ("Increased FSD Range", "Deep Plating") -- a naive display-name string comparison
+// silently matched nothing on a real self-import round-trip test. Driven by the same
+// DATA.blueprintSymbolMap/experimentalEffectSymbolMap the server resolves through, same
+// slotType-first-then-only-candidate-if-unambiguous logic.
+function resolveBlueprintSymbolJS(symbol, slotType) {
+  const candidates = (DATA.blueprintSymbolMap || {})[(symbol || '').toLowerCase()];
+  if (!candidates) return null;
+  if (candidates[slotType]) return candidates[slotType];
+  const keys = Object.keys(candidates);
+  if (keys.length === 1) return candidates[keys[0]];
+  return null;
+}
+function resolveExperimentalEffectSymbolJS(symbol, slotType) {
+  const candidates = (DATA.experimentalEffectSymbolMap || {})[(symbol || '').toLowerCase()];
+  if (!candidates) return null;
+  if (candidates[slotType]) return candidates[slotType];
+  const keys = Object.keys(candidates);
+  if (keys.length === 1) return candidates[keys[0]];
+  return null;
+}
+
+function showImportResult(cls, text) {
+  const el = document.getElementById('engineerImportResult');
+  el.className = `import-result import-visible ${cls}`;
+  el.textContent = text;
+}
+
+async function importFromUrl() {
+  const ship = DATA.ships[engineerModalShipIndex];
+  if (!ship) return;
+  const input = document.getElementById('engineerImportInput');
+  const parsed = parseExportedUrl(input.value);
+  if (!parsed) {
+    showImportResult('import-error', "That doesn't look like a Coriolis or EDSY link at all -- paste a real coriolis.io or edsy.org URL.");
+    return;
+  }
+  if (parsed.compact) {
+    // Real, deliberate scope limit -- see docs/ShipyardPlanner.md: fully decoding either site's
+    // own compact build-share code needs their own large internal per-module ID catalog and (for
+    // Coriolis) a further nested engineering-modifications sub-format; guessing at it risks
+    // silently setting wrong goals, so it isn't attempted. The ship-type slug in a Coriolis
+    // compact URL's own PATH is plain, undecoded text though (e.g. ".../outfit/python?code=..."),
+    // so it's surfaced here for free as a sanity check -- not a full import.
+    const slugNote = parsed.shipSlug ? ` (this link's own URL says it's for a "${parsed.shipSlug}" hull)` : '';
+    showImportResult('import-error', `That's a real ${parsed.site} link${slugNote} -- but it's in ${parsed.site}'s own compact build-share code format, which this page can't decode yet (it depends on ${parsed.site}'s own large internal per-module ID catalog, and guessing at it risks silently setting wrong goals). Only /import/ deep links -- like the ones this page's own Export buttons produce -- can be imported right now.`);
+    return;
+  }
+  if (typeof DecompressionStream === 'undefined') {
+    showImportResult('import-error', "Your browser doesn't support decompression -- try a recent Chrome, Firefox, or Safari.");
+    return;
+  }
+  let json;
+  try {
+    json = JSON.parse(await inflateFromBase64(parsed.data));
+  } catch (err) {
+    showImportResult('import-error', 'Could not decode that link -- it may be corrupted, or in a format this page doesn\'t support.');
+    return;
+  }
+  if (!json || !Array.isArray(json.Modules) || !json.Ship) {
+    showImportResult('import-error', "That decoded, but doesn't look like a real ship Loadout -- nothing was imported.");
+    return;
+  }
+  if (ship.shipSymbol && json.Ship.toLowerCase() !== ship.shipSymbol.toLowerCase()) {
+    showImportResult('import-error', `That build is for a different ship type (${json.Ship}) than this ship's real type (${ship.shipSymbol}) -- nothing was imported, to avoid setting mismatched goals.`);
+    return;
+  }
+
+  // Match by resolved TYPE, not raw slot name -- Coriolis/EDSY's own slot identifiers don't
+  // correspond to this project's Loadout-derived Slot strings.
+  const decodedByType = {};
+  json.Modules.forEach(m => {
+    const type = resolveModuleTypeJS(m.Item || '');
+    if (!type) return;
+    (decodedByType[type] = decodedByType[type] || []).push(m);
+  });
+  const targetByType = {};
+  ship.modules.forEach((m, i) => {
+    if (!m.engineerableType) return;
+    (targetByType[m.engineerableType] = targetByType[m.engineerableType] || []).push({ m, i });
+  });
+
+  let imported = 0;
+  const skipped = [];
+  Object.keys(targetByType).forEach(type => {
+    const decodedList = decodedByType[type];
+    if (!decodedList || !decodedList.length) return; // this ship has a slot type the pasted build doesn't touch -- leave it alone
+    const targets = targetByType[type];
+    // Zip by slot order when a type appears more than once (e.g. multiple Cargo Racks, or several
+    // hardpoints of the same weapon type) -- not guaranteed correct for ships where several
+    // same-type slots serve different roles, but there's no other real signal to match on, since
+    // Coriolis/EDSY's own slot IDs don't map onto this project's real Slot strings.
+    const n = Math.min(decodedList.length, targets.length);
+    for (let k = 0; k < n; k++) {
+      const dm = decodedList[k];
+      const target = targets[k];
+      const eng = dm.Engineering;
+      if (!eng || !eng.BlueprintName) { skipped.push(`${type} (not engineered in the pasted build)`); continue; }
+      // eng.BlueprintName/ExperimentalEffect are the game's own raw internal symbols (e.g.
+      // "FSD_LongRange"), not this project's own display names -- resolve through the same real
+      // symbol maps buildModuleOut uses server-side, not a naive display-name string compare.
+      const resolvedName = resolveBlueprintSymbolJS(eng.BlueprintName, type);
+      if (!resolvedName) { skipped.push(`${type} -- "${eng.BlueprintName}" (blueprint symbol doesn't resolve against this project's own catalog)`); continue; }
+      const options = DATA.blueprintsByType[type] || [];
+      const match = options.find(o => o.name === resolvedName);
+      if (!match) { skipped.push(`${type} -- "${resolvedName}" (resolved, but no matching grade rows in this project's own catalog)`); continue; }
+      const toGrade = Math.min(eng.Level || 1, match.maxGrade);
+      const effectMatch = eng.ExperimentalEffect ? (resolveExperimentalEffectSymbolJS(eng.ExperimentalEffect, type) || '') : '';
+      const fromGrade = (target.m.engineered && target.m.blueprintName === match.name) ? target.m.grade : 0;
+      setGoal(ship, target.m, target.i, type, match.name, toGrade, effectMatch, fromGrade);
+      imported++;
+    }
+    if (decodedList.length > targets.length) skipped.push(`${type} (pasted build has more of this type than this ship does -- extra ones skipped)`);
+  });
+
+  if (imported === 0) {
+    showImportResult('import-error', `Nothing importable found for this ship (checked ${Object.keys(targetByType).length} engineerable module type${Object.keys(targetByType).length === 1 ? '' : 's'}).`);
+    return;
+  }
+  openEngineerModal(engineerModalShipIndex); // refresh the Goal column with the newly-set goals
+  const summary = `Imported ${imported} module goal${imported === 1 ? '' : 's'} from ${parsed.site}.` + (skipped.length ? ` Skipped: ${skipped.join('; ')}.` : '');
+  showImportResult(skipped.length ? 'import-partial' : 'import-ok', summary);
+}
+document.getElementById('engineerImportBtn').addEventListener('click', importFromUrl);
+
 function openEngineerModal(shipIndex) {
   const ship = DATA.ships[shipIndex];
   if (!ship || !ship.hasModules) return;
   engineerModalShipIndex = shipIndex;
   const engineerable = ship.modules.map((m, i) => ({ m, i })).filter(x => x.m.engineerableType);
+  document.getElementById('engineerExportRow').innerHTML = exportButtonsHtml(ship);
   document.getElementById('engineerModalTitle').textContent = `⚙️ Engineer -- ${ship.name || ship.type}`;
   const curPct = ship.completionPct != null ? ship.completionPct.toFixed(0) : null;
   const goalPct = goalCompletionPct(ship);
@@ -696,6 +1437,8 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   closeEngineerModal();
   closeMaterialsPanel();
+  closeShipModulesModal();
+  closeTradeModal();
 });
 
 // Name select changing re-populates that same row's Grade select (cascading, same pattern as the
@@ -737,6 +1480,14 @@ document.getElementById('engineerModalBody').addEventListener('click', e => {
 document.getElementById('fleetSection').addEventListener('click', e => {
   const btn = e.target.closest('.engineer-ship-btn');
   if (!btn) return;
+  // Fresh ship -- clear any leftover import text/result from a previous ship's modal session.
+  // (openEngineerModal itself is also reused to refresh the SAME ship's modal in place after a
+  // goal changes, so this reset intentionally lives here, not inside openEngineerModal, or a
+  // just-shown import confirmation message would get wiped out by its own refresh call.)
+  document.getElementById('engineerImportInput').value = '';
+  const resultEl = document.getElementById('engineerImportResult');
+  resultEl.className = 'import-result';
+  resultEl.textContent = '';
   openEngineerModal(Number(btn.dataset.shipIndex));
 });
 

@@ -19,6 +19,7 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -53,6 +54,7 @@ type shipyardLoadoutEvent struct {
 	HullValue    int64                   `json:"HullValue"`
 	ModulesValue int64                   `json:"ModulesValue"`
 	HullHealth   float64                 `json:"HullHealth"`
+	MaxJumpRange float64                 `json:"MaxJumpRange"` // real field, present on every real Loadout event this project has seen
 	Modules      []shipyardLoadoutModule `json:"Modules"`
 }
 
@@ -106,6 +108,21 @@ type shipOut struct {
 	CompletionPct   float64     `json:"completionPct,omitempty"` // -1 (omitted, i.e. zero value) when HasModules is false or no engineered modules exist to measure
 	EngineeredCount int         `json:"engineeredCount"`
 	LoadoutAt       string      `json:"loadoutAt,omitempty"` // real timestamp of the Loadout this build was recovered from -- honesty about how stale it might be
+	// Distance is nil when either the commander's current position or this ship's own system's
+	// coordinates aren't independently known (e.g. a system named by StoredShips that's never
+	// been visited/scanned with its own real StarPos on record) -- same "nil means honestly
+	// unknown, don't fake a number" pattern BuildTraderData already uses for known traders.
+	Distance *float64 `json:"distanceLy,omitempty"`
+	// MaxJumpRange only exists when a real Loadout was recovered for this ship (0/omitted for a
+	// stored ship whose build wasn't independently confirmed) -- owner: "list some more info about
+	// ships, like jump range or something".
+	MaxJumpRange float64 `json:"maxJumpRange,omitempty"`
+	// ShipSymbol/RawLoadoutJSON: see buildShipFromLoadout's comment -- power the Export to
+	// Coriolis/EDSY buttons and the paste-a-build-link import. Both omitted (zero value) for a
+	// stored ship whose build wasn't independently recovered -- there's no real Loadout JSON to
+	// export in that case.
+	ShipSymbol     string `json:"shipSymbol,omitempty"`
+	RawLoadoutJSON string `json:"rawLoadoutJson,omitempty"`
 }
 
 type shipyardData struct {
@@ -113,8 +130,9 @@ type shipyardData struct {
 	Ships            []shipOut                 `json:"ships"`
 	SnapshotAt       string                    `json:"snapshotAt,omitempty"` // the StoredShips event this fleet listing is based on
 	HasFleetData     bool                      `json:"hasFleetData"`
-	EffectsByType    map[string][]string       `json:"effectsByType"`    // catalog Type -> real Experimental Effect names for that Type, for the "Engineer" modal's effect picker
-	BlueprintsByType map[string][]blueprintOpt `json:"blueprintsByType"` // catalog Type -> every real blueprint Name (+ real max grade) for that Type, for the modal's Name/Grade pickers -- lets it offer "start engineering this stock module", not just "push an already-started one further"
+	CurrentSystem    string                    `json:"currentSystem,omitempty"` // for an honest "distances from X" label, same as traderData
+	EffectsByType    map[string][]string       `json:"effectsByType"`           // catalog Type -> real Experimental Effect names for that Type, for the "Engineer" modal's effect picker
+	BlueprintsByType map[string][]blueprintOpt `json:"blueprintsByType"`        // catalog Type -> every real blueprint Name (+ real max grade) for that Type, for the modal's Name/Grade pickers -- lets it offer "start engineering this stock module", not just "push an already-started one further"
 	// Blueprints/Effects/HeldMaterials power a self-contained "Materials Needed" panel on this
 	// page itself -- real owner report: "pressing add doesnt add it to the engineering planner i
 	// guess because its not on the same page" (confirmed real: this project already learned,
@@ -129,6 +147,31 @@ type shipyardData struct {
 	Blueprints    []plannerBlueprintOut `json:"blueprints"`
 	Effects       []plannerEffectOut    `json:"effects"`
 	HeldMaterials map[string]int64      `json:"heldMaterials"`
+	// Trading feature-matches this page's Materials Needed panel with the engineering planner's
+	// own trade calculator (user: "materials needed needs to be feature matched with engineering
+	// planner, have stuff for trades and all that") -- same traderData BuildTraderData already
+	// gives materials.go/engineeringplanner.go, just also embedded here.
+	Trading traderData `json:"trading"`
+	// ModuleTypeKeywords/NonEngineerableItemPrefixes/EngineItemInfix: this project generates fully
+	// static HTML with no live backend, so a pasted Coriolis/EDSY import (real Item symbols this
+	// project has never necessarily seen before, e.g. a community build using different weapons)
+	// needs the SAME resolveModuleType algorithm (shipmodulenames.go) available client-side too --
+	// exporting the same single source-of-truth data rather than hand-maintaining a second copy in
+	// JS that could drift out of sync.
+	ModuleTypeKeywords          map[string]string `json:"moduleTypeKeywords"`
+	NonEngineerableItemPrefixes []string          `json:"nonEngineerableItemPrefixes"`
+	EngineItemInfix             string            `json:"engineItemInfix"`
+	// BlueprintSymbolMap/ExperimentalEffectSymbolMap: real bug caught during import verification --
+	// a pasted build's raw Engineering.BlueprintName/ExperimentalEffect are the game's own internal
+	// symbols (e.g. "FSD_LongRange", "special_armour_chunky"), NOT this project's own display names
+	// ("Increased FSD Range", "Deep Plating") that DATA.blueprintsByType/effectsByType use --
+	// confirmed directly against this commander's own real Loadout JSON, which a naive display-name
+	// string comparison would have silently failed to match on every single real module. Exporting
+	// the SAME symbol->name maps buildModuleOut already resolves through server-side
+	// (resolveBlueprintSymbol/resolveExperimentalEffectSymbol in shipmodulemaps.go) so the import
+	// path uses the identical real resolution, not a second guess.
+	BlueprintSymbolMap          map[string]map[string]string `json:"blueprintSymbolMap"`
+	ExperimentalEffectSymbolMap map[string]map[string]string `json:"experimentalEffectSymbolMap"`
 }
 
 type blueprintOpt struct {
@@ -233,7 +276,7 @@ func trimmedShipName(raw string) string {
 	return strings.TrimSpace(raw)
 }
 
-func buildShipFromLoadout(v shipyardLoadoutEvent, active bool, system string, localCaptured map[string]string) shipOut {
+func buildShipFromLoadout(v shipyardLoadoutEvent, active bool, system string, localCaptured map[string]string, rawJSON string) shipOut {
 	modules := make([]moduleOut, 0, len(v.Modules))
 	engineeredCount := 0
 	gradeSum, maxSum := 0, 0
@@ -252,7 +295,17 @@ func buildShipFromLoadout(v shipyardLoadoutEvent, active bool, system string, lo
 		ShipID: v.ShipID, Type: shipTypeName(v.Ship, localCaptured), Name: trimmedShipName(v.ShipName), Ident: v.ShipIdent,
 		Active: active, System: system, Value: v.HullValue + v.ModulesValue,
 		HullHealth: v.HullHealth, Modules: modules, HasModules: true,
-		EngineeredCount: engineeredCount,
+		EngineeredCount: engineeredCount, MaxJumpRange: v.MaxJumpRange,
+		// ShipSymbol/RawLoadoutJSON power the export/import buttons (user: "have export ship to
+		// edsy / coriolis buttons ... paste a cori/edsy link and press confirm and itll update
+		// goal ship to that"). The raw journal Loadout JSON is exactly what Coriolis's own real
+		// `shipFromLoadoutJSON` importer and EDSY's own real "Journal JSONL...Loadout" importer
+		// each already know how to parse natively -- verified directly against both projects' own
+		// real open-source code (EDCD/coriolis, taleden/EDSY), not guessed. ShipSymbol (the raw
+		// game symbol, e.g. "python_nx") is kept separately from the resolved display Type so a
+		// pasted import can be validated against the SAME real symbol, not a display name that
+		// could coincidentally collide/differ.
+		ShipSymbol: v.Ship, RawLoadoutJSON: rawJSON,
 	}
 	if maxSum > 0 {
 		out.CompletionPct = float64(gradeSum) / float64(maxSum) * 100
@@ -265,9 +318,9 @@ func buildShipFromLoadout(v shipyardLoadoutEvent, active bool, system string, lo
 // active ship (atOrBefore = "" meaning no cutoff, i.e. the true latest) and for recovering a
 // stored ship's last-known build as of a specific StoredShips snapshot (see this file's header
 // comment on why the cutoff and the type-match guard both matter).
-func latestLoadoutFor(store *Store, shipID int, atOrBefore string) (shipyardLoadoutEvent, string, bool) {
+func latestLoadoutFor(store *Store, shipID int, atOrBefore string) (shipyardLoadoutEvent, string, string, bool) {
 	var best shipyardLoadoutEvent
-	var bestTS string
+	var bestTS, bestRaw string
 	found := false
 	for _, e := range store.RawEvents {
 		if e.Event != "Loadout" {
@@ -283,9 +336,9 @@ func latestLoadoutFor(store *Store, shipID int, atOrBefore string) (shipyardLoad
 		if found && e.Timestamp <= bestTS {
 			continue
 		}
-		best, bestTS, found = v, e.Timestamp, true
+		best, bestTS, bestRaw, found = v, e.Timestamp, e.Raw, true
 	}
-	return best, bestTS, found
+	return best, bestTS, bestRaw, found
 }
 
 func BuildShipyardData(store *Store) shipyardData {
@@ -317,18 +370,24 @@ func BuildShipyardData(store *Store) shipyardData {
 	}
 
 	data := shipyardData{
-		GeneratedAt:      time.Now().UTC().Format("2006-01-02 15:04 MST"),
-		EffectsByType:    effectsByType(),
-		BlueprintsByType: blueprintsByType(),
-		Blueprints:       blueprints,
-		Effects:          effects,
-		HeldMaterials:    held,
+		GeneratedAt:                 time.Now().UTC().Format("2006-01-02 15:04 MST"),
+		EffectsByType:               effectsByType(),
+		BlueprintsByType:            blueprintsByType(),
+		Blueprints:                  blueprints,
+		Effects:                     effects,
+		HeldMaterials:               held,
+		Trading:                     BuildTraderData(store),
+		ModuleTypeKeywords:          moduleTypeKeywords,
+		NonEngineerableItemPrefixes: nonEngineerableItemPrefixes,
+		EngineItemInfix:             engineItemInfix,
+		BlueprintSymbolMap:          blueprintSymbolMap,
+		ExperimentalEffectSymbolMap: experimentalEffectSymbolMap,
 	}
 
 	// Active ship: the true latest real Loadout, full detail, no staleness concern -- this is
 	// always exactly current, since the game only sends Loadout for the ship you're actually in.
 	var trueLatestLoadout shipyardLoadoutEvent
-	var trueLatestTS string
+	var trueLatestTS, trueLatestRaw string
 	haveAnyLoadout := false
 	for _, e := range store.RawEvents {
 		if e.Event != "Loadout" {
@@ -341,15 +400,16 @@ func BuildShipyardData(store *Store) shipyardData {
 		if json.Unmarshal([]byte(e.Raw), &v) != nil {
 			continue
 		}
-		trueLatestLoadout, trueLatestTS, haveAnyLoadout = v, e.Timestamp, true
+		trueLatestLoadout, trueLatestTS, trueLatestRaw, haveAnyLoadout = v, e.Timestamp, e.Raw, true
 	}
 	if !haveAnyLoadout {
 		return data
 	}
 
 	localCaptured := captureRealShipTypeNames(store)
-	activeSystem, _, _, _, _ := currentPosition(store)
-	ships := []shipOut{buildShipFromLoadout(trueLatestLoadout, true, activeSystem, localCaptured)}
+	activeSystem, curX, curY, curZ, haveCurrentPos := currentPosition(store)
+	data.CurrentSystem = activeSystem
+	ships := []shipOut{buildShipFromLoadout(trueLatestLoadout, true, activeSystem, localCaptured, trueLatestRaw)}
 
 	// Stored fleet: the most recent StoredShips snapshot -- ShipsHere (docked at whatever station
 	// that snapshot was taken at) + ShipsRemote (everywhere else, each with its own StarSystem).
@@ -396,8 +456,8 @@ func BuildShipyardData(store *Store) shipyardData {
 				// the recovered Loadout itself reports still matches what StoredShips says is
 				// there NOW, guarding against the real, confirmed ShipID-reuse gotcha (see this
 				// file's header).
-				if lo, ts, ok := latestLoadoutFor(store, s.ShipID, latestStoredTS); ok && strings.EqualFold(lo.Ship, s.ShipType) {
-					built := buildShipFromLoadout(lo, false, sys, localCaptured)
+				if lo, ts, raw, ok := latestLoadoutFor(store, s.ShipID, latestStoredTS); ok && strings.EqualFold(lo.Ship, s.ShipType) {
+					built := buildShipFromLoadout(lo, false, sys, localCaptured, raw)
 					built.Type = name     // StoredShips' own real name (or the resolver) wins over Loadout's raw symbol
 					built.Value = s.Value // StoredShips' own Value is more current than a possibly-stale Loadout's
 					built.LoadoutAt = ts
@@ -410,6 +470,33 @@ func BuildShipyardData(store *Store) shipyardData {
 		}
 		addStored(latestStored.ShipsHere, latestStoredSystem)
 		addStored(latestStored.ShipsRemote, "")
+	}
+
+	// Distance from your current position -- owner: "distance from you" per ship. Same
+	// coordinate-lookup + math.Sqrt approach BuildTraderData already uses for known material
+	// traders, just applied per-ship instead of per-trader; the active ship is always exactly 0
+	// (you're standing in it). Left nil (not 0) when a stored ship's system was never
+	// independently visited/scanned, so the client can honestly show "distance unknown" instead
+	// of a fabricated zero.
+	if haveCurrentPos {
+		for i := range ships {
+			if ships[i].System == "" {
+				continue
+			}
+			if ships[i].System == activeSystem {
+				d := 0.0
+				ships[i].Distance = &d
+				continue
+			}
+			for _, sys := range store.Systems {
+				if sys.Name != ships[i].System {
+					continue
+				}
+				d := math.Sqrt(math.Pow(sys.X-curX, 2) + math.Pow(sys.Y-curY, 2) + math.Pow(sys.Z-curZ, 2))
+				ships[i].Distance = &d
+				break
+			}
+		}
 	}
 
 	sort.SliceStable(ships, func(i, j int) bool {
