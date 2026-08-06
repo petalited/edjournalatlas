@@ -1,17 +1,28 @@
 # edjournalatlas
 
-A local "explore what you've found" viewer for Elite Dangerous — and, beyond just exploration, a
-whole-career recap, a full-journal search tool, and an engineering assistant. It reads your own
-game journal files directly and builds five browsable pages: every system you've visited (region,
-population, bodies scanned, notable finds, presumed exobiology value), a searchable log of
-literally every journal event you've ever generated (combat, trading, missions, engineering,
-powerplay, crew — not just exploration), a "wrapped"-style career recap (kills, favourite ship,
-biggest rival, trade profit, engineering, powerplay rank, fleet carrier, crime record, and more),
-a current materials inventory (Raw/Manufactured/Encoded, grouped into the game's own engineering
-families), and an engineering upgrade planner (queue up blueprints/Experimental Effects, see what
-materials and engineers each one needs). A trade calculator ties the last two together — short on
-a material, click it to see what you could give up instead, and the nearest Material Trader (of
-the right type) you've actually used before.
+A local, offline toolkit for Elite Dangerous, built entirely from your own journal files — no
+account, no companion app, no network calls. Seven browsable pages:
+
+- **Systems explorer** — every system you've visited: region, population, bodies scanned, notable
+  finds, presumed exobiology value; drill into stars/moons/exobiology detail per body.
+- **Journal search** — every event you've ever logged, not just exploration ones, free-text
+  searchable.
+- **Career recap** — a "wrapped"-style stat summary across 17 categories (Combat, Crime, Wing,
+  Powerplay, Trading, Mining, Engineering, Crew, Stations, Missions, and more); click any stat for
+  its full real breakdown, not just the headline number. A separate "last session" recap shows only
+  what actually changed since you last loaded in.
+- **Materials inventory** — current Raw/Manufactured/Encoded holdings, grouped into the game's own
+  engineering families.
+- **Engineering planner** — queue up a basket of blueprint upgrades and see exactly what materials
+  and engineers each one needs, correctly accounting for every lower grade a high-grade roll costs.
+- **Shipyard** — your real fleet (active + stored), fitted modules, per-ship engineering completion
+  %, and export to EDSY/Coriolis.
+- **Powerplay** — current standing, a full merit/delivery/collection history log, a real
+  cumulative-merits chart, and a weekly-cycle viewer for reviewing any past Powerplay cycle.
+
+A trade calculator (materials page and engineering planner) ties the inventory and the planner
+together — short on a material, click it to see what you could give up instead, and the nearest
+Material Trader (of the right type) you've actually used before.
 
 **Nothing else has to be installed, no account needed, nothing is ever sent anywhere over the
 network** — it only reads files already on your own computer, and only ever writes its own small
@@ -20,7 +31,7 @@ local cache file next to itself.
 Two implementations exist, but they're not equivalent anymore:
 
 - **`standalone-go/`** — a single ~3MB self-contained binary (Linux/Windows), no runtime
-  dependency of any kind. **This is the actively developed, full-featured version** — all five
+  dependency of any kind. **This is the actively developed, full-featured version** — all seven
   pages above, plus a small coverage-report JSON file listing which journal event types aren't
   summarized yet (safe to share: event names and field names only, never your actual data). No
   Mac build: Elite Dangerous has no supported native Mac client anymore, so there's no realistic
@@ -53,6 +64,24 @@ Your journal folder is normally named `Elite Dangerous`, under a `Saved Games` f
 If you already use EDMC or another Elite Dangerous tool, its settings usually show the exact path
 it's using — point this at the same one.
 
+### Windows Defender false positives
+
+Windows may flag `edjournalatlas-windows.exe` (commonly as `Trojan:Win32/Wacatac.B!ml`) even
+though nothing here does anything a real trojan does — it never touches the network, never
+modifies anything outside its own folder, and its full source is right here. This isn't a real
+detection, it's Defender's ML heuristic reacting to the *shape* of the binary: a small, unsigned,
+freshly-built Go executable looks structurally similar to a lot of actual malware to that
+heuristic, regardless of what it actually does. The release build already embeds real version
+info/manifest metadata (`winres/winres.json`) specifically because a completely bare, metadata-
+less exe is even more likely to trip it — but that only reduces the odds, it doesn't eliminate
+them, and there isn't really a full fix available: a proper fix (code-signing certificate + built-
+up reputation over many downloads) costs real money for a free personal project. If it gets
+flagged for you, the actual free options are: restore it from quarantine and add an exclusion, or
+[submit it to Microsoft as a false positive](https://www.microsoft.com/en-us/wdsi/filesubmission)
+(this genuinely can get a specific build reclassified, it just isn't instant). Building from
+source yourself (below) sidesteps this entirely, since you're not running a binary someone else
+built.
+
 ## Building it yourself
 
 **Go version** — requires only the Go toolchain, no external modules:
@@ -82,9 +111,9 @@ to run just one step (e.g. rebuild the viewer without re-checking the journal). 
 double-click program from it, see `standalone/build_executable.py` (uses PyInstaller; only
 produces a binary for whichever OS you run the build on).
 
-## The five pages (Go version)
+## The seven pages (Go version)
 
-Running the binary writes/updates all five every time — a small pill-tab bar at the top of each
+Running the binary writes/updates all seven every time — a small pill-tab bar at the top of each
 page switches between them. Every page also has a light/dark toggle (top-right corner) that
 overrides your OS/browser preference and follows you across pages, in case the automatic
 light/dark detection isn't what you want.
@@ -110,9 +139,12 @@ that page fast to open every time, even though this one can get large.
 **`standalone_summary.html` — career recap.** Stat cards across however many of these
 categories your own journal has real activity in (sections you have no data for just don't show
 up — nothing forced): Career Earnings, Exploration, Rank, Combat, Crime, Wing, Powerplay, Trading,
-Mining, Materials, Engineering, Ships, Fleet Carrier, Crew, Colonization, Stations, Missions. A
+Mining, Materials, Engineering, Ships, Fleet Carrier, Crew, Colonization, Stations, Missions. Any
+stat built from a real "top of many" aggregate (favourite target, most frequent wingmate, notable
+finds, and a dozen more) is clickable — opens the full breakdown, not just the single winner. A
 handful of narrative highlights get pulled out too (e.g. who last destroyed you, and what they
-were flying). Discord-export buttons for both the whole recap and individual sections.
+were flying), alongside a separate "last session" recap showing only what changed since you last
+loaded in. Discord-export buttons for the whole recap, individual sections, and the session recap.
 
 **`standalone_materials.html` — materials inventory.** Your current Engineering materials
 (Raw/Manufactured/Encoded) as of the last time the game reported them to the journal, shown either
@@ -140,6 +172,23 @@ shows the nearest known trader of the right type — sourced only from stations 
 traded materials at before (the journal doesn't record trader *type* any other way, and this tool
 never makes a network call to guess), sorted by distance from wherever your journal last placed
 you.
+
+**`standalone_shipyard.html` — shipyard / fleet planner.** Your real fleet — whichever ship is
+currently active plus every stored ship — as a grid of cards, each showing fitted modules (hover
+for a quick preview, click for full detail including Experimental Effects), a real per-ship
+engineering completion percentage, and jump range. Push any fitted module's build into the
+engineering planner's basket in one click, or export a ship's real current build to
+EDSY/Coriolis (and import one back) via the same Journal-loadout format both those tools already
+accept.
+
+**`standalone_powerplay.html` — Powerplay status and history.** Current standing (power, rank,
+merits, time pledged), real per-system totals for how much influence you've pushed where, and a
+full activity log of every merit gain, delivery, collection, and rank-up — each entry colored by
+the power it belonged to. A cumulative-merits chart, tinted to your power's own theme color. A
+"View by Cycle" button breaks your whole history down by Powerplay's real weekly cycle (resets
+every Thursday 07:00 UTC, not the same thing as a system's own BGS tick), so you can review any
+past cycle's merits/deliveries/rank-ups on their own — each with its own Discord-export summary,
+alongside the page-wide one.
 
 **`standalone_unmodeled.json`** — not really meant to be read directly. A small coverage
 report: which journal event types your data has that the recap doesn't summarize yet, with real
