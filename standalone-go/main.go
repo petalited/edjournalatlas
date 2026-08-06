@@ -26,6 +26,7 @@ const defaultUnmodeledOutPath = "standalone_unmodeled.json"
 const defaultMaterialsOutPath = "standalone_materials.html"
 const defaultEngineeringOutPath = "standalone_engineering.html"
 const defaultShipyardOutPath = "standalone_shipyard.html"
+const defaultPowerplayOutPath = "standalone_powerplay.html"
 
 func main() {
 	journalDir := flag.String("journal-dir", "", "Directory containing Journal.*.log files (auto-detected if omitted)")
@@ -43,6 +44,8 @@ func main() {
 	noEngineering := flag.Bool("no-engineering", false, "Skip building the engineering upgrade planner page")
 	shipyardOutPath := flag.String("shipyard-out", defaultShipyardOutPath, "Path to write the shipyard/fleet page")
 	noShipyard := flag.Bool("no-shipyard", false, "Skip building the shipyard/fleet page")
+	powerplayOutPath := flag.String("powerplay-out", defaultPowerplayOutPath, "Path to write the Powerplay status/history page")
+	noPowerplay := flag.Bool("no-powerplay", false, "Skip building the Powerplay status/history page")
 	noOpen := flag.Bool("no-open", false, "Don't open the viewer in a browser automatically")
 	flag.Parse()
 
@@ -184,6 +187,19 @@ func main() {
 			fmt.Println("Error writing shipyard page:", err)
 		} else {
 			fmt.Printf("Wrote %s (%d ships -- your real fleet, fitted modules, and engineering completion)\n", *shipyardOutPath, shipCount)
+		}
+	}
+
+	if !*noPowerplay {
+		powerplayHTML, pledged, err := RenderPowerplay(store)
+		if err != nil {
+			fmt.Println("Error building Powerplay page:", err)
+		} else if err := os.WriteFile(*powerplayOutPath, []byte(powerplayHTML), 0o644); err != nil {
+			fmt.Println("Error writing Powerplay page:", err)
+		} else if pledged {
+			fmt.Printf("Wrote %s (Powerplay status, merit/delivery history, and a real merits-over-time chart)\n", *powerplayOutPath)
+		} else {
+			fmt.Printf("Wrote %s (no Powerplay activity found yet)\n", *powerplayOutPath)
 		}
 	}
 

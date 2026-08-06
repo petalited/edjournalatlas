@@ -50,8 +50,26 @@ type redeemVoucherEvent struct {
 	Amount int64  `json:"Amount"`
 }
 
+// User: "missons would be good, rep gained, influence gained, idk something. its just so empty" --
+// real MissionCompleted events already carry rich FactionEffects data (confirmed against this
+// commander's own real data) this project never parsed before, only ever reading Reward. Faction
+// is who actually gave the mission (the real employer); TargetFaction (not modeled here) is who
+// the mission was FOR, a different real field. ReputationTrend's real values are confirmed
+// "UpGood"/"UpBad"/"DownGood"/"DownBad"/"None" -- the Up/Down prefix is the direction that matters
+// for "reputation gained/lost" (Good/Bad describes whether that direction helps or hurts standing
+// with THAT faction specifically, not needed for a simple gained-vs-lost count).
+type missionFactionInfluence struct {
+	SystemAddress int64 `json:"SystemAddress"`
+}
+type missionFactionEffect struct {
+	Faction         string                    `json:"Faction"`
+	ReputationTrend string                    `json:"ReputationTrend"`
+	Influence       []missionFactionInfluence `json:"Influence"`
+}
 type missionCompletedEvent struct {
-	Reward int64 `json:"Reward"`
+	Faction        string                 `json:"Faction"`
+	Reward         int64                  `json:"Reward"`
+	FactionEffects []missionFactionEffect `json:"FactionEffects"`
 }
 
 // KillerName isn't always a real name -- confirmed against real data (a third-party tester's own
@@ -67,6 +85,24 @@ type diedEvent struct {
 	KillerName          string `json:"KillerName"`
 	KillerNameLocalised string `json:"KillerName_Localised"`
 	KillerShip          string `json:"KillerShip"`
+	// Timestamp isn't part of the real "Died" event JSON -- set manually from the RawEvent's own
+	// Timestamp right after unmarshaling. User: "under last session it needs timestamps for the
+	// events it shows there".
+	Timestamp string `json:"-"`
+}
+
+// isRealPlayerKiller: real Elite Dangerous journal convention, confirmed directly against this
+// commander's own real Died events -- a KillerName caused by another real commander is literally
+// prefixed "Cmdr " (e.g. "Cmdr Toxictrain369"); an NPC killer's name never carries that prefix
+// (e.g. "Cai Myson"). User: "prioritize CMDR deaths, since those are players".
+func isRealPlayerKiller(killerName string) bool {
+	return strings.HasPrefix(killerName, "Cmdr ")
+}
+
+type hullDamageEvent struct {
+	Health      float64 `json:"Health"`
+	PlayerPilot bool    `json:"PlayerPilot"`
+	Fighter     bool    `json:"Fighter"`
 }
 
 type marketSellEvent struct {
@@ -236,6 +272,79 @@ type recapStat struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
 	Sub   string `json:"sub,omitempty"`
+	// Danger: user, on seeing a real "Closest call" of 0.2265% displayed as a rounded-off "0%"
+	// (indistinguishable from an actual death at a glance): "itd be cool if it showed that with a
+	// like, special effect for barely evading". Generic flag (not hardcoded to this one stat) so
+	// the template can give a genuinely dramatic reading its own visual treatment.
+	Danger bool `json:"danger,omitempty"`
+	// DangerExtreme: user, after seeing the full holographic foil shine trigger at the same 10%
+	// hull-health bar as the red pulsing outline: "outline is fine at 10 but the full shine
+	// shouldnt happen until its super low". A second, stricter tier (<=1%) so the two visual
+	// treatments read as genuinely different severities -- Danger alone still gets the red border/
+	// pulse at 10%, but only DangerExtreme additionally gets the full cursor-tracking foil shine
+	// (currently only set on the same "Closest call" stat as Danger).
+	DangerExtreme bool `json:"dangerExtreme,omitempty"`
+	// Rare: user, on seeing Danger's glow effect: "make all rare stuff kinda pop up slightly and
+	// wobble and shine holographically" -- a second, separate flag for genuinely notable-but-not-
+	// dangerous stats (currently just Notable/rare finds), sharing the same holographic hover
+	// treatment as Danger cards but without Danger's red tint/pulse.
+	Rare bool `json:"rare,omitempty"`
+	// EliteTier: 0 = not Elite, 1 = "Elite" itself, 2-6 = the real "Elite I".."Elite V" prestige
+	// tiers, 6 being max ("Elite V"). User: "when you have elite it should get a gold border in a
+	// rank and each prestige should make it more and max it gets full foil".
+	EliteTier int `json:"eliteTier,omitempty"`
+	// Breakdown: user, on "Notable/rare finds" (which only ever showed the single most-common
+	// type in Sub, discarding the rest): "clicking on stuff like 'notable/rare finds' should bring
+	// up a modal listing how many of each rare find" -- then, generalized: "look through them all
+	// and think other categories that could use it". Every "top 1 of a map" stat in this file
+	// already aggregates the FULL real breakdown internally just to find the winner; this is that
+	// same real data, kept instead of thrown away, for a click-to-expand modal. Nil (omitted) for
+	// stats with nothing to expand into (a single scalar, not an aggregate).
+	Breakdown []recapBreakdownItem `json:"breakdown,omitempty"`
+}
+
+type recapBreakdownItem struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+// breakdownByCount/breakdownByValue expand a full nameCount map into every real item (not just
+// the top 1 topByCount/topByValue already return elsewhere), sorted the same way. breakdownFromIntMap
+// mirrors this for the plainer map[string]int aggregates (rep gains/losses, notable-body counts)
+// that never needed a *nameCount's extra Value field.
+func breakdownByCount(m map[string]*nameCount) []recapBreakdownItem {
+	list := topByCount(m, len(m))
+	out := make([]recapBreakdownItem, len(list))
+	for i, v := range list {
+		out[i] = recapBreakdownItem{Label: v.Name, Value: fmtInt(int64(v.Count))}
+	}
+	return out
+}
+
+func breakdownByValue(m map[string]*nameCount) []recapBreakdownItem {
+	list := topByValue(m, len(m))
+	out := make([]recapBreakdownItem, len(list))
+	for i, v := range list {
+		out[i] = recapBreakdownItem{Label: v.Name, Value: formatCr(v.Value)}
+	}
+	return out
+}
+
+func breakdownFromIntMap(m map[string]int) []recapBreakdownItem {
+	type kv struct {
+		k string
+		v int
+	}
+	list := make([]kv, 0, len(m))
+	for k, v := range m {
+		list = append(list, kv{k, v})
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].v > list[j].v })
+	out := make([]recapBreakdownItem, len(list))
+	for i, e := range list {
+		out[i] = recapBreakdownItem{Label: e.k, Value: fmtInt(int64(e.v))}
+	}
+	return out
 }
 
 type recapSection struct {
@@ -243,11 +352,25 @@ type recapSection struct {
 	Stats []recapStat `json:"stats"`
 }
 
+// recapHighlight: user, "under last session it needs timestamps for the events it shows there" --
+// Highlights used to be a flat []string with no time context at all. Timestamp is empty for the
+// rare highlight that has no single natural moment to point at (the "...and N earlier deaths"
+// summary line).
+type recapHighlight struct {
+	Text      string `json:"text"`
+	Timestamp string `json:"timestamp,omitempty"`
+}
+
 type recapData struct {
-	Commander   string         `json:"commander"`
-	GeneratedAt string         `json:"generatedAt"`
-	Sections    []recapSection `json:"sections"`
-	Highlights  []string       `json:"highlights"`
+	Commander   string `json:"commander"`
+	GeneratedAt string `json:"generatedAt"`
+	// Session is the most recent play session's own recap (user: "add a recent session recap ...
+	// shows best things of your last journal"), same recapData shape nested inside itself, reusing
+	// every stat this all-time recap already computes rather than a second parallel calculation.
+	// Nil when no real LoadGame event exists yet to anchor a session boundary from.
+	Session    *sessionRecapData `json:"session,omitempty"`
+	Sections   []recapSection    `json:"sections"`
+	Highlights []recapHighlight  `json:"highlights"`
 }
 
 type nameCount struct {
@@ -451,7 +574,11 @@ func formatDays(seconds int64) string {
 	return fmt.Sprintf("%.1f days", days)
 }
 
-func BuildRecap(store *Store) recapData {
+// isSession: true when called from BuildSessionRecap, scoped to a single play session rather
+// than the whole career -- suppresses stats that are inherently career-scoped and would just be
+// misleading/redundant restated at session granularity (see the "Commander since" guard below;
+// the session's own date range is already shown by the session recap's own header).
+func BuildRecap(store *Store, isSession bool) recapData {
 	shipNames := map[string]string{}
 	captureShipName := func(key, localised string) {
 		if key != "" && localised != "" {
@@ -491,6 +618,15 @@ func BuildRecap(store *Store) recapData {
 		realKillers  []diedEvent
 		timesIntdctd int
 
+		// "Closest to death" -- user: "if its revealed maybe a closest to death would be cool,
+		// lowest health 3% or something". Real journal event "HullDamage" (Health 0.0-1.0,
+		// PlayerPilot bool) -- gated to PlayerPilot true so an NPC crew member's or a multicrew
+		// captain's own hull damage doesn't get misattributed as the commander's own close call.
+		haveHullDamage   bool
+		lowestHullHealth float64
+		lowestHullAt     string
+		lowestHullSystem string
+
 		totalTradeProfit int64
 		tradeByCommodity = map[string]*nameCount{}
 		totalUnitsSold   int64
@@ -520,7 +656,8 @@ func BuildRecap(store *Store) recapData {
 		explorationEarnings int64
 		explorationSales    int
 
-		wingmateCounts = map[string]*nameCount{}
+		wingmateCounts   = map[string]*nameCount{}
+		wingmateLatestTS = map[string]string{}
 
 		crimeCount         int
 		totalFines         int64
@@ -549,6 +686,15 @@ func BuildRecap(store *Store) recapData {
 		meritEvents          int
 		totalMeritsGained    int64
 
+		// User: "powerplay info would be useful as well, merits gained, influence pushed, etc" --
+		// merits already tracked above; "influence pushed" is the real separate Powerplay mechanic
+		// of delivering commodities to reinforce/expand your power's control of a system (real
+		// journal events PowerplayDeliver/PowerplayCollect -- confirmed present in this commander's
+		// own real data, if rarely used: 1 of each on record).
+		totalPowerplayDelivered int64
+		powerplayDeliverEvents  int
+		totalPowerplayCollected int64
+
 		crewWages = map[string]*nameCount{}
 
 		carrierJumps         int
@@ -558,9 +704,21 @@ func BuildRecap(store *Store) recapData {
 		carrierBalance       int64
 		latestCarrierStatsTS string
 
-		dockedStations = map[int64]struct{ Station, System, Type string }{}
-		stationVisits  = map[int64]*nameCount{} // keyed by MarketID, non-carrier stations only
-		depotProgress  = map[int64]struct {
+		dockedStations    = map[int64]struct{ Station, System, Type string }{}
+		stationVisits     = map[int64]*nameCount{}  // keyed by MarketID, non-carrier stations only
+		stationTypeCounts = map[string]*nameCount{} // real StationType per real Docked event -- user: "stations is basically empty, itd be nice for more"
+
+		// Missions: real FactionEffects data every "MissionCompleted" event already carries but
+		// this project never parsed -- user: "missons would be good, rep gained, influence
+		// gained". repGainedFactions/repLostFactions counted by real ReputationTrend
+		// ("UpGood"/"DownGood" etc, confirmed against this commander's own real data); employerCounts
+		// is who actually gave the mission (real Faction field, not TargetFaction, which is who the
+		// mission was FOR, a different thing).
+		repGainedFactions = map[string]int{}
+		repLostFactions   = map[string]int{}
+		employerCounts    = map[string]*nameCount{}
+		influencedSystems = map[int64]bool{}
+		depotProgress     = map[int64]struct {
 			Progress  float64
 			Complete  bool
 			Timestamp string
@@ -660,10 +818,22 @@ func BuildRecap(store *Store) recapData {
 			timesKilled++
 			var v diedEvent
 			if json.Unmarshal([]byte(e.Raw), &v) == nil && v.KillerName != "" {
+				v.Timestamp = e.Timestamp
 				realKillers = append(realKillers, v)
 			}
 		case "Interdicted":
 			timesIntdctd++
+		case "HullDamage":
+			var v hullDamageEvent
+			// Real bug, caught in verification: this commander's own real minimum came back
+			// exactly 0% -- in real Elite Dangerous, hull hitting 0% IS the ship's destruction
+			// moment, not a close call that was survived (confirmed: this commander's own real
+			// "Times destroyed" count is 8, consistent with genuine deaths producing 0% readings).
+			// "Closest to death" is meant to be a scrape you lived through, so > 0 excludes the
+			// destructions themselves and surfaces the real lowest SURVIVED reading instead.
+			if json.Unmarshal([]byte(e.Raw), &v) == nil && v.PlayerPilot && v.Health > 0 && (!haveHullDamage || v.Health < lowestHullHealth) {
+				haveHullDamage, lowestHullHealth, lowestHullAt, lowestHullSystem = true, v.Health, e.Timestamp, e.SystemName
+			}
 		case "MarketSell":
 			var v marketSellEvent
 			if json.Unmarshal([]byte(e.Raw), &v) == nil {
@@ -710,6 +880,23 @@ func BuildRecap(store *Store) recapData {
 			var v missionCompletedEvent
 			if json.Unmarshal([]byte(e.Raw), &v) == nil {
 				totalMissionReward += v.Reward
+				if v.Faction != "" {
+					if employerCounts[v.Faction] == nil {
+						employerCounts[v.Faction] = &nameCount{Name: v.Faction}
+					}
+					employerCounts[v.Faction].Count++
+				}
+				for _, fe := range v.FactionEffects {
+					switch {
+					case strings.HasPrefix(fe.ReputationTrend, "Up"):
+						repGainedFactions[fe.Faction]++
+					case strings.HasPrefix(fe.ReputationTrend, "Down"):
+						repLostFactions[fe.Faction]++
+					}
+					for _, inf := range fe.Influence {
+						influencedSystems[inf.SystemAddress] = true
+					}
+				}
 			}
 		case "MissionAccepted":
 			missionsAccepted++
@@ -770,6 +957,9 @@ func BuildRecap(store *Store) recapData {
 					wingmateCounts[v.Name] = &nameCount{Name: v.Name}
 				}
 				wingmateCounts[v.Name].Count++
+				if e.Timestamp > wingmateLatestTS[v.Name] {
+					wingmateLatestTS[v.Name] = e.Timestamp
+				}
 			}
 		case "EngineerCraft":
 			var v engineerCraftEvent
@@ -844,6 +1034,21 @@ func BuildRecap(store *Store) recapData {
 				meritEvents++
 				totalMeritsGained += v.MeritsGained
 			}
+		case "PowerplayDeliver":
+			var v struct {
+				Count int64 `json:"Count"`
+			}
+			if json.Unmarshal([]byte(e.Raw), &v) == nil {
+				powerplayDeliverEvents++
+				totalPowerplayDelivered += v.Count
+			}
+		case "PowerplayCollect":
+			var v struct {
+				Count int64 `json:"Count"`
+			}
+			if json.Unmarshal([]byte(e.Raw), &v) == nil {
+				totalPowerplayCollected += v.Count
+			}
 		case "NpcCrewPaidWage":
 			var v npcCrewPaidWageEvent
 			if json.Unmarshal([]byte(e.Raw), &v) == nil && v.NpcCrewName != "" {
@@ -880,6 +1085,12 @@ func BuildRecap(store *Store) recapData {
 						stationVisits[v.MarketID] = &nameCount{Name: cleanStationName(v.StationName)}
 					}
 					stationVisits[v.MarketID].Count++
+					if v.StationType != "" {
+						if stationTypeCounts[v.StationType] == nil {
+							stationTypeCounts[v.StationType] = &nameCount{Name: v.StationType}
+						}
+						stationTypeCounts[v.StationType].Count++
+					}
 				}
 			}
 		case "ColonisationConstructionDepot":
@@ -1026,11 +1237,20 @@ func BuildRecap(store *Store) recapData {
 		sections = append(sections, recapSection{Title: "Career Earnings", Stats: earningsStats})
 	}
 
-	explorationStats := []recapStat{
-		{Label: "Systems visited", Value: fmtInt(int64(systemsVisited))},
-		{Label: "Light-years travelled", Value: fmt.Sprintf("%.1f LY", totalLightYears), Sub: fmtInt(int64(fsdJumps)) + " FSD jumps"},
-		{Label: "Bodies scanned", Value: fmtInt(int64(bodiesScanned)), Sub: fmtInt(int64(firstDiscoveries)) + " first discoveries"},
-		{Label: "Full surface scans", Value: fmtInt(int64(fullSurfaceScans))},
+	// User: "no point showing '0 bodies scanned'" -- every base stat gated on its own real count,
+	// same principle as Combat/Trading/Mining above.
+	var explorationStats []recapStat
+	if systemsVisited > 0 {
+		explorationStats = append(explorationStats, recapStat{Label: "Systems visited", Value: fmtInt(int64(systemsVisited))})
+	}
+	if fsdJumps > 0 {
+		explorationStats = append(explorationStats, recapStat{Label: "Light-years travelled", Value: fmt.Sprintf("%.1f LY", totalLightYears), Sub: fmtInt(int64(fsdJumps)) + " FSD jumps"})
+	}
+	if bodiesScanned > 0 {
+		explorationStats = append(explorationStats, recapStat{Label: "Bodies scanned", Value: fmtInt(int64(bodiesScanned)), Sub: fmtInt(int64(firstDiscoveries)) + " first discoveries"})
+	}
+	if fullSurfaceScans > 0 {
+		explorationStats = append(explorationStats, recapStat{Label: "Full surface scans", Value: fmtInt(int64(fullSurfaceScans))})
 	}
 	if furthestName != "" {
 		explorationStats = append(explorationStats, recapStat{Label: "Furthest system visited", Value: furthestName, Sub: fmt.Sprintf("%.1f LY from Sol", furthestDist)})
@@ -1046,23 +1266,35 @@ func BuildRecap(store *Store) recapData {
 		if topNotableLabel != "" {
 			sub = fmtInt(int64(topNotableCount)) + "x " + topNotableLabel
 		}
-		explorationStats = append(explorationStats, recapStat{Label: "Notable/rare finds", Value: fmtInt(int64(totalNotable)), Sub: sub})
+		explorationStats = append(explorationStats, recapStat{Label: "Notable/rare finds", Value: fmtInt(int64(totalNotable)), Sub: sub, Rare: true, Breakdown: breakdownFromIntMap(notableCounts)})
 	}
-	if first, err1 := time.Parse(time.RFC3339, firstTimestamp); err1 == nil {
-		sub := ""
-		if last, err2 := time.Parse(time.RFC3339, lastTimestamp); err2 == nil {
-			days := int(last.Sub(first).Hours()/24) + 1
-			sub = fmtInt(int64(days)) + " days of logged activity"
+	// "Commander since" is inherently a CAREER stat (first-ever real event timestamp) -- skipped
+	// for the session-scoped recap, where it would just restate the session's own start date
+	// (already shown by the session recap's own header) as if it meant "been playing since then".
+	if !isSession {
+		if first, err1 := time.Parse(time.RFC3339, firstTimestamp); err1 == nil {
+			sub := ""
+			if last, err2 := time.Parse(time.RFC3339, lastTimestamp); err2 == nil {
+				days := int(last.Sub(first).Hours()/24) + 1
+				sub = fmtInt(int64(days)) + " days of logged activity"
+			}
+			explorationStats = append(explorationStats, recapStat{Label: "Commander since", Value: first.Format("Jan 2, 2006"), Sub: sub})
 		}
-		explorationStats = append(explorationStats, recapStat{Label: "Commander since", Value: first.Format("Jan 2, 2006"), Sub: sub})
 	}
-	sections = append(sections, recapSection{Title: "Exploration", Stats: explorationStats})
+	if len(explorationStats) > 0 {
+		sections = append(sections, recapSection{Title: "Exploration", Stats: explorationStats})
+	}
 
+	// User: "recap only needs to show changes not everything, like its what changed" -- Rank is a
+	// CURRENT-STANDING snapshot (whichever Rank/Progress event happened to be latest within the
+	// window), not a delta of what happened this session, so it's skipped entirely for the
+	// session-scoped recap -- same reasoning as "Commander since" above.
+	//
 	// Only tracks the commander has actually made progress in get a card -- a rank-0 track is
 	// just the default starting state for everyone, not a real achievement to report (same
 	// "don't force a boring stat" standard as the rest of this file). Federation/Empire go last
 	// since they're the two tracks with real name recognition beyond the Pilots Federation ones.
-	if haveRank {
+	if haveRank && !isSession {
 		var rankStats []recapStat
 		trackOrder := []string{"Combat", "Trade", "Explore", "CQC", "Soldier", "Exobiologist", "Federation", "Empire"}
 		levelByTrack := map[string]int{
@@ -1089,7 +1321,18 @@ func BuildRecap(store *Store) recapData {
 			if value == "" {
 				value = sub // title lookup failure (shouldn't happen for a valid 0-14/0-13 level) falls back to the raw progress instead of an empty card
 			}
-			rankStats = append(rankStats, recapStat{Label: rankTrackLabels[track], Value: value, Sub: sub})
+			stat := recapStat{Label: rankTrackLabels[track], Value: value, Sub: sub}
+			// User: "when you have elite it should get a gold border in a rank and each prestige
+			// should make it more and max it gets full foil" -- real mechanic (confirmed against
+			// this project's own already-verified pilotsFederationRankTitles ladder): level 8 is
+			// "Elite" itself, 9-13 are the real post-launch prestige tiers "Elite I" through
+			// "Elite V" (13 = max). Only the 6 real Pilots Federation ladder tracks ever reach
+			// Elite at all -- Federation/Empire (the `maxLevel` override map below) cap at
+			// "Admiral"/"King" and never use "Elite" terminology, so explicitly excluded here.
+			if _, isFedOrEmpire := maxLevel[track]; !isFedOrEmpire && level >= 8 {
+				stat.EliteTier = level - 7 // 8 -> 1 ("Elite"), 13 -> 6 ("Elite V", max prestige)
+			}
+			rankStats = append(rankStats, stat)
 		}
 		if len(rankStats) > 0 {
 			// Owner request: "add an overall rank% too? %to all max" -- one combined headline
@@ -1107,15 +1350,24 @@ func BuildRecap(store *Store) recapData {
 		}
 	}
 
-	combatStats := []recapStat{
-		{Label: "Total kills", Value: fmtInt(int64(totalKills))},
-		{Label: "Combat earnings", Value: formatCr(totalCombatEarnings)},
+	// User: "recap only needs to show changes not everything, like its what changed" and later
+	// "recap should only show something if somethings happened" -- every base stat in every
+	// section (not just whole sections, which were already gated) now only appears when its own
+	// real count/value is actually nonzero, so a quiet session (or, in principle, an all-time
+	// recap for a very new commander) doesn't pad itself out with a wall of real-but-empty "0"
+	// stats.
+	var combatStats []recapStat
+	if totalKills > 0 {
+		combatStats = append(combatStats, recapStat{Label: "Total kills", Value: fmtInt(int64(totalKills))})
+	}
+	if totalCombatEarnings > 0 {
+		combatStats = append(combatStats, recapStat{Label: "Combat earnings", Value: formatCr(totalCombatEarnings)})
 	}
 	if top := topByCount(killsByTargetShip, 1); len(top) > 0 {
-		combatStats = append(combatStats, recapStat{Label: "Favourite target", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " destroyed"})
+		combatStats = append(combatStats, recapStat{Label: "Favourite target", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " destroyed", Breakdown: breakdownByCount(killsByTargetShip)})
 	}
 	if top := topByCount(killsByOwnShip, 1); len(top) > 0 {
-		combatStats = append(combatStats, recapStat{Label: "Favourite combat ship", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " kills flying it"})
+		combatStats = append(combatStats, recapStat{Label: "Favourite combat ship", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " kills flying it", Breakdown: breakdownByCount(killsByOwnShip)})
 	}
 	if len(killsByVictimFac) > 0 {
 		list := make([]*nameCount, 0, len(killsByVictimFac))
@@ -1123,16 +1375,37 @@ func BuildRecap(store *Store) recapData {
 			list = append(list, v)
 		}
 		sort.Slice(list, func(i, j int) bool { return list[i].Count > list[j].Count })
-		combatStats = append(combatStats, recapStat{Label: "Biggest rival faction", Value: list[0].Name, Sub: fmtInt(int64(list[0].Count)) + " of their ships destroyed"})
+		combatStats = append(combatStats, recapStat{Label: "Biggest rival faction", Value: list[0].Name, Sub: fmtInt(int64(list[0].Count)) + " of their ships destroyed", Breakdown: breakdownByCount(killsByVictimFac)})
 	}
 	if biggestBounty > 0 {
 		combatStats = append(combatStats, recapStat{Label: "Biggest single bounty", Value: formatCr(biggestBounty), Sub: biggestBountyTarget})
 	}
-	combatStats = append(combatStats,
-		recapStat{Label: "Times destroyed", Value: fmtInt(int64(timesKilled))},
-		recapStat{Label: "Times interdicted", Value: fmtInt(int64(timesIntdctd))},
-	)
-	sections = append(sections, recapSection{Title: "Combat", Stats: combatStats})
+	if timesKilled > 0 {
+		combatStats = append(combatStats, recapStat{Label: "Times destroyed", Value: fmtInt(int64(timesKilled))})
+	}
+	if timesIntdctd > 0 {
+		combatStats = append(combatStats, recapStat{Label: "Times interdicted", Value: fmtInt(int64(timesIntdctd))})
+	}
+	if haveHullDamage {
+		sub := lowestHullSystem
+		if len(lowestHullAt) >= 10 {
+			date := lowestHullAt[:10]
+			if sub != "" {
+				sub = date + " -- " + sub
+			} else {
+				sub = date
+			}
+		}
+		combatStats = append(combatStats, recapStat{
+			Label:  "Closest call (lowest hull health)",
+			Value:  fmt.Sprintf("%.4f%%", lowestHullHealth*100),
+			Sub:    sub,
+			Danger: lowestHullHealth <= 0.10, DangerExtreme: lowestHullHealth <= 0.01,
+		})
+	}
+	if len(combatStats) > 0 {
+		sections = append(sections, recapSection{Title: "Combat", Stats: combatStats})
+	}
 
 	// Deliberately not built if this commander has never committed a crime -- same "don't force a
 	// hypothetical" standard as Wing below. Fine and Bounty are two different things (minor traffic-
@@ -1151,10 +1424,10 @@ func BuildRecap(store *Store) recapData {
 			crimeStats = append(crimeStats, recapStat{Label: "Bounties incurred", Value: formatCr(totalBountiesOwed)})
 		}
 		if top := topByCount(crimeTypeCounts, 1); len(top) > 0 {
-			crimeStats = append(crimeStats, recapStat{Label: "Most common offence", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " times"})
+			crimeStats = append(crimeStats, recapStat{Label: "Most common offence", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " times", Breakdown: breakdownByCount(crimeTypeCounts)})
 		}
 		if top := topByCount(crimeFactionCounts, 1); len(top) > 0 {
-			crimeStats = append(crimeStats, recapStat{Label: "Most trouble with", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " incidents"})
+			crimeStats = append(crimeStats, recapStat{Label: "Most trouble with", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " incidents", Breakdown: breakdownByCount(crimeFactionCounts)})
 		}
 		sections = append(sections, recapSection{Title: "Crime", Stats: crimeStats})
 	}
@@ -1171,7 +1444,7 @@ func BuildRecap(store *Store) recapData {
 			if top[0].Count == 1 {
 				sessionWord = "session"
 			}
-			wingStats = append(wingStats, recapStat{Label: "Most frequent wingmate", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " " + sessionWord + " together"})
+			wingStats = append(wingStats, recapStat{Label: "Most frequent wingmate", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " " + sessionWord + " together", Breakdown: breakdownByCount(wingmateCounts)})
 		}
 		wingStats = append(wingStats, recapStat{Label: "Distinct wingmates", Value: fmtInt(int64(len(wingmateCounts)))})
 		sections = append(sections, recapSection{Title: "Wing", Stats: wingStats})
@@ -1180,25 +1453,64 @@ func BuildRecap(store *Store) recapData {
 	// Only built if the commander has actually pledged to a power -- real data confirms this
 	// commander has (1,038 PowerplayMerits events, 69 Powerplay snapshots), but the field is
 	// deliberately gated the same way Wing is, for anyone whose journal has none of this.
-	if pledgedPower != "" {
-		ppStats := []recapStat{
-			{Label: "Pledged to", Value: pledgedPower},
-			{Label: "Powerplay rank", Value: fmtInt(int64(currentPPRank))},
-			{Label: "Current merits", Value: fmtInt(currentPPMerits)},
-		}
-		if currentPPTimePledged > 0 {
-			ppStats = append(ppStats, recapStat{Label: "Time pledged", Value: formatDays(currentPPTimePledged)})
+	// Real gap, fixed while adding isSession: the section used to gate purely on pledgedPower
+	// (only set by the periodic Powerplay/PowerplayRank snapshot events) -- but a real session can
+	// easily have merit/delivery ACTIVITY (PowerplayMerits/PowerplayDeliver/PowerplayCollect)
+	// without either snapshot event happening to also fire in that same session, which would have
+	// hidden real session deltas behind a gate keyed on the wrong signal.
+	if pledgedPower != "" || meritEvents > 0 || powerplayDeliverEvents > 0 || totalPowerplayCollected > 0 {
+		// User: "recap only needs to show changes not everything, like its what changed" --
+		// Pledged to/Powerplay rank/Current merits/Time pledged are all CURRENT-STANDING snapshot
+		// values (from the periodic Powerplay event), not session deltas, so skipped for the
+		// session-scoped recap -- same reasoning as Rank above. Merits earned/Goods delivered/
+		// Goods collected below stay for both: those are real sums of session-scoped events.
+		var ppStats []recapStat
+		if !isSession {
+			ppStats = append(ppStats,
+				recapStat{Label: "Pledged to", Value: pledgedPower},
+				recapStat{Label: "Powerplay rank", Value: fmtInt(int64(currentPPRank))},
+				recapStat{Label: "Current merits", Value: fmtInt(currentPPMerits)},
+			)
+			if currentPPTimePledged > 0 {
+				ppStats = append(ppStats, recapStat{Label: "Time pledged", Value: formatDays(currentPPTimePledged)})
+			}
 		}
 		if meritEvents > 0 {
 			ppStats = append(ppStats, recapStat{Label: "Merits earned", Value: fmtInt(totalMeritsGained), Sub: fmtInt(int64(meritEvents)) + " merit-earning actions"})
 		}
-		sections = append(sections, recapSection{Title: "Powerplay", Stats: ppStats})
+		if powerplayDeliverEvents > 0 {
+			ppStats = append(ppStats, recapStat{Label: "Goods delivered (influence pushed)", Value: fmtInt(totalPowerplayDelivered), Sub: fmtInt(int64(powerplayDeliverEvents)) + " deliveries"})
+		}
+		if totalPowerplayCollected > 0 {
+			ppStats = append(ppStats, recapStat{Label: "Goods collected for delivery", Value: fmtInt(totalPowerplayCollected)})
+		}
+		// Real bug, fixed: the OUTER gate (pledgedPower != "" || meritEvents > 0 || ...) can pass
+		// for a session-scoped call purely because a Powerplay/PowerplayRank snapshot happened to
+		// fire that session, even when isSession=true skips the pledge/rank/merits/time-pledged
+		// stats AND there was no real merit/delivery/collection activity in that same session --
+		// leaving ppStats genuinely empty (nil) while still unconditionally appending the section.
+		// A nil Stats slice marshals to JSON `null`, which broke the client's
+		// `sections.flatMap(sec => sec.stats)` (a literal null landed in the flattened array,
+		// crashing on `stat.danger`) -- confirmed via a real user-reported browser console error
+		// ("can't access property 'danger', stat is null") that this project's own jsdom test
+		// harness never caught, since the specific session data shape that triggers it (a
+		// snapshot-only Powerplay event with zero session-scoped merit/delivery/collection
+		// activity) wasn't present in this project's own test data. Same fix pattern as every
+		// other section in this file: only append if there's real content.
+		if len(ppStats) > 0 {
+			sections = append(sections, recapSection{Title: "Powerplay", Stats: ppStats})
+		}
 	}
 
-	tradeStats := []recapStat{
-		{Label: "Total trade profit", Value: formatCr(totalTradeProfit)},
-		{Label: "Units sold", Value: fmtInt(totalUnitsSold)},
-		{Label: "Units bought", Value: fmtInt(totalUnitsBought)},
+	var tradeStats []recapStat
+	if totalTradeProfit > 0 {
+		tradeStats = append(tradeStats, recapStat{Label: "Total trade profit", Value: formatCr(totalTradeProfit)})
+	}
+	if totalUnitsSold > 0 {
+		tradeStats = append(tradeStats, recapStat{Label: "Units sold", Value: fmtInt(totalUnitsSold)})
+	}
+	if totalUnitsBought > 0 {
+		tradeStats = append(tradeStats, recapStat{Label: "Units bought", Value: fmtInt(totalUnitsBought)})
 	}
 	{
 		list := make([]*nameCount, 0, len(tradeByCommodity))
@@ -1207,28 +1519,33 @@ func BuildRecap(store *Store) recapData {
 		}
 		sort.Slice(list, func(i, j int) bool { return list[i].Value > list[j].Value })
 		if len(list) > 0 {
-			tradeStats = append(tradeStats, recapStat{Label: "Most profitable commodity", Value: list[0].Name, Sub: formatCr(list[0].Value) + " profit"})
+			tradeStats = append(tradeStats, recapStat{Label: "Most profitable commodity", Value: list[0].Name, Sub: formatCr(list[0].Value) + " profit", Breakdown: breakdownByValue(tradeByCommodity)})
 		}
 	}
 	if biggestSale > 0 {
 		tradeStats = append(tradeStats, recapStat{Label: "Biggest single sale", Value: formatCr(biggestSale), Sub: biggestSaleGood})
 	}
-	sections = append(sections, recapSection{Title: "Trading", Stats: tradeStats})
+	if len(tradeStats) > 0 {
+		sections = append(sections, recapSection{Title: "Trading", Stats: tradeStats})
+	}
 
-	miningStats := []recapStat{
-		{Label: "Total refined", Value: fmtInt(int64(totalRefined))},
+	var miningStats []recapStat
+	if totalRefined > 0 {
+		miningStats = append(miningStats, recapStat{Label: "Total refined", Value: fmtInt(int64(totalRefined))})
 	}
 	if top := topByCount(miningByMat, 1); len(top) > 0 {
-		miningStats = append(miningStats, recapStat{Label: "Top material", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " units refined"})
+		miningStats = append(miningStats, recapStat{Label: "Top material", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " units refined", Breakdown: breakdownByCount(miningByMat)})
 	}
-	sections = append(sections, recapSection{Title: "Mining", Stats: miningStats})
+	if len(miningStats) > 0 {
+		sections = append(sections, recapSection{Title: "Mining", Stats: miningStats})
+	}
 
 	if totalMaterials > 0 {
 		materialStats := []recapStat{
 			{Label: "Materials collected", Value: fmtInt(int64(totalMaterials)), Sub: fmt.Sprintf("%d raw · %d encoded · %d manufactured", rawCollected, encodedCollected, manufCollected)},
 		}
 		if top := topByCount(materialCounts, 1); len(top) > 0 {
-			materialStats = append(materialStats, recapStat{Label: "Most collected", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " units"})
+			materialStats = append(materialStats, recapStat{Label: "Most collected", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " units", Breakdown: breakdownByCount(materialCounts)})
 		}
 		sections = append(sections, recapSection{Title: "Materials", Stats: materialStats})
 	}
@@ -1239,19 +1556,24 @@ func BuildRecap(store *Store) recapData {
 			{Label: "Engineers visited", Value: fmtInt(int64(len(engineerCounts)))},
 		}
 		if top := topByCount(engineerCounts, 1); len(top) > 0 {
-			engStats = append(engStats, recapStat{Label: "Favourite engineer", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " upgrades"})
+			engStats = append(engStats, recapStat{Label: "Favourite engineer", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " upgrades", Breakdown: breakdownByCount(engineerCounts)})
 		}
 		if top := topByCount(blueprintCounts, 1); len(top) > 0 {
-			engStats = append(engStats, recapStat{Label: "Most-applied modification", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + "x"})
+			engStats = append(engStats, recapStat{Label: "Most-applied modification", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + "x", Breakdown: breakdownByCount(blueprintCounts)})
 		}
 		sections = append(sections, recapSection{Title: "Engineering", Stats: engStats})
 	}
 
-	shipStats := []recapStat{
-		{Label: "Ships purchased", Value: fmtInt(int64(shipsPurchased))},
-		{Label: "Spent on ships", Value: formatCr(totalShipSpend)},
+	var shipStats []recapStat
+	if shipsPurchased > 0 {
+		shipStats = append(shipStats, recapStat{Label: "Ships purchased", Value: fmtInt(int64(shipsPurchased))})
 	}
-	sections = append(sections, recapSection{Title: "Ships", Stats: shipStats})
+	if totalShipSpend > 0 {
+		shipStats = append(shipStats, recapStat{Label: "Spent on ships", Value: formatCr(totalShipSpend)})
+	}
+	if len(shipStats) > 0 {
+		sections = append(sections, recapSection{Title: "Ships", Stats: shipStats})
+	}
 
 	// Only one real carrier appears in this commander's data (CarrierStats always reports the
 	// same CarrierID) -- if a commander somehow had more than one over their history, the latest
@@ -1284,12 +1606,36 @@ func BuildRecap(store *Store) recapData {
 	}
 
 	if len(crewWages) > 0 {
-		crewStats := []recapStat{}
-		if top := topByValue(crewWages, 1); len(top) > 0 {
-			crewStats = append(crewStats, recapStat{Label: "NPC crew", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " payments"})
-			crewStats = append(crewStats, recapStat{Label: "Wages paid", Value: formatCr(top[0].Value)})
+		// User: "crew should have more info, time since hired, etc" -- real "CrewHire" events
+		// (which would give a real hire date) never fired for this commander at all (checked
+		// directly against their own real data -- 0 occurrences), so "time since hired" genuinely
+		// isn't something this journal can answer for them; NpcCrewPaidWage (the only real crew
+		// event this commander's data actually has) is a wage PAYMENT log, not a hire log. Real
+		// data honestly can only stretch to: how many distinct crew, and the real grand total
+		// across all of them (previously only the single top earner's own total was shown).
+		var totalWages int64
+		for _, c := range crewWages {
+			totalWages += c.Value
 		}
-		sections = append(sections, recapSection{Title: "Crew", Stats: crewStats})
+		// User: "last session recap can also end up with useless stuff like Total wages paid 0
+		// cr, Highest-paid crew Garrett Bradford 0 cr · 1 payments" -- real gap, same class of bug
+		// as the earlier zero-value cleanup: the section-level gate (len(crewWages) > 0, i.e. "at
+		// least one wage-payment EVENT happened") doesn't guarantee the real Amount on that event
+		// was actually nonzero. Every stat here now gated on its own real nonzero value too,
+		// matching the rest of this recap.
+		var crewStats []recapStat
+		if len(crewWages) > 0 {
+			crewStats = append(crewStats, recapStat{Label: "Distinct NPC crew", Value: fmtInt(int64(len(crewWages)))})
+		}
+		if totalWages > 0 {
+			crewStats = append(crewStats, recapStat{Label: "Total wages paid", Value: formatCr(totalWages)})
+		}
+		if top := topByValue(crewWages, 1); len(top) > 0 && top[0].Value > 0 {
+			crewStats = append(crewStats, recapStat{Label: "Highest-paid crew", Value: top[0].Name, Sub: formatCr(top[0].Value) + " · " + fmtInt(int64(top[0].Count)) + " payments", Breakdown: breakdownByValue(crewWages)})
+		}
+		if len(crewStats) > 0 {
+			sections = append(sections, recapSection{Title: "Crew", Stats: crewStats})
+		}
 	}
 
 	if len(depotProgress) > 0 || len(systemsClaimed) > 0 {
@@ -1340,57 +1686,151 @@ func BuildRecap(store *Store) recapData {
 		if info, ok := dockedStations[topMarketID]; ok && info.System != "" {
 			sub += " — " + info.System
 		}
-		sections = append(sections, recapSection{Title: "Stations", Stats: []recapStat{
-			{Label: "Home base", Value: topVisits.Name, Sub: sub},
-		}})
+		// stationVisits is keyed by MarketID (int64), not name, since two different real stations
+		// can share a name -- breakdownByCount can't take it directly (string-keyed nameCount maps
+		// only), so the same real per-station Count is expanded by hand here instead.
+		stationList := make([]*nameCount, 0, len(stationVisits))
+		for _, v := range stationVisits {
+			stationList = append(stationList, v)
+		}
+		sort.Slice(stationList, func(i, j int) bool { return stationList[i].Count > stationList[j].Count })
+		stationBreakdown := make([]recapBreakdownItem, len(stationList))
+		for i, v := range stationList {
+			stationBreakdown[i] = recapBreakdownItem{Label: v.Name, Value: fmtInt(int64(v.Count)) + " visits"}
+		}
+		// User: "stations is basically empty, itd be nice for more" -- real Docked events already
+		// carry StationType for every dock; this project just never counted it before.
+		stationStats := []recapStat{
+			{Label: "Home base", Value: topVisits.Name, Sub: sub, Breakdown: stationBreakdown},
+			{Label: "Distinct stations visited", Value: fmtInt(int64(len(stationVisits)))},
+		}
+		if top := topByCount(stationTypeCounts, 1); len(top) > 0 {
+			// breakdownByCount alone would leak the raw StationType key (Name stores it unprettified,
+			// see where stationTypeCounts is populated above) -- prettifyKey applied per-item here,
+			// same as the Value field on the line below already does for just the top one.
+			typeBreakdown := breakdownByCount(stationTypeCounts)
+			for i := range typeBreakdown {
+				typeBreakdown[i].Label = prettifyKey(typeBreakdown[i].Label)
+			}
+			stationStats = append(stationStats, recapStat{Label: "Most common station type", Value: prettifyKey(top[0].Name), Sub: fmtInt(int64(top[0].Count)) + " dockings", Breakdown: typeBreakdown})
+		}
+		sections = append(sections, recapSection{Title: "Stations", Stats: stationStats})
 	}
 
-	missionStats := []recapStat{
-		{Label: "Missions completed", Value: fmtInt(int64(missionsCompleted))},
-		{Label: "Missions accepted", Value: fmtInt(int64(missionsAccepted))},
+	// User: "missons would be good, rep gained, influence gained, idk something. its just so
+	// empty" -- real per-mission FactionEffects data (see missionCompletedEvent's own comment),
+	// not just the completed/accepted counts this section used to stop at.
+	var missionStats []recapStat
+	if missionsCompleted > 0 {
+		missionStats = append(missionStats, recapStat{Label: "Missions completed", Value: fmtInt(int64(missionsCompleted))})
 	}
-	sections = append(sections, recapSection{Title: "Missions", Stats: missionStats})
+	if missionsAccepted > 0 {
+		missionStats = append(missionStats, recapStat{Label: "Missions accepted", Value: fmtInt(int64(missionsAccepted))})
+	}
+	if top := topByCount(employerCounts, 1); len(top) > 0 {
+		missionStats = append(missionStats, recapStat{Label: "Most missions for", Value: top[0].Name, Sub: fmtInt(int64(top[0].Count)) + " missions", Breakdown: breakdownByCount(employerCounts)})
+	}
+	totalRepGains, totalRepLosses := 0, 0
+	for _, c := range repGainedFactions {
+		totalRepGains += c
+	}
+	for _, c := range repLostFactions {
+		totalRepLosses += c
+	}
+	if totalRepGains > 0 {
+		sub := fmtInt(int64(len(repGainedFactions))) + " distinct factions"
+		var topRepFaction string
+		topRepCount := 0
+		for faction, c := range repGainedFactions {
+			if c > topRepCount {
+				topRepCount, topRepFaction = c, faction
+			}
+		}
+		if topRepFaction != "" {
+			sub = "most with " + topRepFaction
+		}
+		missionStats = append(missionStats, recapStat{Label: "Reputation gained", Value: fmtInt(int64(totalRepGains)) + " missions", Sub: sub, Breakdown: breakdownFromIntMap(repGainedFactions)})
+	}
+	if totalRepLosses > 0 {
+		missionStats = append(missionStats, recapStat{Label: "Reputation lost", Value: fmtInt(int64(totalRepLosses)) + " missions", Sub: fmtInt(int64(len(repLostFactions))) + " distinct factions", Breakdown: breakdownFromIntMap(repLostFactions)})
+	}
+	if len(influencedSystems) > 0 {
+		missionStats = append(missionStats, recapStat{Label: "Systems influenced", Value: fmtInt(int64(len(influencedSystems)))})
+	}
+	if len(missionStats) > 0 {
+		sections = append(sections, recapSection{Title: "Missions", Stats: missionStats})
+	}
 
-	var highlights []string
-	// Capped to the most recent few -- confirmed against a real, more PvP-active tester's data
-	// that this can otherwise grow into a wall of text (realKillers has no size limit of its own,
-	// since it's every real Died event with a killer name, and someone who dies a lot has a lot).
-	// Highlights are meant to stay highlight-sized; the full history is what the events search
-	// page is for.
-	const maxDeathHighlights = 5
-	shownKillers := realKillers
-	omittedDeaths := 0
-	if len(shownKillers) > maxDeathHighlights {
-		omittedDeaths = len(shownKillers) - maxDeathHighlights
-		shownKillers = shownKillers[omittedDeaths:] // most recent N -- realKillers is chronological
+	// Real bug, fixed: a nil []string marshals to JSON `null`, not `[]` -- harmless for the
+	// all-time recap (there's always at least one highlight in any real career), but the new
+	// session-scoped recap (BuildSessionRecap) can legitimately have zero for a short/quiet
+	// session, and the client-side session-recap renderer's `s.recap.highlights.length` crashed
+	// outright on a real null. Initialized non-nil so JSON always gives `[]`, not `null`.
+	var highlights []recapHighlight
+	// User: "only show 3 deaths i think, (prioritize CMDR deaths, since those are players)" --
+	// real Elite Dangerous journal convention (confirmed against this commander's own real Died
+	// events, see isRealPlayerKiller's comment): a KillerName prefixed "Cmdr " is another real
+	// commander, never an NPC. Every real CMDR kill is kept (there's rarely more than a couple in
+	// a real history), with remaining slots up to the cap filled by the most recent NPC kills --
+	// unless CMDR kills alone already exceed the cap, in which case it's the most recent CMDR
+	// kills that win (still all real players, just trimmed like everything else here).
+	const maxDeathHighlights = 3
+	var cmdrKills, npcKills []diedEvent
+	for _, k := range realKillers {
+		if isRealPlayerKiller(k.KillerName) {
+			cmdrKills = append(cmdrKills, k)
+		} else {
+			npcKills = append(npcKills, k)
+		}
 	}
+	var shownKillers []diedEvent
+	if len(cmdrKills) >= maxDeathHighlights {
+		shownKillers = cmdrKills[len(cmdrKills)-maxDeathHighlights:]
+	} else {
+		shownKillers = append(shownKillers, cmdrKills...)
+		remaining := maxDeathHighlights - len(shownKillers)
+		start := len(npcKills) - remaining
+		if start < 0 {
+			start = 0
+		}
+		shownKillers = append(shownKillers, npcKills[start:]...)
+	}
+	omittedDeaths := len(realKillers) - len(shownKillers)
+	sort.Slice(shownKillers, func(i, j int) bool { return shownKillers[i].Timestamp < shownKillers[j].Timestamp })
 	for _, k := range shownKillers {
 		name := k.KillerNameLocalised
 		if name == "" {
 			name = k.KillerName
 		}
+		isPlayer := isRealPlayerKiller(k.KillerName)
 		// Not always literally a ship -- confirmed against real data (settlement defenses, an
 		// on-foot Odyssey combatant) alongside real ship kills, and there's no reliable field to
 		// tell the two apart. "(X)" reads correctly either way; "flying a X" only reads correctly
 		// for the ship case and was actively wrong ("flying a Outpostindustrial") for the other.
 		line := "Destroyed by " + name
+		if isPlayer {
+			line = "💀 " + line + " -- a real commander"
+		}
 		if k.KillerShip != "" {
 			line += " (" + displayShip(k.KillerShip) + ")"
 		}
-		highlights = append(highlights, line)
+		highlights = append(highlights, recapHighlight{Text: line, Timestamp: k.Timestamp})
 	}
 	if omittedDeaths > 0 {
 		plural := "s"
 		if omittedDeaths == 1 {
 			plural = ""
 		}
-		highlights = append(highlights, fmt.Sprintf("...and %d earlier death%s not shown here", omittedDeaths, plural))
+		highlights = append(highlights, recapHighlight{Text: fmt.Sprintf("...and %d earlier death%s not shown here", omittedDeaths, plural)})
 	}
 	// Only called out as a highlight once it's genuinely "frequent" (2+ sessions) -- a single
 	// shared wing session isn't a "best friend" story, just a data point already covered by the
 	// Wing section's stat card above.
 	if top := topByCount(wingmateCounts, 1); len(top) > 0 && top[0].Count >= 2 {
-		highlights = append(highlights, fmt.Sprintf("Flew wing with CMDR %s %d times -- your most frequent wingmate", top[0].Name, top[0].Count))
+		highlights = append(highlights, recapHighlight{
+			Text:      fmt.Sprintf("Flew wing with CMDR %s %d times -- your most frequent wingmate", top[0].Name, top[0].Count),
+			Timestamp: wingmateLatestTS[top[0].Name],
+		})
 	}
 	// Only the single most recent promotion, not all of them -- with 5 real Promotion events in
 	// this commander's history, listing every one would crowd out the rest of this list; "most
@@ -1398,8 +1838,29 @@ func BuildRecap(store *Store) recapData {
 	if mostRecentPromoTrack != "" {
 		if title := rankTitle(mostRecentPromoTrack, mostRecentPromoLevel); title != "" {
 			trackLabel := strings.TrimSuffix(rankTrackLabels[mostRecentPromoTrack], " rank")
-			highlights = append(highlights, fmt.Sprintf("Promoted to %s (%s rank %d)", title, trackLabel, mostRecentPromoLevel))
+			highlights = append(highlights, recapHighlight{
+				Text:      fmt.Sprintf("Promoted to %s (%s rank %d)", title, trackLabel, mostRecentPromoLevel),
+				Timestamp: mostRecentPromoTS,
+			})
 		}
+	}
+	// User: "if its revealed maybe a closest to death would be cool, lowest health 3% or
+	// something, idk" -- always shown as a plain stat above (Combat section) when any real
+	// HullDamage data exists, but only promoted to a highlight-worthy callout once it's genuinely
+	// dramatic (<=10%, same threshold as the stat's own Danger flag -- a real near-miss, not just
+	// "took some damage"). Real display bug also caught here: the original %.0f rounding made a
+	// genuinely-survived 0.2265% read as an indistinguishable "0%" -- the same number an actual
+	// death would show (this commander's own real data has both) -- fixed with real decimal
+	// precision (%.1f) so a close call reads as visibly different from a destruction.
+	if haveHullDamage && lowestHullHealth <= 0.10 {
+		line := fmt.Sprintf("🔥 Barely evaded death: hull dropped to %.4f%%", lowestHullHealth*100)
+		if lowestHullSystem != "" {
+			line += " in " + lowestHullSystem
+		}
+		highlights = append(highlights, recapHighlight{Text: line, Timestamp: lowestHullAt})
+	}
+	if highlights == nil {
+		highlights = []recapHighlight{}
 	}
 
 	return recapData{
@@ -1410,8 +1871,73 @@ func BuildRecap(store *Store) recapData {
 	}
 }
 
+// sessionRecapData wraps the same recapData shape BuildRecap already produces (reused verbatim,
+// zero duplicated stat logic) with the real session's own start/end for display context.
+type sessionRecapData struct {
+	Recap       recapData `json:"recap"`
+	SessionFrom string    `json:"sessionFrom"`
+	SessionTo   string    `json:"sessionTo"`
+}
+
+// BuildSessionRecap scopes BuildRecap to just the most recent play session. Session boundary =
+// the LAST real "LoadGame" event's timestamp -- confirmed directly against this project's own
+// earlier finding (materials.go's header comment): "Materials" fires "immediately after Commander
+// and immediately before LoadGame ... once per game session login," meaning LoadGame is a real,
+// verified once-per-session marker. Deliberately NOT "Fileheader" despite it superficially looking
+// like a cleaner one-per-journal-file marker -- a real Fileheader carries its own "part" field
+// (confirmed against this commander's own real data), meaning the game splits a SINGLE session
+// across multiple journal files/Fileheaders when a file gets rotated, which would incorrectly
+// fragment one real session into several if used as the boundary.
+func BuildSessionRecap(store *Store) (sessionRecapData, bool) {
+	var sessionStart string
+	for _, e := range store.RawEvents {
+		if e.Event == "LoadGame" && e.Timestamp > sessionStart {
+			sessionStart = e.Timestamp
+		}
+	}
+	if sessionStart == "" {
+		return sessionRecapData{}, false
+	}
+	var sessionEvents []RawEvent
+	var sessionEnd string
+	for _, e := range store.RawEvents {
+		if e.Timestamp < sessionStart {
+			continue
+		}
+		sessionEvents = append(sessionEvents, e)
+		if e.Timestamp > sessionEnd {
+			sessionEnd = e.Timestamp
+		}
+	}
+	if len(sessionEvents) == 0 {
+		return sessionRecapData{}, false
+	}
+	// Real bug, caught in verification: BuildRecap also draws several stats (Systems visited,
+	// Furthest system, Presumed bio value, Notable/rare finds) straight from Store.Systems, NOT
+	// from RawEvents -- sharing the full career-spanning map unfiltered made those stats silently
+	// show lifetime totals inside what's supposed to be a single-session recap (confirmed against
+	// real data: "Systems visited: 482" for a real ~1-hour session). Filtered to only systems this
+	// project's own real UpdatedAt (set on every touch, see parse.go) falls within the session
+	// window, so these stats now genuinely reflect just this session's own activity.
+	sessionSystems := map[int64]*System{}
+	for addr, sys := range store.Systems {
+		if sys.UpdatedAt >= sessionStart && sys.UpdatedAt <= sessionEnd {
+			sessionSystems[addr] = sys
+		}
+	}
+	sessionStore := &Store{Commander: store.Commander, Systems: sessionSystems, RawEvents: sessionEvents}
+	return sessionRecapData{
+		Recap:       BuildRecap(sessionStore, true),
+		SessionFrom: sessionStart,
+		SessionTo:   sessionEnd,
+	}, true
+}
+
 func RenderSummary(store *Store) (string, error) {
-	data := BuildRecap(store)
+	data := BuildRecap(store, false)
+	if session, ok := BuildSessionRecap(store); ok {
+		data.Session = &session
+	}
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
 		return "", err

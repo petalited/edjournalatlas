@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>(function(){try{var q=new URLSearchParams(location.search).get('theme');var t=(q==='light'||q==='dark')?q:localStorage.getItem('standalone_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);if(q)localStorage.setItem('standalone_theme',t);}}catch(e){}})();</script>
-<title>edjournalatlas -- local exploration viewer</title>
+<title>standalone -- local exploration viewer</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root {
@@ -112,9 +112,9 @@ input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
    makes that impossible: the detail row's content is now genuinely confined to the already-
    established column width and left to its own overflow-x:auto (see .orbit-tree) instead. */
 table { border-collapse: collapse; width: 100%; min-width: 900px; table-layout: fixed; }
-th.col-name { width: 24%; } th.col-region { width: 15%; } th.col-population { width: 12%; }
-th.col-bodies { width: 11%; } th.col-notable { width: 10%; } th.col-first { width: 15%; }
-th.col-bio { width: 13%; }
+th.col-name { width: 21%; } th.col-region { width: 13%; } th.col-population { width: 10%; }
+th.col-bodies { width: 9%; } th.col-notable { width: 9%; } th.col-first { width: 12%; }
+th.col-bio { width: 12%; } th.col-visited { width: 14%; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
   overflow-x: auto; box-shadow: var(--shadow); position: relative; }
 /* Edge-fade cue for horizontally-scrollable containers (the results table and each system's
@@ -266,6 +266,7 @@ button:focus-visible, thead th[data-key]:focus-visible, tbody tr.system-row:focu
   <a class="page-nav-link" href="standalone_materials.html">🧪 Materials</a>
   <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
   <a class="page-nav-link" href="standalone_shipyard.html">🚀 Shipyard</a>
+  <a class="page-nav-link" href="standalone_powerplay.html">⚔️ Powerplay</a>
 </nav>
 <button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
 
@@ -302,6 +303,7 @@ button:focus-visible, thead th[data-key]:focus-visible, tbody tr.system-row:focu
         <th class="col-notable num" data-key="notableTotal">Notable<span class="sort-arrow"></span></th>
         <th class="col-first num" data-key="firstDiscoveryCount">First discoveries<span class="sort-arrow"></span></th>
         <th class="col-bio num" data-key="bioValue">Bio value<span class="sort-arrow"></span></th>
+        <th class="col-visited" data-key="lastVisitedAt" title="Most recent real journal event that touched this system">Last visited<span class="sort-arrow"></span></th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
@@ -319,6 +321,12 @@ function escapeHtml(s) {
 function formatCredits(n) {
   if (n === null || n === undefined) return '—';
   return n.toLocaleString('en-US') + ' cr';
+}
+// User: "add sort by date, recent / oldest for system map". Just the date portion (real
+// timestamp's own ISO-8601 prefix) -- sorting itself uses the full raw string via the generic
+// data-key comparator above, this is only the display text.
+function formatVisitedDate(iso) {
+  return iso ? iso.slice(0, 10) : '—';
 }
 function notableTotal(s) {
   return Object.values(s.notableCounts).reduce((a, b) => a + b, 0);
@@ -338,7 +346,8 @@ function eventsSearchUrl(systemName) {
 }
 // No per-body/per-star deep link is reliable without EDSM's own internal numeric IDs (this
 // project never fetches them) -- every name links to the same system page instead, which lists
-// all of a system's known bodies once EDSM has data for it.
+// all of a system's known bodies once EDSM has data for it. Same approach edexotracker's main
+// report uses for its own Discord export.
 function discordLink(label, systemName) {
   return `[${label}](${edsmUrl(systemName)})`;
 }
@@ -504,7 +513,7 @@ function appendBodyLines(lines, bodies, lineForBody) {
   if (remaining > 0) lines.push(`  _+${remaining} more_`);
 }
 
-// Two Discord export variants: a commander's own
+// Two Discord export variants, same reasoning as edexotracker's main report: a commander's own
 // bonuses (first footfall, first-logged) are one-time opportunities -- once claimed, they're
 // gone for whoever else visits, so they don't belong in a number meant to represent what's
 // genuinely still "available" to share/compare.
@@ -756,7 +765,7 @@ function starChip(sys, st) {
 // Groups bodies by which star(s) they orbit. parentStars is a list, not a single name -- a body
 // genuinely orbiting a binary pair's shared barycenter rather than either star individually
 // (real confirmed example: bodies named "AB 2"/"AB 4") has every star sharing that barycenter
-// listed.
+// listed, same pattern as edexotracker/report.py's proven version for the ExploData-backed tool.
 function groupBodiesByOrbit(bodies) {
   const groups = new Map();
   for (const b of bodies) {
@@ -886,6 +895,7 @@ function render() {
       <td class="num">${s.notableTotal > 0 ? `<strong>${s.notableTotal}</strong>` : '—'}</td>
       <td class="num">${s.firstDiscoveryCount > 0 ? s.firstDiscoveryCount : '—'}</td>
       <td class="num value ${s.bioValue > 0 ? 'good' : ''}">${s.bioValue > 0 ? formatCredits(s.bioValue) : '—'}</td>
+      <td class="muted">${formatVisitedDate(s.lastVisitedAt)}</td>
     </tr>`;
     if (!isOpen) return row;
 
@@ -897,7 +907,7 @@ function render() {
         ).join('')
       : '<div class="muted">No individually-scanned bodies recorded for this system.</div>';
 
-    const detail = `<tr class="detail-row"><td colspan="7"><div class="detail-wrap">
+    const detail = `<tr class="detail-row"><td colspan="8"><div class="detail-wrap">
       <div class="detail-header"><h3>${escapeHtml(s.name)}</h3>${copyBtn(s.name)}${discordCopyBtn(s.name)}${discordObjectiveCopyBtn(s.name)}<a class="ext-link" href="${edsmUrl(s.name)}" target="_blank" rel="noopener">EDSM ↗</a><a class="ext-link" href="${inaraUrl(s.name)}" target="_blank" rel="noopener">Inara ↗</a><a class="ext-link" href="${eventsSearchUrl(s.name)}" target="_blank" rel="noopener" title="Search the full journal for this system">Journal ↗</a><button class="nearest-btn" type="button" data-nearest-name="${escapeHtml(s.name)}" title="Sort every system in the table by distance from this one" aria-label="Sort every system in the table by distance from ${escapeHtml(s.name)}">📍 Nearest</button>${s.faction ? `<span class="muted">Controlled by ${escapeHtml(s.faction)}</span>` : ''}</div>
       ${systemStatsHtml(s)}
       ${starsHtml}

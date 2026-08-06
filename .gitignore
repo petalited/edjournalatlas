@@ -12,6 +12,8 @@ standalone_summary.html
 standalone_unmodeled.json
 standalone_materials.html
 standalone_engineering.html
+standalone_shipyard.html
+standalone_powerplay.html
 
 __pycache__/
 *.pyc

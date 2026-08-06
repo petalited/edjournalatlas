@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>(function(){try{var q=new URLSearchParams(location.search).get('theme');var t=(q==='light'||q==='dark')?q:localStorage.getItem('standalone_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);if(q)localStorage.setItem('standalone_theme',t);}}catch(e){}})();</script>
-<title>edjournalatlas -- materials inventory</title>
+<title>standalone -- materials inventory</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root {
@@ -115,7 +115,14 @@ input[type=text]:focus, select:focus { border-color: var(--accent); outline: non
   padding: var(--space-3); box-shadow: var(--shadow); }
 .grid-family-name { font-weight: 700; font-size: 0.78rem; margin-bottom: var(--space-2); color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.05em; }
-.grid-family-cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--space-2); }
+/* User: "materials page has a max of 5 columumns i guess? it should just all show in a row" --
+   `auto-fit`/`minmax(130px,...)` was wrapping to a 2nd row whenever a family had more grade
+   cells than fit at 130px each in the real container width (which is what actually produced the
+   "5 columns" the user saw -- not a hardcoded cap, just where auto-fit happened to wrap for their
+   real window size). A family's grade-cell count is always small and bounded (never more than a
+   handful of real grades), so forcing a single row via grid-auto-flow (cells shrink to fit
+   instead of wrapping) reads more correctly than ever wrapping. */
+.grid-family-cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(90px, 1fr); gap: var(--space-2); }
 .grid-cell { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2);
   transition: border-color var(--transition), background-color var(--transition); }
 .grid-cell-held { background: var(--accent-weak); border-color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); }
@@ -197,6 +204,7 @@ a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible
   <a class="page-nav-link page-nav-active" href="standalone_materials.html">🧪 Materials</a>
   <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
   <a class="page-nav-link" href="standalone_shipyard.html">🚀 Shipyard</a>
+  <a class="page-nav-link" href="standalone_powerplay.html">⚔️ Powerplay</a>
 </nav>
 <button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
 

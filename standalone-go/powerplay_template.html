@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var q=new URLSearchParams(location.search).get('theme');var t=(q==='light'||q==='dark')?q:localStorage.getItem('standalone_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);if(q)localStorage.setItem('standalone_theme',t);}}catch(e){}})();</script>
+<title>standalone -- powerplay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  color-scheme: light dark;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+  --transition: 160ms ease;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --good: #0ca30c; --good-bg: #e5f7e5; --warning: #b5710a; --warning-bg: #fdf1de;
+  --bonus-bg: #fdf1d3; --bonus-text: #7a5a00;
+  --notable-bg: #efe6fb; --notable-text: #6b3fb0;
+  --bad-bg: #fbe2df; --bad-text: #c22f2f;
+  --shadow: 0 1px 2px rgba(20,18,12,0.06), 0 6px 16px -8px rgba(20,18,12,0.16), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0d12; --panel: #15181d; --text: #f2f3f5; --muted: #b7bcc4; --muted-faint: #7c828b;
+    --border: #262a31; --border-strong: #343a43; --accent: #3987e5; --accent-weak: #17233a;
+    --good: #3ecf3e; --good-bg: #12291a; --warning: #e0a53c; --warning-bg: #2e2312;
+    --bonus-bg: #3d3110; --bonus-text: #f0c766;
+    --notable-bg: #2c2140; --notable-text: #caa9f7;
+    --bad-bg: #3a1f1f; --bad-text: #e66767;
+    --shadow: 0 1px 2px rgba(0,0,0,0.45), 0 8px 20px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.045);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --good: #0ca30c; --good-bg: #e5f7e5; --warning: #b5710a; --warning-bg: #fdf1de;
+  --bonus-bg: #fdf1d3; --bonus-text: #7a5a00;
+  --notable-bg: #efe6fb; --notable-text: #6b3fb0;
+  --bad-bg: #fbe2df; --bad-text: #c22f2f;
+  --shadow: 0 1px 2px rgba(20,18,12,0.06), 0 6px 16px -8px rgba(20,18,12,0.16), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0d12; --panel: #15181d; --text: #f2f3f5; --muted: #b7bcc4; --muted-faint: #7c828b;
+  --border: #262a31; --border-strong: #343a43; --accent: #3987e5; --accent-weak: #17233a;
+  --good: #3ecf3e; --good-bg: #12291a; --warning: #e0a53c; --warning-bg: #2e2312;
+  --bonus-bg: #3d3110; --bonus-text: #f0c766;
+  --notable-bg: #2c2140; --notable-text: #caa9f7;
+  --bad-bg: #3a1f1f; --bad-text: #e66767;
+  --shadow: 0 1px 2px rgba(0,0,0,0.45), 0 8px 20px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.045);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text); padding: var(--space-5); font-variant-numeric: tabular-nums; }
+.page-nav { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.page-nav-link { font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill); border: 1px solid var(--border); transition: border-color var(--transition), color var(--transition); }
+.page-nav-link:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); }
+.page-nav-link.page-nav-active { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); font-weight: 600;
+  box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--accent) 50%, transparent); }
+h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 2px; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 var(--space-5); max-width: 900px; }
+.empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center;
+  border: 1px dashed var(--border); border-radius: var(--radius-md); }
+.empty-note-icon { font-size: 1.9rem; margin-bottom: var(--space-2); opacity: 0.75; }
+.theme-toggle { position: fixed; top: var(--space-4); right: var(--space-4); z-index: 20;
+  display: flex; align-items: center; justify-content: center; width: 38px; height: 38px;
+  cursor: pointer; font-size: 1.05rem; line-height: 1; background: var(--panel);
+  border: 1px solid var(--border); border-radius: var(--radius-pill); box-shadow: var(--shadow);
+  transition: border-color var(--transition), transform var(--transition); }
+.theme-toggle:hover { border-color: var(--accent); transform: translateY(-1px); }
+.copy-btn-small { background: transparent; color: var(--muted); border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+  padding: 2px var(--space-3); font-size: 0.72rem; font-weight: 400; cursor: pointer; white-space: nowrap;
+  transition: background-color var(--transition), color var(--transition), border-color var(--transition); }
+.copy-btn-small:hover { color: var(--accent); border-color: var(--accent); }
+.copy-btn-small.copied { color: #fff; background: var(--accent); border-color: var(--accent); }
+.copy-btn-small.copy-failed { color: #fff; background: var(--bad-text); border-color: var(--bad-text); }
+/* Real bug, fixed: discord-export-btn and cycle-view-btn each had their own hardcoded
+   `position: fixed; right: <magic pixel offset>`, sized to assume a specific button width --
+   "view by cycle and copy for discord overlap" (user). Any width drift (font rendering, a longer
+   power name inflating one label, etc) could push them into each other. Fixed by wrapping both in
+   a single fixed-position flex row (`.page-actions-row`) so real widths + a real gap always
+   determine spacing, never a guessed offset. */
+.page-actions-row { position: fixed; top: var(--space-4); right: 66px; z-index: 20;
+  display: flex; align-items: center; gap: var(--space-2); }
+.discord-export-btn, .cycle-view-btn {
+  font-size: 0.82rem; padding: var(--space-2) var(--space-4); border-radius: var(--radius-pill); cursor: pointer;
+  background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); box-shadow: var(--shadow);
+  transition: border-color var(--transition), color var(--transition); white-space: nowrap; }
+.discord-export-btn:hover, .cycle-view-btn:hover { border-color: var(--accent); color: var(--accent); }
+.discord-export-btn.copied { color: #fff; background: var(--accent); border-color: var(--accent); }
+.cycle-modal-overlay { position: fixed; inset: 0; background: rgba(10,10,10,0.55); display: flex;
+  align-items: center; justify-content: center; z-index: 100; padding: var(--space-4); }
+.cycle-modal-overlay[hidden] { display: none; }
+.cycle-modal { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); max-width: 640px; width: 100%; height: 85vh; max-height: 720px;
+  display: flex; flex-direction: column; padding: var(--space-5); }
+.cycle-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3);
+  margin-bottom: var(--space-3); flex: 0 0 auto; }
+.cycle-modal-title { font-size: 1.1rem; font-weight: 700; }
+.cycle-modal-close { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: var(--muted); line-height: 1; padding: 4px; }
+.cycle-modal-close:hover { color: var(--text); }
+.cycle-select-row { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4); flex: 0 0 auto; }
+.cycle-select-row select { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); font-size: 0.9rem; font: inherit; }
+.cycle-nav-btn { background: var(--panel); border: 1px solid var(--border-strong); color: var(--text);
+  border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); cursor: pointer; font-size: 0.9rem;
+  transition: border-color var(--transition), color var(--transition); }
+.cycle-nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.cycle-nav-btn:disabled { opacity: 0.4; cursor: default; }
+.cycle-range-label { font-size: 0.78rem; color: var(--muted); margin-bottom: var(--space-3); flex: 0 0 auto; }
+.cycle-empty { font-size: 0.85rem; color: var(--muted); padding: var(--space-4) 0; text-align: center; }
+#cycleModalBody { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm);
+}
+
+/* Status cards -- same visual language as the other pages' stat-card/need-card patterns. */
+.status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-5); }
+.status-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-4); box-shadow: var(--shadow); }
+.status-card-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.status-card-value { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; margin-top: 2px; }
+.status-card-sub { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+
+/* Chart -- user: "how youre contributing to your power", a real cumulative-merits-over-time line.
+   Single series (no legend needed, dataviz skill's own simplification for exactly one series),
+   thin 2px line, rounded end marker, recessive gridlines, hover crosshair+tooltip. The history log
+   below is this chart's real non-visual/table-view alternative (same underlying per-event data).
+   Real bug, fixed: the first version fixed `height: 220px` in CSS while `width` stayed responsive
+   (100%), combined with `preserveAspectRatio="none"` on the SVG -- that forces independent X/Y
+   scale factors as the container resizes, which visually distorts a STROKED path (a 2px line
+   stretched only horizontally reads as warped/uneven thickness, and the end-dot circle becomes an
+   ellipse) -- "the graph warps with the browser strangely". Fixed by locking the container to the
+   SAME aspect ratio as the viewBox (so the rendered box's own ratio always matches, meaning
+   uniform default scaling is an exact fit, never letterboxed) and dropping preserveAspectRatio
+   back to its default (xMidYMid meet -- uniform, no distortion). */
+.chart-section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-5); }
+.chart-title { font-size: 1.05rem; font-weight: 700; margin-bottom: var(--space-3); }
+.chart-wrap { position: relative; }
+#meritsChart { width: 100%; aspect-ratio: 800 / 240; height: auto; display: block; overflow: visible; }
+.chart-line { fill: none; stroke: var(--chart-color, var(--accent)); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chart-grid-line { stroke: var(--border); stroke-width: 1; }
+.chart-grid-line-x { stroke: var(--border); stroke-width: 1; opacity: 0.6; }
+.chart-axis-label { fill: var(--muted); font-size: 10px; }
+.chart-end-dot { fill: var(--chart-color, var(--accent)); }
+.chart-crosshair { stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 3 3; display: none; }
+.chart-hover-dot { fill: var(--panel); stroke: var(--chart-color, var(--accent)); stroke-width: 2; display: none; }
+.chart-hit-layer { fill: transparent; cursor: crosshair; }
+.chart-tooltip { position: absolute; display: none; pointer-events: none; z-index: 5;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3); font-size: 0.78rem; box-shadow: var(--shadow); white-space: nowrap; }
+.chart-tooltip-value { font-weight: 700; }
+
+/* History log -- the real per-event feed (merits/rank/delivered/collected/joined). */
+.history-section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); padding: var(--space-4) var(--space-5); }
+.history-title { font-size: 1.05rem; font-weight: 700; margin-bottom: var(--space-3); }
+.history-list { display: flex; flex-direction: column; gap: 6px; max-height: 480px; overflow-y: auto; }
+.history-row { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm); font-size: 0.85rem;
+  border-left: 3px solid var(--power-color, transparent); }
+.history-row:nth-child(odd) { background: var(--bg); }
+.history-icon { flex-shrink: 0; }
+.history-label { flex: 1; }
+.history-date { font-size: 0.74rem; color: var(--muted); white-space: nowrap; }
+.history-cycle { color: var(--muted-faint); }
+.history-row-joined { font-weight: 700; }
+.history-row-rank { color: var(--accent); font-weight: 600; }
+.systems-list { display: flex; flex-direction: column; gap: 6px; }
+.systems-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-size: 0.85rem; }
+.systems-row:nth-child(odd) { background: var(--bg); }
+.systems-name { font-weight: 600; }
+.systems-count { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+  <a class="page-nav-link" href="standalone_viewer.html">🗺️ Systems</a>
+  <a class="page-nav-link" href="standalone_events.html">🔍 Journal search</a>
+  <a class="page-nav-link" href="standalone_summary.html">📊 Recap</a>
+  <a class="page-nav-link" href="standalone_materials.html">🧪 Materials</a>
+  <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
+  <a class="page-nav-link" href="standalone_shipyard.html">🚀 Shipyard</a>
+  <a class="page-nav-link page-nav-active" href="standalone_powerplay.html">⚔️ Powerplay</a>
+</nav>
+<button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
+<div class="page-actions-row">
+  <button class="cycle-view-btn" type="button" id="cycleViewBtn" hidden>📅 View by Cycle</button>
+  <button class="discord-export-btn" type="button" id="discordExportBtn" hidden>💬 Copy for Discord</button>
+</div>
+
+<h1>standalone -- powerplay</h1>
+<p class="subtitle" id="subtitle"></p>
+
+<div class="cycle-modal-overlay" id="cycleModalOverlay" hidden>
+  <div class="cycle-modal" role="dialog" aria-modal="true" aria-labelledby="cycleModalTitle">
+    <div class="cycle-modal-head">
+      <div class="cycle-modal-title" id="cycleModalTitle">📅 View by Cycle</div>
+      <div style="display:flex;align-items:center;gap:var(--space-2)">
+        <button type="button" class="copy-btn-small" id="cycleDiscordBtn">💬 Copy</button>
+        <button type="button" class="cycle-modal-close" id="cycleModalClose" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="cycle-select-row">
+      <button type="button" class="cycle-nav-btn" id="cyclePrevBtn" title="Older cycle">◀</button>
+      <select id="cycleSelect"></select>
+      <button type="button" class="cycle-nav-btn" id="cycleNextBtn" title="More recent cycle">▶</button>
+    </div>
+    <div class="cycle-range-label" id="cycleRangeLabel"></div>
+    <div id="cycleModalBody"></div>
+  </div>
+</div>
+
+<div id="content"></div>
+
+<script id="powerplay-data" type="application/json">__DATA_JSON__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('powerplay-data').textContent);
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtInt(n) {
+  return Math.round(n).toLocaleString('en-US');
+}
+function fmtDate(iso) {
+  return iso ? iso.replace('T', ' ').replace('Z', '') + ' UTC' : '';
+}
+// User: "it should say like, which system tick you got the merits in? look into the games
+// background sim if you need to understand it" -- researched this rather than guess: Powerplay
+// runs on its own real weekly cycle, separate from the per-system daily BGS tick (which varies
+// system-to-system and isn't what "merits" are scoped by) -- the real Powerplay cycle resets
+// every Thursday at 07:00 UTC, confirmed against real community documentation of the actual
+// mechanic. Computes the most recent Thursday-07:00-UTC boundary on or before a given real event
+// timestamp, i.e. which weekly cycle that event's merits actually belong to.
+function powerplayCycleStart(iso) {
+  const d = new Date(iso);
+  const cycle = new Date(d);
+  cycle.setUTCHours(7, 0, 0, 0);
+  const daysSinceThursday = (cycle.getUTCDay() - 4 + 7) % 7; // getUTCDay(): 0=Sun..4=Thu..6=Sat
+  cycle.setUTCDate(cycle.getUTCDate() - daysSinceThursday);
+  if (cycle.getTime() > d.getTime()) {
+    // Event happened on a Thursday but before that day's 07:00 UTC reset -- still last week's cycle.
+    cycle.setUTCDate(cycle.getUTCDate() - 7);
+  }
+  return cycle;
+}
+function powerplayCycleLabel(iso) {
+  if (!iso) return '';
+  return `cycle of ${powerplayCycleStart(iso).toISOString().slice(0, 10)}`;
+}
+
+// User: "add a cycle viewer button that lets you view your stuff in each cycle" -- groups every
+// real history entry (merits/rank/delivered/collected/joined) by the same real weekly Powerplay
+// cycle boundary powerplayCycleLabel already computes, so "your stuff in each cycle" covers
+// everything that happened that week, not just merits. Returns cycles sorted most-recent-first.
+function groupHistoryByCycle() {
+  const byKey = new Map(); // cycle start ISO date -> { startISO, entries: [] }
+  for (const h of DATA.history) {
+    const startISO = powerplayCycleStart(h.timestamp).toISOString().slice(0, 10);
+    if (!byKey.has(startISO)) byKey.set(startISO, { startISO, entries: [] });
+    byKey.get(startISO).entries.push(h);
+  }
+  const cycles = [...byKey.values()];
+  cycles.sort((a, b) => b.startISO.localeCompare(a.startISO));
+  for (const c of cycles) {
+    c.meritsGained = c.entries.filter(e => e.kind === 'merits').length
+      ? c.entries.filter(e => e.kind === 'merits').reduce((sum, e) => {
+          const m = e.label.match(/\+([\d,]+)/);
+          return sum + (m ? Number(m[1].replace(/,/g, '')) : 0);
+        }, 0)
+      : 0;
+    c.meritActions = c.entries.filter(e => e.kind === 'merits').length;
+    c.delivered = {};
+    // deliveredBySystem: user, on the cycle viewer's own Discord export: "i should ... be able to
+    // click copy and its a summary of each systems total influence ive contributed to in that
+    // cycle" -- same real per-entry label already parsed for goods type above, just keyed by the
+    // system name (the 3rd regex group) instead of the goods type (the 2nd).
+    c.deliveredBySystem = {};
+    for (const e of c.entries) {
+      if (e.kind !== 'delivered') continue;
+      const m = e.label.match(/^Delivered ([\d,]+) (.+?)(?: in (.+))?$/);
+      if (!m) continue;
+      const count = Number(m[1].replace(/,/g, ''));
+      c.delivered[m[2]] = (c.delivered[m[2]] || 0) + count;
+      if (m[3]) c.deliveredBySystem[m[3]] = (c.deliveredBySystem[m[3]] || 0) + count;
+    }
+    c.rankUps = c.entries.filter(e => e.kind === 'rank');
+    c.joined = c.entries.filter(e => e.kind === 'joined');
+  }
+  return cycles;
+}
+
+let cycleList = [];
+let cycleIndex = 0;
+
+function renderCycle() {
+  const c = cycleList[cycleIndex];
+  if (!c) {
+    document.getElementById('cycleModalBody').innerHTML = '<div class="cycle-empty">No activity in this cycle.</div>';
+    return;
+  }
+  const start = new Date(c.startISO + 'T07:00:00Z');
+  const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+  document.getElementById('cycleRangeLabel').textContent =
+    `${c.startISO} 07:00 UTC -- ${end.toISOString().slice(0, 10)} 07:00 UTC · ${c.entries.length} real events`;
+
+  const cards = [];
+  if (c.meritActions > 0) cards.push({ label: 'Merits gained', value: fmtInt(c.meritsGained), sub: `${fmtInt(c.meritActions)} actions` });
+  const deliveredEntries = Object.entries(c.delivered);
+  if (deliveredEntries.length) {
+    const total = deliveredEntries.reduce((s, [, n]) => s + n, 0);
+    cards.push({ label: 'Goods delivered', value: fmtInt(total), sub: deliveredEntries.map(([t, n]) => `${t}: ${fmtInt(n)}`).join(', ') });
+  }
+  if (c.rankUps.length) cards.push({ label: 'Rank ups', value: fmtInt(c.rankUps.length), sub: c.rankUps.map(r => r.label).join(', ') });
+  if (c.joined.length) cards.push({ label: 'Pledged', value: c.joined[0].label });
+
+  document.getElementById('cycleModalBody').innerHTML = cards.length
+    ? `<div class="status-grid">${cards.map(cd => `
+        <div class="status-card">
+          <div class="status-card-label">${escapeHtml(cd.label)}</div>
+          <div class="status-card-value">${escapeHtml(cd.value)}</div>
+          ${cd.sub ? `<div class="status-card-sub">${escapeHtml(cd.sub)}</div>` : ''}
+        </div>`).join('')}</div>
+      <div class="history-section" style="margin-top:var(--space-4);padding:0;box-shadow:none;border:none;">
+        <div class="history-list">${c.entries.slice().reverse().map(h => `
+          <div class="history-row history-row-${h.kind}"${powerColorStyle(h.power)}>
+            <span class="history-icon">${historyIcon(h.kind)}</span>
+            <span class="history-label">${escapeHtml(h.label)}</span>
+            <span class="history-date">${escapeHtml(fmtDate(h.timestamp))}</span>
+          </div>`).join('')}</div>
+      </div>`
+    : '<div class="cycle-empty">No activity in this cycle.</div>';
+
+  document.getElementById('cyclePrevBtn').disabled = cycleIndex >= cycleList.length - 1;
+  document.getElementById('cycleNextBtn').disabled = cycleIndex <= 0;
+}
+
+function openCycleModal() {
+  cycleList = groupHistoryByCycle();
+  const select = document.getElementById('cycleSelect');
+  select.innerHTML = cycleList.map((c, i) => `<option value="${i}">${escapeHtml(c.startISO)} (${c.entries.length} events)</option>`).join('');
+  cycleIndex = 0;
+  select.value = '0';
+  renderCycle();
+  document.getElementById('cycleModalOverlay').hidden = false;
+}
+function closeCycleModal() {
+  document.getElementById('cycleModalOverlay').hidden = true;
+}
+// User: "i should when i open view by cycle be able to click copy and its a summary of each
+// systems total influence ive contributed to in that cycle" -- the currently-viewed cycle's own
+// real per-system delivery totals (see groupHistoryByCycle's own deliveredBySystem), not the
+// page-wide totals the main Discord export button above already covers.
+function formatCycleForDiscord(c) {
+  const start = new Date(c.startISO + 'T07:00:00Z');
+  const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const lines = [`**Powerplay -- cycle of ${c.startISO}**`, `_${c.startISO} 07:00 UTC -- ${end.toISOString().slice(0, 10)} 07:00 UTC_`];
+  if (c.meritActions > 0) lines.push(`✨ ${fmtInt(c.meritsGained)} merits earned (${fmtInt(c.meritActions)} actions)`);
+  const systems = Object.entries(c.deliveredBySystem).sort((a, b) => b[1] - a[1]);
+  if (systems.length) {
+    lines.push('', '**Systems reinforced this cycle:**');
+    for (const [system, count] of systems) lines.push(`  ${system}: ${fmtInt(count)} delivered`);
+  }
+  if (c.rankUps.length) lines.push('', `⬆️ ${c.rankUps.map(r => r.label).join(', ')}`);
+  if (c.joined.length) lines.push('', `🤝 ${c.joined[0].label}`);
+  if (lines.length === 2) lines.push('', 'No activity this cycle.');
+  return lines.join('\n');
+}
+document.getElementById('cycleDiscordBtn').addEventListener('click', () => {
+  const btn = document.getElementById('cycleDiscordBtn');
+  const c = cycleList[cycleIndex];
+  if (!c) return;
+  copyToClipboard(formatCycleForDiscord(c)).then(ok => {
+    const original = btn.textContent;
+    btn.textContent = ok ? '✓ Copied' : '✗ Failed';
+    btn.classList.toggle('copied', ok);
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, ok ? 1400 : 2500);
+  });
+});
+document.getElementById('cycleViewBtn').addEventListener('click', openCycleModal);
+document.getElementById('cycleModalClose').addEventListener('click', closeCycleModal);
+document.getElementById('cycleModalOverlay').addEventListener('click', e => {
+  if (e.target.id === 'cycleModalOverlay') closeCycleModal();
+});
+document.getElementById('cycleSelect').addEventListener('change', e => {
+  cycleIndex = Number(e.target.value);
+  renderCycle();
+});
+document.getElementById('cyclePrevBtn').addEventListener('click', () => {
+  if (cycleIndex < cycleList.length - 1) { cycleIndex++; document.getElementById('cycleSelect').value = String(cycleIndex); renderCycle(); }
+});
+document.getElementById('cycleNextBtn').addEventListener('click', () => {
+  if (cycleIndex > 0) { cycleIndex--; document.getElementById('cycleSelect').value = String(cycleIndex); renderCycle(); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCycleModal(); });
+
+document.getElementById('subtitle').textContent = DATA.pledged
+  ? `Generated ${DATA.generatedAt} -- pledged to ${DATA.power}, computed from your real journal history.`
+  : `Generated ${DATA.generatedAt}.`;
+
+// --- Merits-over-time chart -- plain SVG, no charting library, matching this page's own
+// "as lightweight as possible" bar. Single series so no legend (dataviz skill's own rule for
+// exactly one series); the real per-event history list below is this chart's table-view
+// alternative -- same underlying data, not a visual-only story.
+// Shared layout constants -- both renderChart and wireChartHover need the exact same numbers to
+// agree on where things are, so they're defined once here instead of duplicated in two places
+// (a real risk the first version had: hardcoding height/padB separately in each function).
+const CHART_W = 800, CHART_H = 240, CHART_PAD_L = 44, CHART_PAD_R = 12, CHART_PAD_T = 12, CHART_PAD_B = 32;
+
+// User: "it needs vertical lines to tell WHEN stuff hgappens it just shows it going up butg you
+// dont know over how long and when" -- real gap, the first version only had Y-axis (merit value)
+// gridlines, nothing marking the time axis at all. Picks up to 5 evenly-time-spaced ticks across
+// the real [tMin, tMax] range and labels each with a real short date.
+function chartTimeTicks(tMin, tMax, count) {
+  if (tMax <= tMin) return [tMin];
+  const ticks = [];
+  for (let i = 0; i < count; i++) ticks.push(tMin + (tMax - tMin) * (i / (count - 1)));
+  return ticks;
+}
+function shortDate(ms) {
+  return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function renderChart(points) {
+  if (!points || points.length < 2) return '';
+  const { width, height, padL, padR, padT, padB } = { width: CHART_W, height: CHART_H, padL: CHART_PAD_L, padR: CHART_PAD_R, padT: CHART_PAD_T, padB: CHART_PAD_B };
+  const times = points.map(p => new Date(p.timestamp).getTime());
+  const values = points.map(p => p.cumulativeMerits);
+  const tMin = times[0], tMax = times[times.length - 1];
+  const vMax = Math.max(...values, 1);
+  const x = t => padL + (tMax > tMin ? (t - tMin) / (tMax - tMin) : 0) * (width - padL - padR);
+  const y = v => height - padB - (v / vMax) * (height - padT - padB);
+  const coords = points.map((p, i) => [x(times[i]), y(p.cumulativeMerits)]);
+  const path = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c[0].toFixed(1)},${c[1].toFixed(1)}`).join(' ');
+  const gridLines = [0, 0.5, 1].map(f => {
+    const gy = padT + f * (height - padT - padB);
+    const label = fmtInt(vMax * (1 - f));
+    return `<line class="chart-grid-line" x1="${padL}" y1="${gy}" x2="${width - padR}" y2="${gy}" />
+      <text class="chart-axis-label" x="${padL - 6}" y="${gy + 3}" text-anchor="end">${label}</text>`;
+  }).join('');
+  const timeTicks = chartTimeTicks(tMin, tMax, 5).map(t => {
+    const tx = x(t);
+    return `<line class="chart-grid-line-x" x1="${tx.toFixed(1)}" y1="${padT}" x2="${tx.toFixed(1)}" y2="${height - padB}" />
+      <text class="chart-axis-label" x="${tx.toFixed(1)}" y="${height - padB + 14}" text-anchor="middle">${escapeHtml(shortDate(t))}</text>`;
+  }).join('');
+  const last = coords[coords.length - 1];
+  return `
+    <div class="chart-wrap">
+      <svg id="meritsChart" viewBox="0 0 ${width} ${height}">
+        ${gridLines}
+        ${timeTicks}
+        <path class="chart-line" d="${path}" />
+        <circle class="chart-end-dot" cx="${last[0]}" cy="${last[1]}" r="3.5" />
+        <line class="chart-crosshair" id="chartCrosshair" x1="0" y1="${padT}" x2="0" y2="${height - padB}" />
+        <circle class="chart-hover-dot" id="chartHoverDot" r="4" />
+        <rect class="chart-hit-layer" x="${padL}" y="0" width="${width - padL - padR}" height="${height}" id="chartHitLayer" />
+      </svg>
+      <div class="chart-tooltip" id="chartTooltip"></div>
+    </div>`;
+}
+
+function wireChartHover(points) {
+  const svg = document.getElementById('meritsChart');
+  if (!svg) return;
+  const hit = document.getElementById('chartHitLayer');
+  const crosshair = document.getElementById('chartCrosshair');
+  const dot = document.getElementById('chartHoverDot');
+  const tooltip = document.getElementById('chartTooltip');
+  const width = CHART_W, height = CHART_H, padL = CHART_PAD_L, padR = CHART_PAD_R, padT = CHART_PAD_T, padB = CHART_PAD_B;
+  const times = points.map(p => new Date(p.timestamp).getTime());
+  const values = points.map(p => p.cumulativeMerits);
+  const tMin = times[0], tMax = times[times.length - 1];
+  const vMax = Math.max(...values, 1);
+  const xOf = t => padL + (tMax > tMin ? (t - tMin) / (tMax - tMin) : 0) * (width - padL - padR);
+  const yOf = v => height - padB - (v / vMax) * (height - padT - padB);
+
+  function showAt(clientX) {
+    const rect = svg.getBoundingClientRect();
+    const svgX = (clientX - rect.left) / rect.width * width;
+    // Nearest point by x-position.
+    let best = 0, bestDist = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const d = Math.abs(xOf(times[i]) - svgX);
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+    const px = xOf(times[best]), py = yOf(values[best]);
+    crosshair.setAttribute('x1', px); crosshair.setAttribute('x2', px);
+    crosshair.style.display = 'block';
+    dot.setAttribute('cx', px); dot.setAttribute('cy', py);
+    dot.style.display = 'block';
+    tooltip.innerHTML = `<div>${escapeHtml(fmtDate(points[best].timestamp))}</div><div class="chart-tooltip-value">${fmtInt(values[best])} merits</div>`;
+    tooltip.style.display = 'block';
+    const wrapRect = svg.parentElement.getBoundingClientRect();
+    const left = (px / width) * wrapRect.width;
+    tooltip.style.left = `${Math.min(Math.max(left - 60, 0), wrapRect.width - 140)}px`;
+    tooltip.style.top = `${(py / height) * wrapRect.height - 46}px`;
+  }
+  hit.addEventListener('mousemove', e => showAt(e.clientX));
+  hit.addEventListener('mouseleave', () => {
+    crosshair.style.display = 'none';
+    dot.style.display = 'none';
+    tooltip.style.display = 'none';
+  });
+}
+
+function historyIcon(kind) {
+  return { merits: '✨', rank: '⬆️', delivered: '📦', collected: '🎒', joined: '🤝' }[kind] || '•';
+}
+
+// User: "change colour theme in powerplay of action to match hex of power the action was for
+// (search their colours online)" -- no canonical hex list exists anywhere published (checked
+// Frontier's own materials, EDCD/EDDN journal docs, EDMC plugin source, EDSM/Inara/Spansh map
+// tools); the user supplied real in-game screenshots of the Powerplay menu instead (the small bar
+// under each power's portrait is their real theme color), read by eye off those screenshots. Each
+// history entry's own real `power` field (see powerplay.go's own comment on why this is read
+// per-EVENT rather than assumed to be the commander's current pledge -- PowerplayDefect means a
+// real commander's own history can span more than one power) looks up its real color here.
+const POWER_COLORS = {
+  'Aisling Duval': '#29ABE2', 'Archon Delaine': '#E74C3C', 'Arissa Lavigny-Duval': '#8E44AD',
+  'Denton Patreus': '#17A2B8', 'Edmund Mahon': '#27AE60', 'Felicia Winters': '#D68910',
+  'Jerome Archer': '#D6249F', 'Li Yong-Rui': '#16A085', 'Nakato Kaine': '#A4C639',
+  'Pranav Antal': '#F1C40F', 'Yuri Grom': '#E67E22', 'Zemina Torval': '#2E86DE',
+};
+function powerColorStyle(power) {
+  const color = POWER_COLORS[power];
+  return color ? ` style="--power-color:${color}"` : '';
+}
+
+function renderContent() {
+  if (!DATA.pledged) {
+    document.getElementById('content').innerHTML =
+      `<div class="empty-note"><div class="empty-note-icon">⚔️</div>No Powerplay activity found in your journal yet -- pledge to a power in-game, then re-run this tool.</div>`;
+    return;
+  }
+  document.getElementById('discordExportBtn').hidden = false;
+  if (DATA.history.length) document.getElementById('cycleViewBtn').hidden = false;
+
+  const statusCards = [
+    { label: 'Pledged to', value: DATA.power },
+    { label: 'Powerplay rank', value: fmtInt(DATA.rank) },
+    { label: 'Current merits', value: fmtInt(DATA.merits) },
+  ];
+  if (DATA.timePledgedDays) statusCards.push({ label: 'Time pledged', value: `${DATA.timePledgedDays.toFixed(1)} days` });
+  if (DATA.joinedAt) statusCards.push({ label: 'Pledged since', value: fmtDate(DATA.joinedAt).split(' ')[0] });
+  if (DATA.totalDelivered) {
+    const sub = DATA.deliveredSystems && DATA.deliveredSystems.length > 1
+      ? `across ${DATA.deliveredSystems.length} systems`
+      : 'influence pushed';
+    statusCards.push({ label: 'Goods delivered', value: fmtInt(DATA.totalDelivered), sub });
+  }
+  if (DATA.totalCollected) statusCards.push({ label: 'Goods collected', value: fmtInt(DATA.totalCollected) });
+
+  const statusHtml = `<div class="status-grid">${statusCards.map(c => `
+    <div class="status-card">
+      <div class="status-card-label">${escapeHtml(c.label)}</div>
+      <div class="status-card-value">${escapeHtml(c.value)}</div>
+      ${c.sub ? `<div class="status-card-sub">${escapeHtml(c.sub)}</div>` : ''}
+    </div>`).join('')}</div>`;
+
+  // User: "it needs to say how much youve pushed EACH SYSTEM, its important" -- a flat list of
+  // system names wasn't enough; real per-system delivery totals, sorted biggest contribution
+  // first (already sorted server-side).
+  const systemsHtml = DATA.deliveredSystems && DATA.deliveredSystems.length
+    ? `<div class="chart-section">
+        <div class="chart-title">Systems reinforced</div>
+        <div class="systems-list">${DATA.deliveredSystems.map(d => `
+          <div class="systems-row">
+            <span class="systems-name">${escapeHtml(d.system)}</span>
+            <span class="systems-count">${fmtInt(d.count)} delivered</span>
+          </div>`).join('')}</div>
+      </div>`
+    : '';
+
+  const chartColor = POWER_COLORS[DATA.power];
+  const chartHtml = DATA.chart.length >= 2
+    ? `<div class="chart-section"${chartColor ? ` style="--chart-color:${chartColor}"` : ''}><div class="chart-title">Merits over time</div>${renderChart(DATA.chart)}</div>`
+    : '';
+
+  const historyHtml = DATA.history.length
+    ? `<div class="history-section">
+        <div class="history-title">Activity log</div>
+        <div class="history-list">${DATA.history.map(h => `
+          <div class="history-row history-row-${h.kind}"${powerColorStyle(h.power)}>
+            <span class="history-icon">${historyIcon(h.kind)}</span>
+            <span class="history-label">${escapeHtml(h.label)}</span>
+            <span class="history-date">${escapeHtml(fmtDate(h.timestamp))}${h.kind === 'merits' ? ` <span class="history-cycle">(${escapeHtml(powerplayCycleLabel(h.timestamp))})</span>` : ''}</span>
+          </div>`).join('')}</div>
+      </div>`
+    : '';
+
+  document.getElementById('content').innerHTML = statusHtml + systemsHtml + chartHtml + historyHtml;
+  if (DATA.chart.length >= 2) wireChartHover(DATA.chart);
+}
+renderContent();
+
+// User: "could use a discord export too to share how youre contributing to your power with
+// others" -- same copyToClipboard/legacyCopy pattern already used by the other pages' Discord/
+// copy buttons.
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(() => true, () => legacyCopy(text));
+  }
+  return Promise.resolve(legacyCopy(text));
+}
+function legacyCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* best effort */ }
+  document.body.removeChild(ta);
+  return ok;
+}
+// User: "powerplay copy should be a summary, totals for each thing not each reward" -- the first
+// version listed the 5 most recent individual merit-gain events, which reads as noisy detail, not
+// a shareable summary. Every line here is now a real TOTAL for its category instead of an
+// itemized list -- DATA.chart's own last point (cumulative merits, already computed for the chart
+// itself) doubles as "total merits earned", with DATA.chart.length as the real action count.
+// User: "add timestamps to the powerplay output" -- the export had no time context at all before
+// this (not even when it was generated, or when the commander was last actually active).
+function formatPowerplayForDiscord() {
+  const lines = [`**Powerplay -- ${DATA.power}**`, `_Generated ${DATA.generatedAt}_`];
+  lines.push(`Rank ${DATA.rank} · ${fmtInt(DATA.merits)} current merits`);
+  if (DATA.timePledgedDays) lines.push(`Pledged ${DATA.timePledgedDays.toFixed(1)} days`);
+  if (DATA.joinedAt) lines.push(`Pledged since ${fmtDate(DATA.joinedAt)}`);
+  if (DATA.chart.length) {
+    const totalMerits = DATA.chart[DATA.chart.length - 1].cumulativeMerits;
+    lines.push(`✨ ${fmtInt(totalMerits)} total merits earned (${fmtInt(DATA.chart.length)} actions)`);
+  }
+  if (DATA.totalDelivered) lines.push(`📦 ${fmtInt(DATA.totalDelivered)} goods delivered (influence pushed)`);
+  if (DATA.totalCollected) lines.push(`🎒 ${fmtInt(DATA.totalCollected)} goods collected`);
+  // User: "powerplay export should say which systems youve pushed influence towards", then "it
+  // needs to say how much youve pushed EACH SYSTEM, its important" -- real per-system totals, not
+  // just a flat name list.
+  if (DATA.deliveredSystems && DATA.deliveredSystems.length) {
+    lines.push('', '**Systems reinforced:**');
+    for (const d of DATA.deliveredSystems) lines.push(`  ${d.system}: ${fmtInt(d.count)} delivered`);
+  }
+  // History is reverse-chronological -- [0] is the real most recent real activity of any kind.
+  if (DATA.history.length) {
+    const last = DATA.history[0];
+    const cycleBit = last.kind === 'merits' ? ` (${powerplayCycleLabel(last.timestamp)})` : '';
+    lines.push('', `_Last activity: ${last.label} — ${fmtDate(last.timestamp)}${cycleBit}_`);
+  }
+  // User: "the last line be (merits last cycle)" -- the real weekly-cycle merit total (see
+  // groupHistoryByCycle), not just the single most recent event above, as the real closing line.
+  const cycles = groupHistoryByCycle();
+  if (cycles.length) {
+    const c = cycles[0];
+    const end = new Date(new Date(c.startISO + 'T07:00:00Z').getTime() + 7 * 24 * 60 * 60 * 1000);
+    lines.push(`_Merits last cycle (${c.startISO} -- ${end.toISOString().slice(0, 10)}): ${fmtInt(c.meritsGained)}_`);
+  }
+  return lines.join('\n');
+}
+document.getElementById('discordExportBtn').addEventListener('click', () => {
+  const btn = document.getElementById('discordExportBtn');
+  copyToClipboard(formatPowerplayForDiscord()).then(ok => {
+    const original = btn.textContent;
+    btn.textContent = ok ? '✓ Copied' : '✗ Failed';
+    btn.classList.toggle('copied', ok);
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, ok ? 1400 : 2500);
+  });
+});
+
+// Manual light/dark override -- see the other six pages for the same pattern/comment.
+function currentTheme() {
+  const forced = document.documentElement.getAttribute('data-theme');
+  if (forced === 'light' || forced === 'dark') return forced;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function updateThemeToggleLabel() {
+  const btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  const dark = currentTheme() === 'dark';
+  btn.textContent = dark ? '🌙' : '☀️';
+  btn.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
+}
+function propagateThemeToNavLinks(theme) {
+  document.querySelectorAll('.page-nav-link[href]').forEach(a => {
+    const base = a.getAttribute('href').split('?')[0];
+    a.setAttribute('href', theme ? base + '?theme=' + theme : base);
+  });
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('standalone_theme', theme); } catch (e) { /* storage unavailable */ }
+  updateThemeToggleLabel();
+  propagateThemeToNavLinks(theme);
+}
+const themeToggleBtn = document.getElementById('themeToggle');
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener('click', () => applyTheme(currentTheme() === 'dark' ? 'light' : 'dark'));
+}
+updateThemeToggleLabel();
+propagateThemeToNavLinks(document.documentElement.getAttribute('data-theme'));
+</script>
+</body>
+</html>

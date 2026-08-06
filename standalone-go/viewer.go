@@ -114,6 +114,10 @@ type viewerSystem struct {
 	BioValue            int64          `json:"bioValue"`
 	Stars               []viewerStar   `json:"stars"`
 	Bodies              []viewerBody   `json:"bodies"`
+	// LastVisitedAt: real timestamp of this system's own most recent update (any FSDJump/
+	// Location/scan event that touched it) -- user: "add sort by date, recent / oldest for
+	// system map". Same UpdatedAt field this project's Store.System already tracks.
+	LastVisitedAt string `json:"lastVisitedAt,omitempty"`
 }
 
 type viewerData struct {
@@ -249,7 +253,7 @@ func Render(store *Store) (string, int, error) {
 			BodyCountTotal: sys.BodyCountTotal, RecordedBodyCount: len(bodies) + len(stars),
 			ClaimedByCommander: sys.ClaimedByCmdr, NotableCounts: notableCounts,
 			FirstDiscoveryCount: firstDiscoveryCount, BioValue: bioValue,
-			Stars: stars, Bodies: bodies,
+			Stars: stars, Bodies: bodies, LastVisitedAt: sys.UpdatedAt,
 		})
 	}
 	sort.Slice(systems, func(i, j int) bool { return systems[i].Name < systems[j].Name })

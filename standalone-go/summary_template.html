@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>(function(){try{var q=new URLSearchParams(location.search).get('theme');var t=(q==='light'||q==='dark')?q:localStorage.getItem('standalone_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);if(q)localStorage.setItem('standalone_theme',t);}}catch(e){}})();</script>
-<title>edjournalatlas -- career recap</title>
+<title>standalone -- career recap</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root {
@@ -82,6 +82,26 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .highlights { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
 .highlight { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent);
   border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); box-shadow: var(--shadow); font-size: 0.9rem; }
+/* User: "under last session it needs timestamps for the events it shows there". */
+.highlight-date { font-size: 0.74rem; color: var(--muted); margin-top: 3px; }
+/* User: "maybe add a recent session recap? that shows best things of your last journal like '5
+   kills last session, 2 first descoveries' etc" -- a compact highlight strip (not the full
+   exhaustive per-category breakdown the rest of this page already has) scoped to just the most
+   recent play session, sitting ahead of the all-time recap since it's the most immediately
+   relevant thing right after actually playing. Reuses the exact same recapStat data shape as the
+   all-time sections below -- just a curated subset of the session's own non-zero stats, picked by
+   pickSessionHighlights (see JS below) rather than every stat at once. */
+.session-recap { background: var(--accent-weak); border: 1px solid var(--accent); border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5); margin-bottom: var(--space-5); box-shadow: var(--shadow); }
+.session-recap-title { font-size: 1rem; font-weight: 700; margin-bottom: 2px; display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+.session-recap-range { font-size: 0.78rem; color: var(--muted); font-weight: 400; }
+.session-recap-empty { font-size: 0.85rem; color: var(--muted); margin-top: var(--space-2); }
+.session-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3); margin-top: var(--space-3); }
+.session-stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3); box-shadow: var(--shadow); }
+.session-stat-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.session-stat-value { font-size: 1.2rem; font-weight: 800; letter-spacing: -0.01em; margin-top: 2px; }
+.session-stat-sub { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
 .section { margin-bottom: var(--space-6); }
 .section-title { font-size: 1.05rem; font-weight: 700; margin: 0 0 var(--space-3); padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.03em;
@@ -90,7 +110,109 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3); }
 .stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: var(--space-4); box-shadow: var(--shadow); transition: transform var(--transition), box-shadow var(--transition); }
-.stat-card:hover { transform: translateY(-1px); box-shadow: var(--shadow), 0 6px 14px -8px color-mix(in srgb, var(--accent) 25%, transparent); }
+/* Real bug, fixed: this rule's specificity (class + :hover = 0,2,0) beat .stat-card-danger/
+   .stat-card-rare's own transform rule below (0,1,0) whenever a special card was actually
+   hovered -- so the elaborate perspective/tilt/lift/scale chain got silently overridden by this
+   plain 1px lift the whole time, which is why "card doesnt actually lift up at all" (1px was all
+   that was ever rendering). Excluded special cards here so they're driven entirely by their own
+   custom-property-based rule instead of fighting this one. */
+.stat-card:not(.stat-card-danger):not(.stat-card-rare):hover { transform: translateY(-1px); box-shadow: var(--shadow), 0 6px 14px -8px color-mix(in srgb, var(--accent) 25%, transparent); }
+/* User: "itd be cool if it showed that with a like, special effect for barely evading [death]" --
+   a pulsing red glow on whichever stat card carries recapStat.Danger (currently just a genuinely
+   dramatic "Closest call" hull-health reading, <=10%). Pure CSS animation, no JS/library needed,
+   staying as lightweight as the rest of this page. */
+@keyframes danger-pulse {
+  0%, 100% { box-shadow: var(--shadow), 0 0 0 0 color-mix(in srgb, var(--bad-text) 55%, transparent); }
+  50% { box-shadow: var(--shadow), 0 0 20px 3px color-mix(in srgb, var(--bad-text) 55%, transparent); }
+}
+.stat-card.stat-card-danger, .session-stat-card.stat-card-danger {
+  border-color: var(--bad-text); animation: danger-pulse 1.8s ease-in-out infinite;
+}
+.stat-card.stat-card-danger .stat-value, .session-stat-card.stat-card-danger .session-stat-value {
+  color: var(--bad-text);
+}
+/* User: "make all rare stuff kinda pop up slightly and wobble and shine holographically" -- a
+   second flag (Rare, e.g. Notable/rare finds) sharing this same hover treatment but without
+   Danger's red tint.
+   Real bug, fixed: the first version triggered a fixed-length CSS `:hover` keyframe animation
+   (900ms wobble+shine, then stop) -- user: "needs a the animation only happens once it should
+   like, happen as you move your cursor around like a foil card yk?". A real foil/holographic
+   trading-card effect has to track the actual cursor position continuously, not just play a
+   canned animation once on hover-enter. Rebuilt as real mousemove-driven CSS custom properties
+   (--holo-px/--holo-py position the shine's radial-gradient center, --holo-rx/--holo-ry drive a
+   3D tilt via rotateX/rotateY) updated live by JS (see wireHoloCards below) -- still pure CSS
+   for the actual rendering (transform/gradient), just fed live values instead of a fixed
+   keyframe, so the shine and tilt genuinely follow the cursor the whole time it's over the card,
+   the same way a real foil card catches light as you turn it. */
+.stat-card.stat-card-rare, .session-stat-card.stat-card-rare {
+  border-color: var(--notable-text);
+}
+.stat-card.stat-card-rare .stat-value, .session-stat-card.stat-card-rare .session-stat-value {
+  color: var(--notable-text);
+}
+/* User, after the full foil shine was firing at the same 10% hull-health bar as the red pulsing
+   outline: "outline is fine at 10 but the full shine shouldnt happen until its super low". Danger
+   alone (10%, see .stat-card.stat-card-danger above) still gets the red border/pulse; the shine/
+   tilt/lift mechanic below now keys off the stricter .stat-card-danger-extreme (<=1%, recapStat's
+   own DangerExtreme) instead of plain .stat-card-danger. */
+.stat-card-danger-extreme, .stat-card-rare, .stat-card-elite-max {
+  position: relative; overflow: hidden; will-change: transform;
+  transition: transform 120ms ease-out, box-shadow 200ms ease-out;
+  transform: perspective(700px) rotateX(calc(var(--holo-ry, 0) * 1deg)) rotateY(calc(var(--holo-rx, 0) * 1deg))
+    translateY(var(--holo-lift, 0px)) scale(var(--holo-scale, 1));
+}
+.stat-card-danger-extreme::after, .stat-card-rare::after, .stat-card-elite-max::after {
+  content: ''; position: absolute; inset: -20%; pointer-events: none;
+  opacity: var(--holo-opacity, 0); transition: opacity 200ms ease-out;
+  background-size: 250% 250%;
+  background-position: calc(50% - var(--holo-rx, 0) * 3.2%) calc(50% - var(--holo-ry, 0) * 3.2%);
+}
+.stat-card-danger-extreme.holo-active, .stat-card-rare.holo-active, .stat-card-elite-max.holo-active {
+  z-index: 2; box-shadow: var(--shadow), 0 20px 34px -12px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+/* User: "the foil effeect is cool but its too bright and the wrong colour on some of them" --
+   fixed by tinting each card type off its own real theme color instead of one shared hardcoded
+   gradient, and toning the intensity down.
+   Second real fix, same effect: "the card should still come out a bit and like, change
+   perspective like its rotating and the cursor shouldnt be the spot it should be like a light
+   reflecting on it, FOIL CARD, SHINY, WOW!" -- a real foil card's glint comes from a FIXED light
+   source catching the surface at whatever angle it's currently tilted to, not a spotlight glued
+   to the cursor. Re-keyed the shine's `background-position` off the TILT (--holo-rx/--holo-ry,
+   the same values driving the rotation) instead of the raw cursor position (--holo-px/--holo-py,
+   no longer used here) -- as the card rotates, the diagonal sheen band sweeps across it like real
+   light reflecting off an angled surface, decoupled from exactly where the cursor happens to be.
+   Also gave the "coming out" pop real presence: a live --holo-lift (translateY) alongside the
+   existing scale, and a stronger shadow while active, so it genuinely reads as lifting off the
+   page and tilting, not just a static hover color change. */
+.stat-card-danger-extreme::after {
+  background-image: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.55) 48%,
+    color-mix(in srgb, var(--bad-text) 60%, transparent) 52%, transparent 62%);
+}
+.stat-card-rare::after {
+  background-image: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.55) 48%,
+    color-mix(in srgb, var(--notable-text) 60%, transparent) 52%, transparent 62%);
+}
+/* User: "when you have elite it should get a gold border in a rank and each prestige should make
+   it more and max it gets full foil". EliteTier 1-6 (see recapStat's own comment: 1 = "Elite"
+   itself, 6 = max prestige "Elite V") sets a real per-card --elite-tier custom property the
+   template inlines; the gold border/glow intensity scales continuously with it via calc(), and
+   only at the true max tier (6, "Elite V") does the card additionally get .stat-card-elite-max,
+   which reuses the exact same transform/shine mechanic as Danger/Rare above (added to their
+   shared selectors below) but gold-tinted -- "max it gets full foil". Not verified against this
+   commander's own real data (their own highest real rank is nowhere near Elite yet, confirmed
+   against their real Combat rank "Competent" level 3/13) -- verified with a synthetic mock
+   instead, see docs/StandaloneGoRewrite.md for how. */
+.stat-card-elite {
+  border-color: color-mix(in srgb, #d4af37 calc(var(--elite-tier, 1) * 15%), var(--border-strong));
+  box-shadow: var(--shadow), 0 0 calc(var(--elite-tier, 1) * 2.5px) color-mix(in srgb, #d4af37 calc(var(--elite-tier, 1) * 12%), transparent);
+}
+.stat-card-elite .stat-label, .session-stat-card-elite .session-stat-label {
+  color: color-mix(in srgb, #d4af37 calc(var(--elite-tier, 1) * 12%), var(--muted));
+}
+.stat-card-elite-max::after {
+  background-image: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.6) 48%,
+    color-mix(in srgb, #d4af37 70%, transparent) 52%, transparent 62%);
+}
 .stat-label { font-size: 0.73rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
   margin: 0 0 5px; }
 .stat-value { font-size: 1.65rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
@@ -101,6 +223,36 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center;
   border: 1px dashed var(--border); border-radius: var(--radius-md); }
 .empty-note-icon { font-size: 1.9rem; margin-bottom: var(--space-2); opacity: 0.75; }
+
+/* User, on Notable/rare finds (which only ever showed the single most-common type): "clicking on
+   stuff like 'notable / rare finds' should bring up a modal listing how many of each rare find" --
+   then generalized to every stat card built from a "top 1 of N" real aggregate (see recapStat's
+   own Breakdown field in summary.go). A small "›" affordance marks a card as expandable; the
+   modal itself follows the same overlay/panel visual language as the Powerplay page's own cycle
+   viewer modal, kept as independent class names here since this page didn't have a modal system
+   yet either. */
+.stat-card-clickable, .session-stat-card-clickable { cursor: pointer; position: relative; }
+.stat-card-clickable::before, .session-stat-card-clickable::before {
+  content: '›'; position: absolute; top: var(--space-2); right: var(--space-3);
+  color: var(--muted-faint); font-size: 1.1rem; font-weight: 700; line-height: 1;
+}
+.breakdown-modal-overlay { position: fixed; inset: 0; background: rgba(10,10,10,0.55); display: flex;
+  align-items: center; justify-content: center; z-index: 100; padding: var(--space-4); }
+.breakdown-modal-overlay[hidden] { display: none; }
+.breakdown-modal { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); max-width: 480px; width: 100%; max-height: 75vh; overflow-y: auto;
+  padding: var(--space-5); }
+.breakdown-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3);
+  margin-bottom: var(--space-3); }
+.breakdown-modal-title { font-size: 1.05rem; font-weight: 700; }
+.breakdown-modal-close { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: var(--muted); line-height: 1; padding: 4px; }
+.breakdown-modal-close:hover { color: var(--text); }
+.breakdown-list { display: flex; flex-direction: column; gap: 4px; }
+.breakdown-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-size: 0.85rem; }
+.breakdown-row:nth-child(odd) { background: var(--bg); }
+.breakdown-row-name { flex: 1; }
+.breakdown-row-value { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* Deliberately NOT a .page-nav-link -- owner: "the mode button shouldnt be there it looks like a
    different page buton" -- a nav-styled pill read as "one more page to visit," not a settings
@@ -123,6 +275,7 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
   <a class="page-nav-link" href="standalone_materials.html">🧪 Materials</a>
   <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
   <a class="page-nav-link" href="standalone_shipyard.html">🚀 Shipyard</a>
+  <a class="page-nav-link" href="standalone_powerplay.html">⚔️ Powerplay</a>
 </nav>
 <button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
 
@@ -132,8 +285,19 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 </div>
 <p class="subtitle" id="subtitle"></p>
 
+<div id="sessionRecap"></div>
 <div class="highlights" id="highlights"></div>
 <div id="sections"></div>
+
+<div class="breakdown-modal-overlay" id="breakdownModalOverlay" hidden>
+  <div class="breakdown-modal" role="dialog" aria-modal="true" aria-labelledby="breakdownModalTitle">
+    <div class="breakdown-modal-head">
+      <div class="breakdown-modal-title" id="breakdownModalTitle"></div>
+      <button type="button" class="breakdown-modal-close" id="breakdownModalClose" aria-label="Close">✕</button>
+    </div>
+    <div class="breakdown-list" id="breakdownModalBody"></div>
+  </div>
+</div>
 
 <script id="recap-data" type="application/json">__DATA_JSON__</script>
 <script>
@@ -142,6 +306,60 @@ const DATA = JSON.parse(document.getElementById('recap-data').textContent);
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+// User: "under last session it needs timestamps for the events it shows there" -- highlights are
+// now {text, timestamp} objects (timestamp empty for the one summary line that has no single real
+// moment, "...and N earlier deaths not shown here"). Short readable form, not a raw ISO string.
+function fmtHighlightDate(iso) {
+  if (!iso) return '';
+  return iso.replace('T', ' ').replace('Z', '') + ' UTC';
+}
+// User: "when you have elite it should get a gold border in a rank and each prestige should make
+// it more and max it gets full foil". eliteTier 1-6 (1 = "Elite", 6 = max prestige "Elite V", see
+// recapStat's own Go-side comment) drives a continuously-scaling gold border/glow via the
+// --elite-tier custom property; only the true max tier gets the full foil treatment instead of
+// the plain danger/rare gold border.
+function eliteClass(stat) {
+  if (!stat.eliteTier) return '';
+  return stat.eliteTier >= 6 ? ' stat-card-elite stat-card-elite-max' : ' stat-card-elite';
+}
+function eliteStyle(stat) {
+  return stat.eliteTier ? ` style="--elite-tier:${stat.eliteTier}"` : '';
+}
+
+// User, on Notable/rare finds: "clicking on stuff like 'notable / rare finds' should bring up a
+// modal listing how many of each rare find" -- then generalized: "look through them all and think
+// other categories that could use it" (see recapStat.Breakdown's own Go-side comment for the full
+// list this ended up covering). The full breakdown is embedded as a data attribute (JSON, HTML-
+// escaped) rather than looked up by section/stat index, since this same render path is shared by
+// both the all-time sections and the session recap's own flattened stat list, which don't share
+// an indexing scheme.
+function breakdownAttr(stat) {
+  if (!stat.breakdown || !stat.breakdown.length) return { cls: '', attr: '' };
+  return {
+    cls: ' stat-card-clickable',
+    attr: ` data-breakdown="${escapeHtml(JSON.stringify(stat.breakdown))}" data-breakdown-label="${escapeHtml(stat.label)}"`,
+  };
+}
+function openBreakdownModal(label, items) {
+  document.getElementById('breakdownModalTitle').textContent = label;
+  document.getElementById('breakdownModalBody').innerHTML = items.map(it => `
+    <div class="breakdown-row">
+      <span class="breakdown-row-name">${escapeHtml(it.label)}</span>
+      <span class="breakdown-row-value">${escapeHtml(it.value)}</span>
+    </div>`).join('');
+  document.getElementById('breakdownModalOverlay').hidden = false;
+}
+document.getElementById('breakdownModalClose').addEventListener('click', () => {
+  document.getElementById('breakdownModalOverlay').hidden = true;
+});
+document.getElementById('breakdownModalOverlay').addEventListener('click', e => {
+  if (e.target.id === 'breakdownModalOverlay') document.getElementById('breakdownModalOverlay').hidden = true;
+});
+document.addEventListener('click', e => {
+  const card = e.target.closest('[data-breakdown]');
+  if (!card) return;
+  openBreakdownModal(card.getAttribute('data-breakdown-label'), JSON.parse(card.getAttribute('data-breakdown')));
+});
 
 // Real bug this fixed: execCommand('copy') needs the source element to actually have browser
 // FOCUS, not just a text selection, in enough real browsers that skipping ta.focus() here made
@@ -196,7 +414,7 @@ function formatRecapForDiscord() {
   }
   if (DATA.highlights.length) {
     lines.push('**Highlights**');
-    for (const h of DATA.highlights) lines.push(`  ${h}`);
+    for (const h of DATA.highlights) lines.push(`  ${h.text}${h.timestamp ? ` (${fmtHighlightDate(h.timestamp)})` : ''}`);
   }
   return lines.join('\n').trim();
 }
@@ -228,8 +446,99 @@ const totalStats = DATA.sections.reduce((n, s) => n + s.stats.length, 0);
 document.getElementById('subtitle').textContent =
   `Generated ${DATA.generatedAt} — ${totalStats} stats across ${DATA.sections.length} categories, computed from your whole journal history.`;
 
+// User: "maybe add a recent session recap? that shows best things of your last journal like '5
+// kills last session, 2 first descoveries' etc". DATA.session (see summary.go's BuildSessionRecap)
+// is the exact same recapData shape as the all-time recap, just scoped to events since the most
+// recent real LoadGame -- BuildRecap already gates most of its own sections to only appear when
+// something real happened (no Powerplay section if never pledged, no Crime section if no crimes,
+// etc), so a single short session naturally ends up compact without needing a separate "pick the
+// best N stats" heuristic here -- every stat shown is real and actually happened this session.
+function formatSessionDuration(fromIso, toIso) {
+  const ms = new Date(toIso).getTime() - new Date(fromIso).getTime();
+  if (!(ms > 0)) return '';
+  const totalMinutes = Math.round(ms / 60000);
+  const h = Math.floor(totalMinutes / 60), m = totalMinutes % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+if (DATA.session) {
+  const s = DATA.session;
+  const allStats = s.recap.sections.flatMap(sec => sec.stats);
+  const duration = formatSessionDuration(s.sessionFrom, s.sessionTo);
+  const rangeBit = `${escapeHtml(s.sessionFrom.replace('T', ' ').replace('Z', ''))} -- ${escapeHtml(s.sessionTo.replace('T', ' ').replace('Z', ''))} UTC${duration ? ` (${duration})` : ''}`;
+  const highlightsHtml = s.recap.highlights.length
+    ? `<div class="highlights" style="margin-top:var(--space-3);margin-bottom:0">${s.recap.highlights.map(h => `<div class="highlight">${escapeHtml(h.text)}${h.timestamp ? `<div class="highlight-date">${escapeHtml(fmtHighlightDate(h.timestamp))}</div>` : ''}</div>`).join('')}</div>`
+    : '';
+  const statsHtml = allStats.length
+    ? `<div class="session-stat-grid">${allStats.map(stat => `
+        <div class="session-stat-card${stat.danger ? ' stat-card-danger' : ''}${stat.dangerExtreme ? ' stat-card-danger-extreme' : ''}${stat.rare ? ' stat-card-rare' : ''}${eliteClass(stat)}${breakdownAttr(stat).cls}"${eliteStyle(stat)}${breakdownAttr(stat).attr}>
+          <div class="session-stat-label">${escapeHtml(stat.label)}</div>
+          <div class="session-stat-value">${escapeHtml(stat.value)}</div>
+          ${stat.sub ? `<div class="session-stat-sub">${escapeHtml(stat.sub)}</div>` : ''}
+        </div>
+      `).join('')}</div>`
+    : '<p class="session-recap-empty">Nothing recap-worthy happened this session -- just some flying around, maybe.</p>';
+  document.getElementById('sessionRecap').innerHTML = `
+    <div class="session-recap">
+      <div class="session-recap-title">🕐 Last Session <span class="session-recap-range">${rangeBit}</span>
+        <button class="copy-btn-small" type="button" id="sessionDiscordCopyBtn">💬 Copy for Discord</button>
+      </div>
+      ${highlightsHtml}
+      ${statsHtml}
+    </div>`;
+  wireHoloCards(document.getElementById('sessionRecap'));
+  // User: "should also be able to export last session recap" -- same per-stat formatting
+  // formatRecapForDiscord/formatSectionForDiscord already use, just scoped to the session's own
+  // flattened stats + highlights instead of the all-time DATA.sections.
+  document.getElementById('sessionDiscordCopyBtn').addEventListener('click', () => {
+    const lines = [`🕐 **Last Session** (${rangeBit})`, ''];
+    for (const stat of allStats) {
+      lines.push(`  ${stat.label}: **${stat.value}**${stat.sub ? ` (${stat.sub})` : ''}`);
+    }
+    if (s.recap.highlights.length) {
+      lines.push('', '**Highlights**');
+      for (const h of s.recap.highlights) lines.push(`  ${h.text}${h.timestamp ? ` (${fmtHighlightDate(h.timestamp)})` : ''}`);
+    }
+    copyWithFeedback(document.getElementById('sessionDiscordCopyBtn'), lines.join('\n').trim());
+  });
+}
+
+// User: "it should like, happen as you move your cursor around like a foil card yk?" -- real
+// cursor-tracking, not a fixed one-shot animation. Live mousemove updates the CSS custom
+// properties the .stat-card-danger/.stat-card-rare rules above read (--holo-px/py position the
+// shine, --holo-rx/ry drive the tilt); mouseleave smoothly resets to neutral via the CSS
+// transition already on those properties' consuming rules. Delegated at the container level (one
+// listener per render, not one per card) since these sections get fully rebuilt on load.
+function wireHoloCards(container) {
+  if (!container) return;
+  container.querySelectorAll('.stat-card-danger-extreme, .stat-card-rare, .stat-card-elite-max').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const rect = card.getBoundingClientRect();
+      const px = ((e.clientX - rect.left) / rect.width) * 100;
+      const py = ((e.clientY - rect.top) / rect.height) * 100;
+      const rx = (px / 100 - 0.5) * 16;  // left/right cursor position -> tilt around the vertical axis
+      const ry = (py / 100 - 0.5) * -16; // up/down cursor position -> tilt around the horizontal axis
+      card.style.setProperty('--holo-px', `${px}%`);
+      card.style.setProperty('--holo-py', `${py}%`);
+      card.style.setProperty('--holo-rx', rx.toFixed(2));
+      card.style.setProperty('--holo-ry', ry.toFixed(2));
+      card.style.setProperty('--holo-scale', '1.06');
+      card.style.setProperty('--holo-lift', '-6px');
+      card.style.setProperty('--holo-opacity', '1');
+      card.classList.add('holo-active');
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.setProperty('--holo-rx', '0');
+      card.style.setProperty('--holo-ry', '0');
+      card.style.setProperty('--holo-scale', '1');
+      card.style.setProperty('--holo-lift', '0px');
+      card.style.setProperty('--holo-opacity', '0');
+      card.classList.remove('holo-active');
+    });
+  });
+}
+
 document.getElementById('highlights').innerHTML = DATA.highlights
-  .map(h => `<div class="highlight">${escapeHtml(h)}</div>`)
+  .map(h => `<div class="highlight">${escapeHtml(h.text)}${h.timestamp ? `<div class="highlight-date">${escapeHtml(fmtHighlightDate(h.timestamp))}</div>` : ''}</div>`)
   .join('');
 
 document.getElementById('sections').innerHTML = DATA.sections.length
@@ -241,7 +550,7 @@ document.getElementById('sections').innerHTML = DATA.sections.length
       </div>
       <div class="stat-grid">
         ${section.stats.map(stat => `
-          <div class="stat-card">
+          <div class="stat-card${stat.danger ? ' stat-card-danger' : ''}${stat.dangerExtreme ? ' stat-card-danger-extreme' : ''}${stat.rare ? ' stat-card-rare' : ''}${eliteClass(stat)}${breakdownAttr(stat).cls}"${eliteStyle(stat)}${breakdownAttr(stat).attr}>
             <div class="stat-label">${escapeHtml(stat.label)}</div>
             <div class="stat-value">${escapeHtml(stat.value)}</div>
             ${stat.sub ? `<div class="stat-sub">${escapeHtml(stat.sub)}</div>` : ''}
@@ -251,6 +560,7 @@ document.getElementById('sections').innerHTML = DATA.sections.length
     </div>
   `).join('')
   : '<div class="empty-note"><div class="empty-note-icon">📊</div>No recap-relevant events found in your journal yet.</div>';
+wireHoloCards(document.getElementById('sections'));
 
 // Manual light/dark override -- CSS already auto-follows the OS via
 // @media(prefers-color-scheme), but that gives no way to actually compare both from inside the
