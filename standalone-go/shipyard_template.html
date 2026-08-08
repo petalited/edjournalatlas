@@ -67,17 +67,17 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center;
   border: 1px dashed var(--border); border-radius: var(--radius-md); }
 .empty-note-icon { font-size: 1.9rem; margin-bottom: var(--space-2); opacity: 0.75; }
-/* Owner: "shipyard should probably be a 16:9 grid" -- this is only viable now because the module
-   list stopped living inline in the card (moved to hover-preview/click-modal, previous round): a
-   card's visible content height no longer varies with how many modules a ship has, so every card
-   can share the same 16:9 box without wildly differing amounts of leftover/cramped space. */
+/* A 16:9 grid layout, only viable because the module list stopped living inline in the card
+   (moved to hover-preview/click-modal, previous round): a card's visible content height no longer
+   varies with how many modules a ship has, so every card can share the same 16:9 box without
+   wildly differing amounts of leftover/cramped space. */
 .fleet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-4); }
 .ship-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
   box-shadow: var(--shadow); padding: var(--space-4); position: relative;
   aspect-ratio: 16 / 9; }
 .ship-card.ship-active { border-color: var(--accent); box-shadow: var(--shadow), 0 0 0 1px var(--accent); }
-/* Owner: "the whole box background to be a lightly distented ascii art of the ship" -- a faint
-   monospace watermark stretched to fill the ENTIRE card (not just a small corner), sitting behind
+/* A faint monospace ASCII-art watermark stretched to fill the ENTIRE card (not just a small
+   corner), sitting behind
    the card's real content (z-index 0 vs. .ship-card-fg's 1). .ship-ascii-wrap clips to the card's
    rounded corners and is the stretch target; the inner <pre> is scaled to it via a per-card
    `transform: scale(x,y)` computed in JS (fitShipAscii) since its natural rendered size varies
@@ -121,23 +121,23 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .completion-bar { flex: 1; height: 8px; border-radius: var(--radius-pill); background: var(--border); overflow: hidden; }
 .completion-bar-fill { height: 100%; background: var(--accent); border-radius: var(--radius-pill); transition: width var(--transition); }
 .completion-label { font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
-/* Owner tried the <details>/<summary> expand-button version and said it "makes the page look
-   weird" -- replaced with "hovering show info and clicking open stuff": a plain text hint (no
-   button chrome) that reveals a small hover preview (CSS shows/hides it, no JS needed for that
-   part), while an actual click opens the full list in a modal (#shipModulesModalOverlay).
+/* Replaced an earlier <details>/<summary> expand-button version, which made the page look
+   cluttered, with hover-to-preview/click-to-open instead: a plain text hint (no button chrome)
+   that reveals a small hover preview (CSS shows/hides it, no JS needed for that part), while an
+   actual click opens the full list in a modal (#shipModulesModalOverlay).
    Real bug, fixed: this hint sits at the BOTTOM of each 16:9 card (pushed there by
    .ship-card-spacer), so the preview's default "open downward" position could land partly or
-   fully below the viewport, especially for cards in a lower grid row -- "opens a list out of
-   view". Default direction flipped to open upward (toward the card's own body, which is already
-   on-screen) as the common case, with positionModuleHoverPreview (JS, on hover) flipping back to
-   downward -- and clamping horizontally -- only when there's genuinely more room that way, so it
-   can never land off-screen regardless of where the card sits in the grid.
+   fully below the viewport, especially for cards in a lower grid row. Default direction flipped
+   to open upward (toward the card's own body, which is already on-screen) as the common case,
+   with positionModuleHoverPreview (JS, on hover) flipping back to downward -- and clamping
+   horizontally -- only when there's genuinely more room that way, so it can never land off-screen
+   regardless of where the card sits in the grid.
    Second real bug, fixed: the label and the preview had a 4px margin gap between them -- moving
    the mouse from the label toward the preview crossed a strip of page that belongs to neither
    box, ending the CSS :hover match (and the preview's own `:hover` self-keep-open rule can't save
-   it if it already went display:none before the cursor arrives) -- "too far away... if you move
-   to it it disappears before you can scroll". Margin dropped to 0 in both CSS and JS so the two
-   boxes touch directly -- the cursor is always over one or the other, no gap left to cross. */
+   it if it already went display:none before the cursor arrives), so the preview could vanish
+   before the cursor ever reached it. Margin dropped to 0 in both CSS and JS so the two boxes
+   touch directly -- the cursor is always over one or the other, no gap left to cross. */
 .module-hint { position: relative; margin-top: var(--space-2); font-size: 0.8rem; color: var(--muted); }
 .module-hint-label { cursor: pointer; }
 .module-hint-label:hover { color: var(--accent); }
@@ -159,10 +159,10 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .no-modules-note { font-size: 0.82rem; color: var(--muted); font-style: italic; }
 .snapshot-note { font-size: 0.76rem; color: var(--muted-faint); margin-top: var(--space-3); }
 
-/* "⚙️ Engineer" modal -- owner: "add an engineer button to top right that lets you quickly add
-   engineering changes to your engineering planner with a whole window". Same modal-overlay
-   visual language as the trade calculator on the materials/engineering pages, kept as its own
-   independent class names since this is a separate self-contained embedded file. */
+/* "⚙️ Engineer" modal -- lets you push a fitted module's engineering into the engineering
+   planner's basket in one click, rather than needing to switch pages and re-enter it by hand.
+   Same modal-overlay visual language as the trade calculator on the materials/engineering pages,
+   kept as its own independent class names since this is a separate self-contained embedded file. */
 .engineer-modal-overlay { position: fixed; inset: 0; background: rgba(10,10,10,0.55); display: flex;
   align-items: center; justify-content: center; z-index: 100; padding: var(--space-4); }
 .engineer-modal-overlay[hidden] { display: none; }
@@ -197,9 +197,7 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
   transition: border-color var(--transition), color var(--transition); }
 .goal-clear-btn:hover { border-color: var(--bad-text); color: var(--bad-text); }
 
-/* Export/Import -- user: "have export ship to edsy / coriolis buttons where it copies a url for
-   said sites however they format their outfitting and engineering", then "add an import thing,
-   so you can paste a cori / edsy link and press confirm and itll update goal ship to that". See
+/* Export/Import to EDSY/Coriolis. See
    the export/import JS functions below for the real, verified encoding this is built on (raw
    journal Loadout JSON, deflate-compressed, base64 -- the same mechanism both Coriolis's own real
    `shipFromLoadoutJSON` importer and EDSY's own real Journal-import path already accept). */
@@ -223,10 +221,9 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .import-result.import-partial { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning); }
 .import-result.import-error { background: var(--bad-bg); color: var(--bad-text); border: 1px solid var(--bad-text); }
 
-/* "Current Ship" / "Goal Ship" comparison -- owner: "each ship should when you edit it kinda
-   duplicate the window and show a Current ship window and Goal ship window ... so you know how
-   far you are from finishing your ship". Real bug, fixed: the first version rendered two fully
-   independent stacked lists (map+join per column) -- the goal cell is taller than the current
+/* "Current Ship" / "Goal Ship" comparison -- shows a side-by-side current-vs-goal build so it's
+   clear how far along a ship is toward finishing. Real bug, fixed: the first version rendered two
+   fully independent stacked lists (map+join per column) -- the goal cell is taller than the current
    cell (badge + 3 selects + buttons vs. 2-3 lines of text), so row N's height differed between
    columns and every row below it drifted out of alignment. Fixed by emitting ONE flat grid whose
    children alternate current-cell, goal-cell per module (title cells first) -- with the default
@@ -247,8 +244,8 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
   border-radius: var(--radius-sm); padding: 3px var(--space-2); margin-bottom: var(--space-2); display: inline-block; }
 .goal-badge.goal-badge-unset { color: var(--muted); background: var(--bg); font-weight: 400; font-style: italic; }
 
-/* Self-contained "Materials Needed" panel -- owner: "open a side window with materials needed
-   if you cant [add across pages]". Reuses the exact same modal-overlay visual language as the
+/* Self-contained "Materials Needed" panel, so a materials shortfall is visible without needing to
+   flip to the engineering planner page. Reuses the exact same modal-overlay visual language as the
    Engineer modal above (same class names -- this IS a second modal on the same page, not a
    separate visual system, so sharing them is intentional here, unlike the deliberately
    independent naming this page uses versus OTHER pages' own trade-calculator modal). */
@@ -281,8 +278,8 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .need-short .need-status { color: var(--warning); }
 .need-met .need-status { color: var(--good); }
 
-/* Trade calculator -- user: "materials needed needss to be feeature matched with engineering
-   planner ... have stuff for trades and a;; that". Ported verbatim (same classes, same JS logic)
+/* Trade calculator, feature-matched with the engineering planner's own trade calculator so it's
+   available here too. Ported verbatim (same classes, same JS logic)
    from engineering_template.html/materials_template.html's own trade calculator: click a
    "short by X" material-needed card to see what you could give up from what you already hold to
    cover it, plus the nearest known trader of the right type from your own real journal history.
@@ -634,22 +631,16 @@ document.getElementById('subtitle').textContent = DATA.hasFleetData
   ? `Generated ${DATA.generatedAt} -- your active ship is always current; the rest of your fleet reflects your last Shipyard visit${DATA.snapshotAt ? ` (${DATA.snapshotAt.replace('T', ' ').replace('Z', '')} UTC)` : ''}.`
   : `Generated ${DATA.generatedAt}.`;
 
-// Owner: "i wanna be able to plan builds against current materials yk?" -- originally wrote
-// straight into the SAME basket the engineering planner page reads (standalone_engineering_
-// basket), on the assumption a saved localStorage value would just be there when you later open
-// that other page. Real owner report: "pressing add doesnt add it to the engineering planner i
-// guess because its not on the same page" -- confirmed real: this project already learned,
-// building the theme toggle earlier this session, that separate file:// pages can't reliably
-// share localStorage (some browsers isolate storage per exact file path, not per directory).
-// That's exactly what broke here too. Fix, per the owner's own suggestion ("open a side window
-// with materials needed if you cant"): the shipyard page now keeps its own self-contained plan
-// (own storage key, own materials-needed panel below) that never depends on navigating anywhere
-// else -- see docs/ShipyardPlanner.md.
+// Real bug, fixed: an earlier version wrote straight into the SAME basket the engineering planner
+// page reads (standalone_engineering_basket), on the assumption a saved localStorage value would
+// just be there when you later open that other page -- but separate file:// pages can't reliably
+// share localStorage (some browsers isolate storage per exact file path, not per directory), the
+// same real constraint this project already ran into building the theme toggle. Fixed by keeping
+// the shipyard page's own self-contained plan (own storage key, own materials-needed panel below)
+// that never depends on navigating anywhere else.
 //
-// Real follow-up ask: "each ship should when you edit it kinda duplicate the window and show a
-// Current ship window and Goal ship window with your engineering stuff changed so you know how
-// far you are from finishing your ship" -- the Engineer modal now shows both side by side per
-// module slot, which needed a real reshape from a flat qty-based plan (fine for a cross-fleet
+// The Engineer modal shows the current and goal builds side by side per module slot, which needed
+// a real reshape from a flat qty-based plan (fine for a cross-fleet
 // materials total, but with no sense of "this ship's goal state") to per-SLOT goal overrides --
 // one entry per real module slot the commander has actually set a goal for, keyed by the ship's
 // real ShipID + that module's real Slot name (NOT array index -- confirmed real risk: ship list
@@ -661,8 +652,8 @@ document.getElementById('subtitle').textContent = DATA.hasFleetData
 // "clear the stale goal," not worth more complexity to prevent given how narrow the window is.
 //
 // fromGrade is the real, additional piece the old cross-page basket never had a way to express:
-// "account for less materials from partial upgrades" -- pushing an ALREADY grade-3 module to
-// grade 5 only actually costs grades 4+5 worth of materials (real game mechanic: each roll only
+// accounting for partial upgrades. Pushing an ALREADY grade-3 module to grade 5 only actually
+// costs grades 4+5 worth of materials (real game mechanic: each roll only
 // pays for the grade it's currently completing), not the full 1-through-5 a from-scratch pick
 // would need. Every goal override carries its own real fromGrade (0 for a never-engineered
 // module, or the module's actual current grade when continuing the SAME blueprint it already
@@ -711,8 +702,8 @@ const effectIndex = {};
 // cumulativeIngredients: real Elite Dangerous mechanic (same one this project's engineering
 // planner already accounts for, extended here with a real fromGrade lower bound) -- at max
 // engineer rank, grade N takes N rolls, and reaching grade N means rolling every lower grade
-// first. Owner: "account for less materials from partial upgrades" -- a module already at grade
-// fromGrade has already paid for grades 1..fromGrade, so only fromGrade+1..toGrade still needs
+// first. A module already at grade fromGrade has already paid for grades 1..fromGrade, so only
+// fromGrade+1..toGrade still needs
 // summing, not the full 1..toGrade a from-scratch pick would need.
 function cumulativeIngredients(type, name, fromGrade, toGrade) {
   const byGrade = (bpIndex[type] || {})[name] || {};
@@ -778,9 +769,8 @@ function materialsGrid() {
     const shortB = b.count - (DATA.heldMaterials[b.key] || 0);
     return shortB - shortA || a.name.localeCompare(b.name);
   });
-  // User: "materials needed needss to be feeature matched with engineering planner ... have stuff
-  // for trades and a;; that" -- same trade-trigger pattern as the engineering planner's own
-  // materialsSummary: only short cards get it, and only if the material is actually tradeable
+  // Same trade-trigger pattern as the engineering planner's own materialsSummary: only short
+  // cards get it, and only if the material is actually tradeable
   // (belongs to a named family -- Guardian/Thargoid materials aren't tradeable at any Material
   // Trader, see docs/MaterialTraderMechanics.md).
   const cards = rows.map(m => {
@@ -860,22 +850,21 @@ function moduleRow(m) {
   </div>`;
 }
 
-// Owner: "light grey blending into the background ascii art of each ship shown so you can
-// identify them". This is the plumbing for that -- a lookup keyed by the exact real ship type
-// display name (shipTypeName's output, e.g. "Python", "Anaconda", "Mandalay"), rendered as a faint
-// monospace watermark behind each card (see .ship-ascii above). Left deliberately EMPTY for now --
-// owner doesn't have real reference screenshots on hand yet (see docs/ShipyardPlanner.md for the
-// full discussion of why it should be their own in-game screenshots, not Frontier's official
-// site's renders). All the rendering/stretch-to-fill plumbing (.ship-ascii-wrap, fitShipAscii)
-// stays fully in place and just quietly does nothing until entries land here -- drop in
+// A faint, light-grey ASCII-art watermark behind each card so a ship type is identifiable at a
+// glance -- a lookup keyed by the exact real ship type display name (shipTypeName's output, e.g.
+// "Python", "Anaconda", "Mandalay"), rendered behind each card (see .ship-ascii above). Left
+// deliberately EMPTY for now -- populating it needs real reference screenshots per ship type,
+// which don't exist here yet. All the rendering/stretch-to-fill plumbing (.ship-ascii-wrap,
+// fitShipAscii) stays fully in place and just quietly does nothing until entries land here -- drop in
 // `'Python': '...'` etc. keyed by ship type and it'll show up with no other code changes needed.
 const SHIP_ASCII = {};
 function shipAsciiArt(type) {
   return SHIP_ASCII[type] || '';
 }
 
-// Owner: "distance from you" per ship. Backend (shipyard.go) leaves distanceLy null when either
-// your current position or that ship's system's coordinates aren't independently known --
+// Distance from your current position, per ship. Backend (shipyard.go) leaves distanceLy null
+// when either your current position or that ship's system's coordinates aren't independently
+// known --
 // reported honestly here rather than guessed at.
 function distanceLabel(s) {
   if (s.distanceLy == null) return 'distance unknown';
@@ -895,9 +884,8 @@ function shipCard(s, shipIndex) {
   if (s.system) subBits.push(escapeHtml(s.system));
   subBits.push(distanceLabel(s));
   subBits.push(formatCredits(s.value));
-  // Owner: "list some more info about ships, like jump range or something if needed" -- only
-  // present when a real Loadout was recovered for this ship (0/omitted for an unrecovered stored
-  // ship), so this just doesn't render rather than showing a fake "0.0 ly".
+  // Only present when a real Loadout was recovered for this ship (0/omitted for an unrecovered
+  // stored ship), so this just doesn't render rather than showing a fake "0.0 ly".
   const infoHtml = s.maxJumpRange
     ? `<div class="ship-info-row"><span>Jump range: <strong>${s.maxJumpRange.toFixed(1)} ly</strong></span></div>`
     : '';
@@ -908,9 +896,9 @@ function shipCard(s, shipIndex) {
       <span class="completion-label">${s.completionPct.toFixed(0)}% engineered</span>
     </div>`;
   }
-  // Owner tried the earlier <details>/<summary> "Modules (N)" expand button and said it "makes
-  // the page look weird" -- replaced with a plain text hint: hovering shows a quick CSS-only
-  // preview (.module-hover-preview), clicking opens the full list in a modal (openShipModulesModal).
+  // Replaced an earlier <details>/<summary> "Modules (N)" expand button, which made the page look
+  // cluttered, with a plain text hint instead: hovering shows a quick CSS-only preview
+  // (.module-hover-preview), clicking opens the full list in a modal (openShipModulesModal).
   let bodyHtml;
   if (!s.hasModules) {
     bodyHtml = `<p class="no-modules-note">Build not recorded yet -- this ship's module loadout hasn't been independently confirmed since it was last flown (or its slot number may have been reused by a different ship since). Fly it once to refresh.</p>`;
@@ -944,10 +932,9 @@ function shipCard(s, shipIndex) {
   </div>`;
 }
 
-// Stretches each card's ASCII watermark (if any) to fill the whole card -- owner: "the whole box
-// background to be a lightly distented ascii art of the ship". Natural rendered size varies per
-// art string, so the fill scale has to be computed per card rather than a single fixed CSS value;
-// unequal x/y scale factors are expected (that's the "distorted" look asked for), not a bug.
+// Stretches each card's ASCII watermark (if any) to fill the whole card. Natural rendered size
+// varies per art string, so the fill scale has to be computed per card rather than a single fixed
+// CSS value; unequal x/y scale factors are expected (a deliberately distorted look), not a bug.
 function fitShipAscii() {
   document.querySelectorAll('.ship-ascii-wrap').forEach(wrap => {
     const pre = wrap.querySelector('.ship-ascii');
@@ -1032,17 +1019,14 @@ document.getElementById('fleetSection').addEventListener('click', e => {
 });
 window.addEventListener('resize', fitShipAscii);
 
-// ---- "⚙️ Engineer" modal -- owner: "add an engineer button to top right that lets you quickly
-// add engineering changes to your engineering planner with a whole window". Replaces the old
-// per-module inline "+ Plan G_" buttons (real owner feedback: "the upgrade button is weird") --
-// one deliberate action per ship instead of a button scattered into every module row.
+// ---- "⚙️ Engineer" modal -- replaces an earlier per-module inline "+ Plan G_" button design
+// (a button scattered into every module row read as fiddly) with one deliberate action per ship
+// instead.
 //
-// Real follow-up: "each ship should when you edit it kinda duplicate the window and show a
-// Current ship window and Goal ship window with your engineering stuff changed so you know how
-// far you are from finishing your ship". Now shows two columns side by side, same module order
-// in both so they line up: "Current Ship" (read-only, real state) and "Goal Ship" (editable --
-// shows whatever goal has been set for that slot, or lets you set one), plus a header comparing
-// the ship's real completion % against what it would be once every set goal is done.
+// Shows two columns side by side, same module order in both so they line up: "Current Ship"
+// (read-only, real state) and "Goal Ship" (editable -- shows whatever goal has been set for that
+// slot, or lets you set one), plus a header comparing the ship's real completion % against what
+// it would be once every set goal is done.
 let engineerModalShipIndex = null;
 
 function gradeOptionsHtml(maxGrade, selected) {
@@ -1137,9 +1121,8 @@ function goalModuleRow(ship, m, moduleIndex) {
   </div>`;
 }
 
-// Export to Coriolis/EDSY -- user: "have export ship to edsy / coriolis buttons where it copies a
-// url for said sites however they format their outfitting and engineering". Verified directly
-// against each site's own real open-source code (not guessed): EDCD/coriolis's Coriolis.jsx
+// Export to Coriolis/EDSY. Verified directly against each site's own real open-source code (not
+// guessed): EDCD/coriolis's Coriolis.jsx
 // registers a real '/import/:data' route whose handler, when the decoded JSON has a real
 // `Modules` array (a real journal Loadout shape, not Coriolis's own separate "SLEF"/Companion-API
 // shapes), calls JournalUtils.shipFromLoadoutJSON(json) directly -- i.e. Coriolis's own official
@@ -1194,10 +1177,10 @@ document.getElementById('engineerExportRow').addEventListener('click', async e =
     if (site === 'coriolis') {
       // Real bug, fixed: the previous version used '/import/<data>' (data as a raw PATH segment).
       // Standard base64 can contain '/', and even percent-encoded as %2F, some client-side routers
-      // decode the full path before splitting on '/' -- silently truncating the data and 404ing (a
-      // real user report: "cor export doesnt work, 404s on the linnk"). Coriolis's own router also
-      // registers a bare '/import' route (confirmed in its real source), which reads the same data
-      // from a query string instead -- avoids the whole path-segment ambiguity, so used here.
+      // decode the full path before splitting on '/' -- silently truncating the data and 404ing.
+      // Coriolis's own router also registers a bare '/import' route (confirmed in its real
+      // source), which reads the same data from a query string instead -- avoids the whole
+      // path-segment ambiguity, so used here.
       url = `https://coriolis.io/import?data=${encodeURIComponent(b64)}`;
     } else {
       const urlSafe = b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -1215,17 +1198,16 @@ document.getElementById('engineerExportRow').addEventListener('click', async e =
   });
 });
 
-// Import from Coriolis/EDSY -- user: "add an import thing, so you can paste a cori / edsy link and
-// press confirm and itll update goal ship to that ... itd make it easier to track builds and work
-// towards them". Decodes the SAME '/import/'-deep-link shape the Export buttons above produce --
-// deliberately NOT each site's own compact build-share code (Coriolis's '/outfit/:ship/:code',
-// EDSY's own equivalent native code), since those depend on each site's own large internal
-// per-module ID catalog that isn't loaded here and would risk silently mismapping a module if
-// guessed at. A real, honest limitation, not an oversight -- see docs/ShipyardPlanner.md.
-// Real bug, fixed: a user reported pasting their own real Coriolis/EDSY build links (Coriolis's
+// Import from Coriolis/EDSY -- so a pasted build link can update the goal ship directly, making
+// it easier to track builds and work towards them. Decodes the SAME '/import/'-deep-link shape
+// the Export buttons above produce -- deliberately NOT each site's own compact build-share code
+// (Coriolis's '/outfit/:ship/:code', EDSY's own equivalent native code), since those depend on
+// each site's own large internal per-module ID catalog that isn't loaded here and would risk
+// silently mismapping a module if guessed at. A real, honest limitation, not an oversight.
+// Real bug, fixed: pasting a real Coriolis/EDSY build link (Coriolis's
 // own '/outfit/:ship?code=...' share format, EDSY's own '#/L=...' share format -- their NORMAL
 // "share this build" links, not the /import/ deep-link this page's own Export buttons produce)
-// and getting a misleading "not recognized" message, as if the link were garbage. It's a real,
+// used to get a misleading "not recognized" message, as if the link were garbage. It's a real,
 // valid link -- just in a different, much more complex format (each site's own internal
 // per-module ID/bit-packing scheme, backed by a large separate data catalog neither site
 // publishes as a simple lookup table) that isn't safely decodable here without risking a silently

@@ -114,8 +114,7 @@ type shipOut struct {
 	// unknown, don't fake a number" pattern BuildTraderData already uses for known traders.
 	Distance *float64 `json:"distanceLy,omitempty"`
 	// MaxJumpRange only exists when a real Loadout was recovered for this ship (0/omitted for a
-	// stored ship whose build wasn't independently confirmed) -- owner: "list some more info about
-	// ships, like jump range or something".
+	// stored ship whose build wasn't independently confirmed).
 	MaxJumpRange float64 `json:"maxJumpRange,omitempty"`
 	// ShipSymbol/RawLoadoutJSON: see buildShipFromLoadout's comment -- power the Export to
 	// Coriolis/EDSY buttons and the paste-a-build-link import. Both omitted (zero value) for a
@@ -134,23 +133,19 @@ type shipyardData struct {
 	EffectsByType    map[string][]string       `json:"effectsByType"`           // catalog Type -> real Experimental Effect names for that Type, for the "Engineer" modal's effect picker
 	BlueprintsByType map[string][]blueprintOpt `json:"blueprintsByType"`        // catalog Type -> every real blueprint Name (+ real max grade) for that Type, for the modal's Name/Grade pickers -- lets it offer "start engineering this stock module", not just "push an already-started one further"
 	// Blueprints/Effects/HeldMaterials power a self-contained "Materials Needed" panel on this
-	// page itself -- real owner report: "pressing add doesnt add it to the engineering planner i
-	// guess because its not on the same page" (confirmed real: this project already learned,
-	// building the theme toggle earlier this session, that separate file:// pages can't reliably
-	// share localStorage -- the exact same limitation applies here, and the shared-basket
-	// cross-page handoff was never reliable in the first place). Rather than depend on that again,
-	// the shipyard page now tracks its own plan and computes materials needed without ever
-	// leaving the page -- the owner's own suggested fix ("open a side window with materials
-	// needed if you cant"). Per-grade ingredient data (needed to sum a range of grades, not just
-	// look one up) isn't otherwise exposed to this page, so it's embedded here the same way
-	// engineeringplanner.go already does for its own page.
+	// page itself -- real bug avoided here: pushing a build straight into the engineering
+	// planner's own basket relies on cross-page localStorage sharing, which this project already
+	// learned (building the theme toggle) doesn't reliably work between separate file:// pages.
+	// Rather than depend on that again, the shipyard page tracks its own plan and computes
+	// materials needed without ever leaving the page. Per-grade ingredient data (needed to sum a
+	// range of grades, not just look one up) isn't otherwise exposed to this page, so it's
+	// embedded here the same way engineeringplanner.go already does for its own page.
 	Blueprints    []plannerBlueprintOut `json:"blueprints"`
 	Effects       []plannerEffectOut    `json:"effects"`
 	HeldMaterials map[string]int64      `json:"heldMaterials"`
 	// Trading feature-matches this page's Materials Needed panel with the engineering planner's
-	// own trade calculator (user: "materials needed needs to be feature matched with engineering
-	// planner, have stuff for trades and all that") -- same traderData BuildTraderData already
-	// gives materials.go/engineeringplanner.go, just also embedded here.
+	// own trade calculator -- same traderData BuildTraderData already gives
+	// materials.go/engineeringplanner.go, just also embedded here.
 	Trading traderData `json:"trading"`
 	// ModuleTypeKeywords/NonEngineerableItemPrefixes/EngineItemInfix: this project generates fully
 	// static HTML with no live backend, so a pasted Coriolis/EDSY import (real Item symbols this
@@ -269,9 +264,9 @@ func maxGradeFor(bpType, bpName string) int {
 // arrives as a single space character rather than a genuinely empty string (confirmed against
 // this commander's own real data, ShipIdent "PE-24P"). Left un-trimmed, that space is truthy in
 // the client's own JS ("s.name ? ... : ..."), so the ship card showed a stray leading blank
-// before the ident badge instead of falling back to the ship type -- a real owner-reported bug
-// ("name rendering in the shipyard is weird"). Trimmed once here, at the one place ShipName ever
-// enters shipOut, rather than in the template -- keeps every consumer honest by construction.
+// before the ident badge instead of falling back to the ship type. Trimmed once here, at the one
+// place ShipName ever enters shipOut, rather than in the template -- keeps every consumer honest
+// by construction.
 func trimmedShipName(raw string) string {
 	return strings.TrimSpace(raw)
 }
@@ -296,9 +291,8 @@ func buildShipFromLoadout(v shipyardLoadoutEvent, active bool, system string, lo
 		Active: active, System: system, Value: v.HullValue + v.ModulesValue,
 		HullHealth: v.HullHealth, Modules: modules, HasModules: true,
 		EngineeredCount: engineeredCount, MaxJumpRange: v.MaxJumpRange,
-		// ShipSymbol/RawLoadoutJSON power the export/import buttons (user: "have export ship to
-		// edsy / coriolis buttons ... paste a cori/edsy link and press confirm and itll update
-		// goal ship to that"). The raw journal Loadout JSON is exactly what Coriolis's own real
+		// ShipSymbol/RawLoadoutJSON power the export/import buttons. The raw journal Loadout JSON
+		// is exactly what Coriolis's own real
 		// `shipFromLoadoutJSON` importer and EDSY's own real "Journal JSONL...Loadout" importer
 		// each already know how to parse natively -- verified directly against both projects' own
 		// real open-source code (EDCD/coriolis, taleden/EDSY), not guessed. ShipSymbol (the raw
@@ -472,9 +466,9 @@ func BuildShipyardData(store *Store) shipyardData {
 		addStored(latestStored.ShipsRemote, "")
 	}
 
-	// Distance from your current position -- owner: "distance from you" per ship. Same
-	// coordinate-lookup + math.Sqrt approach BuildTraderData already uses for known material
-	// traders, just applied per-ship instead of per-trader; the active ship is always exactly 0
+	// Distance from your current position, per ship. Same coordinate-lookup + math.Sqrt approach
+	// BuildTraderData already uses for known material traders, just applied per-ship instead of
+	// per-trader; the active ship is always exactly 0
 	// (you're standing in it). Left nil (not 0) when a stored ship's system was never
 	// independently visited/scanned, so the client can honestly show "distance unknown" instead
 	// of a fabricated zero.

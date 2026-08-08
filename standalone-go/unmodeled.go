@@ -1,7 +1,7 @@
 package main
 
-// unmodeled.go answers a real question the owner raised: this whole project's development
-// practice is "ground every stat in this commander's own real journal data before writing code"
+// unmodeled.go addresses a real structural risk: this whole project's development practice is
+// "ground every stat in this commander's own real journal data before writing code"
 // (see summary.go's own header comment) -- which is exactly right for correctness of what IS
 // modeled, but has a structural blind spot: an event type (or a field within one this project
 // DOES otherwise model, like CommitCrime's Bounty field) that never appears in the one commander's

@@ -1,8 +1,7 @@
 package main
 
 // materials.go builds a fourth page: a current-inventory viewer for Engineering materials
-// (Raw/Manufactured/Encoded), the kind of thing the in-game right-panel Materials screen shows --
-// requested directly by the owner ("add inventory viewer ... like an engineer area").
+// (Raw/Manufactured/Encoded), the kind of thing the in-game right-panel Materials screen shows.
 //
 // Deliberately NOT computed as net gained-minus-spent from MaterialCollected/EngineerCraft/
 // Synthesis/MaterialTrade/MaterialDiscarded/etc: that requires correctly modeling every possible

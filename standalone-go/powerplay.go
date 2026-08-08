@@ -1,8 +1,8 @@
 package main
 
-// powerplay.go builds a 7th page: a dedicated Powerplay status + history view. User: "add a
-// powerplay window i guess, why not" -- confirmed scope via a follow-up: a new page (not just an
-// expanded section on the recap page), with real history/a chart, not just current standing.
+// powerplay.go builds a 7th page: a dedicated Powerplay status + history view -- a full page
+// rather than just an expanded section on the recap page, with real history/a chart, not just
+// current standing.
 //
 // Real data (see summary.go's own Powerplay-family comment for the periodic-snapshot-vs-delta
 // distinction already established there): "Powerplay" is a periodic snapshot of CURRENT standing
@@ -31,8 +31,7 @@ type powerplayJoinEvent struct {
 // Type is a real raw internal commodity symbol (e.g. "$siriusindustrialequipment_name;") --
 // confirmed against the real event shape that TypeLocalised is a real sibling field, same pattern
 // as basically every other enum-ish field in this journal. Real bug, fixed: the first version only
-// captured Type, so the raw unresolved symbol leaked straight into the UI -- caught live by the
-// user ("this is weird Delivered 750 $siriusindustrialequipment_name;").
+// captured Type, so the raw unresolved symbol leaked straight into the UI instead of a real name.
 type powerplayDeliverEvent struct {
 	Power         string `json:"Power"`
 	Count         int64  `json:"Count"`
@@ -91,16 +90,14 @@ type powerplayData struct {
 	// page's own "table view" fallback for the chart below (see dataviz skill's accessibility
 	// check: a chart needs a non-visual alternative, and a real per-event log already IS one).
 	History []powerplayHistoryEntry `json:"history"`
-	// Chart is chronological (oldest first) -- a real cumulative-merits-over-time series, the
-	// "how you're contributing to your power" visualization the user asked for.
+	// Chart is chronological (oldest first) -- a real cumulative-merits-over-time series showing
+	// how you're contributing to your power.
 	Chart []powerplayChartPoint `json:"chart"`
-	// DeliveredSystems: user, "powerplay export should say which systems youve pushed influence
-	// towards" -- real PowerplayDeliver events carry no system field of their own (confirmed
+	// DeliveredSystems: real PowerplayDeliver events carry no system field of their own (confirmed
 	// against the real event shape, just Count/Power/Type), so this comes from RawEvent's own
 	// SystemName (best-effort "whichever system you were in when this fired", already tracked by
-	// this project's parser for exactly this kind of event). Follow-up: "it needs to say how much
-	// youve pushed EACH SYSTEM" -- a flat name list wasn't enough, this is now a real per-system
-	// total, sorted by amount (biggest contribution first).
+	// this project's parser for exactly this kind of event). A real per-system total, sorted by
+	// amount (biggest contribution first) -- a flat name list alone wasn't informative enough.
 	DeliveredSystems []powerplaySystemDelivery `json:"deliveredSystems,omitempty"`
 }
 

@@ -1,10 +1,8 @@
 package main
 
-// engineeringplanner.go builds a fifth page: an engineering upgrade planner. Requested directly
-// by the owner: "add an engineering planner where you can add a few engineering upgrades to a
-// list and ittl tell you a summary of what materials you have for it and which engineers you
-// have that can give you it" -- basket-style, multiple picks with quantities ("4 overcharged
-// multicannons and 1 range fsd").
+// engineeringplanner.go builds a fifth page: an engineering upgrade planner -- basket-style,
+// multiple picks with quantities, a running summary of materials needed and which engineers can
+// provide each upgrade.
 //
 // The journal itself has no blueprint recipe data at all (confirmed for materials.go already --
 // EngineerCraft only records what WAS spent on a specific past craft, and the same blueprint+
@@ -27,8 +25,8 @@ package main
 // engineer can give me this"). 786 real ship-module blueprints remain, and every one of their
 // ingredients resolved cleanly against this project's own 137-material table.
 //
-// Experimental Effects (real owner catch: "you forgot experimental effects lol") are also from
-// engineers and cost the same material pool -- vendored as a second, separate list, scoped the
+// Experimental Effects are also from engineers and cost the same material pool -- vendored as a
+// second, separate list, scoped the
 // same way (real engineer, ship-module, not Suit/Weapon) plus two effect-specific exclusions:
 // the upstream data's "@Technology"-only entries (Technology Broker unlocks, not a real
 // Engineer) and its "Unlock" Type (engineer INVITE requirements -- a different concept from
@@ -37,9 +35,9 @@ package main
 // applies regardless of which grade you rolled the base upgrade to, so it's a second, independent
 // pick in the UI (Type -> Upgrade -> Grade -> optional Effect), not a 4th column on the same row.
 //
-// Also vendors each engineer's real home system (owner: "clicking on an engineers name should
-// copy the name of the system theyre in so you can plot a route") -- source:
-// int-Frank/EDEPathFinder's EDEPaths.json (Apache 2.0 licensed,
+// Also vendors each engineer's real home system, so clicking an engineer's name copies their
+// system for route-plotting -- source: int-Frank/EDEPathFinder's EDEPaths.json (Apache 2.0
+// licensed,
 // https://github.com/int-Frank/EDEPathFinder/blob/master/EDEPaths.json, fetched 2026-08-04), a
 // small standalone "shortest path between engineers" tool with exactly this data already
 // structured. That source has some real name typos of its own ("Masha Hicks", "Lei Chung",

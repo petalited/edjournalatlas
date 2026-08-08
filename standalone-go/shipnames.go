@@ -5,8 +5,8 @@ import (
 )
 
 // shipnames.go: real ship TYPE display names (e.g. "smallcombat01_nx" -> "Kestrel Mk II") --
-// distinct from ship-modules.go's per-module naming. Owner report: "a bunch of ships are just
-// named like internal names smallcombat01_nx yk? it should say their name".
+// distinct from ship-modules.go's per-module naming. Without this, ships would show their raw
+// internal type symbol instead of a real name.
 //
 // Two sources, real data preferred when available: this commander's own real
 // ShipyardBuy/ShipyardSwap/ShipyardNew events carry a real ShipType_Localised field for

@@ -10,15 +10,14 @@ package main
 // crossing families (same category still) costs a flat extra x6 on top. Guardian/Thargoid
 // materials aren't tradeable at all, which materialFamilyCatalog already reflects by omission.
 //
-// Owner: "add a trade calulator, so if youre short you can click on what youre short on and see
-// what you can trade at said material trader (maybe system name of nearest trader of that type
-// from your current pos?". Two real data gaps discussed and resolved with the owner before
-// building: (1) the journal's Docked.StationServices only flags THAT a station has a material
-// trader, not WHICH of the three types -- the only way to know for certain is a real
-// MaterialTrade event there, which carries an explicit TraderType. Chose (owner's call) to only
-// ever surface stations the commander has personally traded at before, rather than guessing from
-// station economy or adding a live galaxy-wide lookup -- this project has never made a live
-// network call anywhere, and stays that way here too.
+// A trade-shortfall calculator: click a material you're short on to see what you could trade for
+// it at a Material Trader, plus the nearest trader of the right type. Two real data gaps: (1) the
+// journal's Docked.StationServices only flags THAT a station has a material trader, not WHICH of
+// the three types -- the only way to know for certain is a real MaterialTrade event there, which
+// carries an explicit TraderType. So this only ever surfaces stations the commander has
+// personally traded at before, rather than guessing from station economy or adding a live
+// galaxy-wide lookup -- this project has never made a live network call anywhere, and stays that
+// way here too.
 
 import (
 	"encoding/json"

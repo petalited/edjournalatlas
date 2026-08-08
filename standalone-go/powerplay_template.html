@@ -77,9 +77,9 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
 .copy-btn-small.copied { color: #fff; background: var(--accent); border-color: var(--accent); }
 .copy-btn-small.copy-failed { color: #fff; background: var(--bad-text); border-color: var(--bad-text); }
 /* Real bug, fixed: discord-export-btn and cycle-view-btn each had their own hardcoded
-   `position: fixed; right: <magic pixel offset>`, sized to assume a specific button width --
-   "view by cycle and copy for discord overlap" (user). Any width drift (font rendering, a longer
-   power name inflating one label, etc) could push them into each other. Fixed by wrapping both in
+   `position: fixed; right: <magic pixel offset>`, sized to assume a specific button width, which
+   could overlap. Any width drift (font rendering, a longer power name inflating one label, etc)
+   could push them into each other. Fixed by wrapping both in
    a single fixed-position flex row (`.page-actions-row`) so real widths + a real gap always
    determine spacing, never a guessed offset. */
 .page-actions-row { position: fixed; top: var(--space-4); right: 66px; z-index: 20;
@@ -124,7 +124,7 @@ a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible
 .status-card-value { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; margin-top: 2px; }
 .status-card-sub { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
 
-/* Chart -- user: "how youre contributing to your power", a real cumulative-merits-over-time line.
+/* Chart -- a real cumulative-merits-over-time line showing how you're contributing to your power.
    Single series (no legend needed, dataviz skill's own simplification for exactly one series),
    thin 2px line, rounded end marker, recessive gridlines, hover crosshair+tooltip. The history log
    below is this chart's real non-visual/table-view alternative (same underlying per-event data).
@@ -231,10 +231,8 @@ function fmtInt(n) {
 function fmtDate(iso) {
   return iso ? iso.replace('T', ' ').replace('Z', '') + ' UTC' : '';
 }
-// User: "it should say like, which system tick you got the merits in? look into the games
-// background sim if you need to understand it" -- researched this rather than guess: Powerplay
-// runs on its own real weekly cycle, separate from the per-system daily BGS tick (which varies
-// system-to-system and isn't what "merits" are scoped by) -- the real Powerplay cycle resets
+// Powerplay runs on its own real weekly cycle, separate from the per-system daily BGS tick (which
+// varies system-to-system and isn't what "merits" are scoped by) -- the real Powerplay cycle resets
 // every Thursday at 07:00 UTC, confirmed against real community documentation of the actual
 // mechanic. Computes the most recent Thursday-07:00-UTC boundary on or before a given real event
 // timestamp, i.e. which weekly cycle that event's merits actually belong to.
@@ -255,10 +253,9 @@ function powerplayCycleLabel(iso) {
   return `cycle of ${powerplayCycleStart(iso).toISOString().slice(0, 10)}`;
 }
 
-// User: "add a cycle viewer button that lets you view your stuff in each cycle" -- groups every
-// real history entry (merits/rank/delivered/collected/joined) by the same real weekly Powerplay
-// cycle boundary powerplayCycleLabel already computes, so "your stuff in each cycle" covers
-// everything that happened that week, not just merits. Returns cycles sorted most-recent-first.
+// Groups every real history entry (merits/rank/delivered/collected/joined) by the same real
+// weekly Powerplay cycle boundary powerplayCycleLabel already computes, covering everything that
+// happened that week, not just merits. Returns cycles sorted most-recent-first.
 function groupHistoryByCycle() {
   const byKey = new Map(); // cycle start ISO date -> { startISO, entries: [] }
   for (const h of DATA.history) {
@@ -277,10 +274,9 @@ function groupHistoryByCycle() {
       : 0;
     c.meritActions = c.entries.filter(e => e.kind === 'merits').length;
     c.delivered = {};
-    // deliveredBySystem: user, on the cycle viewer's own Discord export: "i should ... be able to
-    // click copy and its a summary of each systems total influence ive contributed to in that
-    // cycle" -- same real per-entry label already parsed for goods type above, just keyed by the
-    // system name (the 3rd regex group) instead of the goods type (the 2nd).
+    // deliveredBySystem: powers the cycle viewer's per-system Discord export -- same real
+    // per-entry label already parsed for goods type above, just keyed by the system name (the 3rd
+    // regex group) instead of the goods type (the 2nd).
     c.deliveredBySystem = {};
     for (const e of c.entries) {
       if (e.kind !== 'delivered') continue;
@@ -353,10 +349,9 @@ function openCycleModal() {
 function closeCycleModal() {
   document.getElementById('cycleModalOverlay').hidden = true;
 }
-// User: "i should when i open view by cycle be able to click copy and its a summary of each
-// systems total influence ive contributed to in that cycle" -- the currently-viewed cycle's own
-// real per-system delivery totals (see groupHistoryByCycle's own deliveredBySystem), not the
-// page-wide totals the main Discord export button above already covers.
+// The currently-viewed cycle's own real per-system delivery totals (see groupHistoryByCycle's own
+// deliveredBySystem), not the page-wide totals the main Discord export button above already
+// covers.
 function formatCycleForDiscord(c) {
   const start = new Date(c.startISO + 'T07:00:00Z');
   const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -413,10 +408,9 @@ document.getElementById('subtitle').textContent = DATA.pledged
 // (a real risk the first version had: hardcoding height/padB separately in each function).
 const CHART_W = 800, CHART_H = 240, CHART_PAD_L = 44, CHART_PAD_R = 12, CHART_PAD_T = 12, CHART_PAD_B = 32;
 
-// User: "it needs vertical lines to tell WHEN stuff hgappens it just shows it going up butg you
-// dont know over how long and when" -- real gap, the first version only had Y-axis (merit value)
-// gridlines, nothing marking the time axis at all. Picks up to 5 evenly-time-spaced ticks across
-// the real [tMin, tMax] range and labels each with a real short date.
+// Real gap, fixed: the first version only had Y-axis (merit value) gridlines, nothing marking the
+// time axis at all -- a rising line with no sense of over how long. Picks up to 5 evenly
+// time-spaced ticks across the real [tMin, tMax] range and labels each with a real short date.
 function chartTimeTicks(tMin, tMax, count) {
   if (tMax <= tMin) return [tMin];
   const ticks = [];
@@ -513,11 +507,11 @@ function historyIcon(kind) {
   return { merits: '✨', rank: '⬆️', delivered: '📦', collected: '🎒', joined: '🤝' }[kind] || '•';
 }
 
-// User: "change colour theme in powerplay of action to match hex of power the action was for
-// (search their colours online)" -- no canonical hex list exists anywhere published (checked
+// No canonical hex list exists anywhere published for Powerplay's per-power theme colors (checked
 // Frontier's own materials, EDCD/EDDN journal docs, EDMC plugin source, EDSM/Inara/Spansh map
-// tools); the user supplied real in-game screenshots of the Powerplay menu instead (the small bar
-// under each power's portrait is their real theme color), read by eye off those screenshots. Each
+// tools) -- these values were read by eye off real in-game screenshots of the Powerplay menu (the
+// small bar under each power's portrait is their real theme color), so treat them as approximate.
+// Each
 // history entry's own real `power` field (see powerplay.go's own comment on why this is read
 // per-EVENT rather than assumed to be the commander's current pledge -- PowerplayDefect means a
 // real commander's own history can span more than one power) looks up its real color here.
@@ -563,9 +557,8 @@ function renderContent() {
       ${c.sub ? `<div class="status-card-sub">${escapeHtml(c.sub)}</div>` : ''}
     </div>`).join('')}</div>`;
 
-  // User: "it needs to say how much youve pushed EACH SYSTEM, its important" -- a flat list of
-  // system names wasn't enough; real per-system delivery totals, sorted biggest contribution
-  // first (already sorted server-side).
+  // Real per-system delivery totals, sorted biggest contribution first (already sorted
+  // server-side) -- a flat list of system names alone wasn't informative enough.
   const systemsHtml = DATA.deliveredSystems && DATA.deliveredSystems.length
     ? `<div class="chart-section">
         <div class="chart-title">Systems reinforced</div>
@@ -599,9 +592,7 @@ function renderContent() {
 }
 renderContent();
 
-// User: "could use a discord export too to share how youre contributing to your power with
-// others" -- same copyToClipboard/legacyCopy pattern already used by the other pages' Discord/
-// copy buttons.
+// Same copyToClipboard/legacyCopy pattern already used by the other pages' Discord/copy buttons.
 function copyToClipboard(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     return navigator.clipboard.writeText(text).then(() => true, () => legacyCopy(text));
@@ -621,13 +612,11 @@ function legacyCopy(text) {
   document.body.removeChild(ta);
   return ok;
 }
-// User: "powerplay copy should be a summary, totals for each thing not each reward" -- the first
-// version listed the 5 most recent individual merit-gain events, which reads as noisy detail, not
-// a shareable summary. Every line here is now a real TOTAL for its category instead of an
-// itemized list -- DATA.chart's own last point (cumulative merits, already computed for the chart
-// itself) doubles as "total merits earned", with DATA.chart.length as the real action count.
-// User: "add timestamps to the powerplay output" -- the export had no time context at all before
-// this (not even when it was generated, or when the commander was last actually active).
+// Every line here is a real TOTAL for its category rather than an itemized list of individual
+// events, which reads as noisy detail rather than a shareable summary -- DATA.chart's own last
+// point (cumulative merits, already computed for the chart itself) doubles as "total merits
+// earned", with DATA.chart.length as the real action count. Also carries real time context
+// throughout (generated-at, pledged-since, last-activity) rather than none at all.
 function formatPowerplayForDiscord() {
   const lines = [`**Powerplay -- ${DATA.power}**`, `_Generated ${DATA.generatedAt}_`];
   lines.push(`Rank ${DATA.rank} · ${fmtInt(DATA.merits)} current merits`);
@@ -639,9 +628,7 @@ function formatPowerplayForDiscord() {
   }
   if (DATA.totalDelivered) lines.push(`📦 ${fmtInt(DATA.totalDelivered)} goods delivered (influence pushed)`);
   if (DATA.totalCollected) lines.push(`🎒 ${fmtInt(DATA.totalCollected)} goods collected`);
-  // User: "powerplay export should say which systems youve pushed influence towards", then "it
-  // needs to say how much youve pushed EACH SYSTEM, its important" -- real per-system totals, not
-  // just a flat name list.
+  // Real per-system totals, not just a flat name list.
   if (DATA.deliveredSystems && DATA.deliveredSystems.length) {
     lines.push('', '**Systems reinforced:**');
     for (const d of DATA.deliveredSystems) lines.push(`  ${d.system}: ${fmtInt(d.count)} delivered`);
@@ -652,8 +639,8 @@ function formatPowerplayForDiscord() {
     const cycleBit = last.kind === 'merits' ? ` (${powerplayCycleLabel(last.timestamp)})` : '';
     lines.push('', `_Last activity: ${last.label} — ${fmtDate(last.timestamp)}${cycleBit}_`);
   }
-  // User: "the last line be (merits last cycle)" -- the real weekly-cycle merit total (see
-  // groupHistoryByCycle), not just the single most recent event above, as the real closing line.
+  // Closing line: the real weekly-cycle merit total (see groupHistoryByCycle), not just the
+  // single most recent event above.
   const cycles = groupHistoryByCycle();
   if (cycles.length) {
     const c = cycles[0];

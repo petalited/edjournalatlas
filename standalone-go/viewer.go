@@ -115,8 +115,8 @@ type viewerSystem struct {
 	Stars               []viewerStar   `json:"stars"`
 	Bodies              []viewerBody   `json:"bodies"`
 	// LastVisitedAt: real timestamp of this system's own most recent update (any FSDJump/
-	// Location/scan event that touched it) -- user: "add sort by date, recent / oldest for
-	// system map". Same UpdatedAt field this project's Store.System already tracks.
+	// Location/scan event that touched it), so the system table can sort by recent/oldest. Same
+	// UpdatedAt field this project's Store.System already tracks.
 	LastVisitedAt string `json:"lastVisitedAt,omitempty"`
 }
 

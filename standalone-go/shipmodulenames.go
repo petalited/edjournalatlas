@@ -26,10 +26,10 @@ package main
 // formatBlueprintName) -- never a raw, ugly `int_whatever_size3_class2` string shown verbatim.
 //
 // Real bug, fixed: the first version of this file guessed "slugshot" -> Rail Gun purely from
-// memory, marked [known, not independently confirmed] -- wrong. A real owner report ("PE-24P has
-// fragment cannons not railguns") caught it: "hpt_slugshot_*" is genuinely Fragment Cannon's real
-// internal symbol, confirmed directly against EDCD/FDevIDs' own `outfitting.csv` (the same
-// trusted source already used for `material.csv`) and independently cross-checked against four
+// memory, marked [known, not independently confirmed] -- wrong. "hpt_slugshot_*" is genuinely
+// Fragment Cannon's real internal symbol, confirmed directly against EDCD/FDevIDs' own
+// `outfitting.csv` (the same trusted source already used for `material.csv`) and independently
+// cross-checked against four
 // more unrelated community sources that all agree. The real Rail Gun symbol is the much more
 // literal "hpt_railgun_*". A concrete lesson from this: [known]-tagged entries in this file are a
 // real risk, not just a formality -- verify against an authoritative source before trusting
@@ -75,7 +75,7 @@ var moduleTypeKeywords = map[string]string{
 	"beamlaser":                "Beam Laser",
 	"pulselaser":               "Pulse Laser",
 	"multicannon":              "Multi-cannon",
-	"slugshot":                 "Fragment Cannon", // real bug, now fixed: this was wrongly mapped to "Rail Gun" (this author's own unverified guess, see git history) -- a real owner report ("PE-24P has fragment cannons not railguns") caught it. Verified directly against EDCD/FDevIDs' own outfitting.csv (the same trusted source already used for material.csv): "Hpt_Slugshot_*" is Fragment Cannon, full stop, cross-confirmed independently against four more unrelated community sources (EDDI, EDMarketConnector, an EDDN mapper, icarus's vendored Coriolis data) that all agree.
+	"slugshot":                 "Fragment Cannon", // real bug, now fixed: this was wrongly mapped to "Rail Gun" (an unverified guess, see git history). Verified directly against EDCD/FDevIDs' own outfitting.csv (the same trusted source already used for material.csv): "Hpt_Slugshot_*" is Fragment Cannon, full stop, cross-confirmed independently against four more unrelated community sources (EDDI, EDMarketConnector, an EDDN mapper, icarus's vendored Coriolis data) that all agree.
 	"advancedtorppylon":        "Torpedo Pylon",
 	"basicmissilerack":         "Missile Rack",
 	"dumbfiremissilerack":      "Missile Rack",
@@ -98,9 +98,9 @@ var moduleTypeKeywords = map[string]string{
 // moduleTypeKeywords substring (e.g. "hpt_mkiiplasmashockautocannon_..." contains "cannon"),
 // are genuinely NOT part of this project's engineerable catalog -- checked BEFORE the keyword
 // scan in resolveModuleType so they never get misattributed to a real Type, however close the
-// substring match looks. Two real, confirmed cases (owner report, "PE-24P has fragment cannons
-// not railguns" prompted a full audit of all 323 distinct real Item symbols this commander's
-// fleet has ever used against EDCD/EDDI's authoritative ModuleDefinitions.cs):
+// substring match looks. Two real, confirmed cases (found during a full audit of all 323 distinct
+// real Item symbols this commander's fleet has ever used against EDCD/EDDI's authoritative
+// ModuleDefinitions.cs, prompted by the earlier Fragment Cannon mislabel above):
 //   - "hpt_mrascanner_*" is the Pulse Wave Analyser (a Guardian-ruin detection utility),
 //     confirmed via EDCD/FDevIDs' outfitting.csv -- NOT Manifest Scanner, which this project had
 //     wrongly assumed. Pulse Wave Analyser isn't in this project's vendored blueprint catalog at
