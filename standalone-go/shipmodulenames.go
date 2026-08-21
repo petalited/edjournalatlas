@@ -8,8 +8,8 @@ package main
 // No `Item_Localised` field exists anywhere in the journal (confirmed: same as Raw materials
 // never getting a Name_Localised, checked directly against this project's own real data) --
 // module names have to be derived, not read off the journal directly. Rather than vendor a full
-// per-module database (the same real licensing/tech-stack problem this whole page ran into with
-// Coriolis, see docs/ShipyardPlanner.md), this parses the `Item` symbol's own structural
+// per-module database (the same real licensing/tech-stack problem "fork Coriolis" ran into),
+// this parses the `Item` symbol's own structural
 // convention directly: `int_<type>_size<N>_class<C>` for internal compartments,
 // `hpt_<weapon>_<mount>_<size>` for hardpoints -- both real, stable, well-known encodings that
 // haven't changed in years. The size/class -> in-game "6A"-style shorthand (class 5=A best down

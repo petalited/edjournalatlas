@@ -2,8 +2,7 @@ package main
 
 // materialtrader.go builds real Material Trader location data from the commander's own journal
 // history, plus the trade-ratio math for a shortfall calculator surfaced on both the materials
-// page (materials.go) and the engineering planner (engineeringplanner.go). See
-// docs/MaterialTraderMechanics.md for the full researched mechanic this implements -- summary:
+// page (materials.go) and the engineering planner (engineeringplanner.go). The mechanic:
 // three trader types (raw/manufactured/encoded), each restricted to its own category; within a
 // category, materials are grouped into named families (materialFamilyCatalog, materialgrades.go);
 // trading within the same family costs a pure grade-difference ratio (6^n up, 1:3^n down);

@@ -1,7 +1,7 @@
 package main
 
 // Best-effort auto-detection of the Elite Dangerous journal folder -- ported from
-// edexotracker's standalone/journal_locate.py. Same reasoning: no single standard path exists
+// this project's Python version's journal_locate.py. Same reasoning: no single standard path exists
 // on Linux (unlike Windows/Mac's fixed locations), so this is best-effort with an explicit
 // override otherwise, same problem EDMC itself has to solve.
 

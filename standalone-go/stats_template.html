@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var q=new URLSearchParams(location.search).get('theme');var t=(q==='light'||q==='dark')?q:localStorage.getItem('standalone_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);if(q)localStorage.setItem('standalone_theme',t);}}catch(e){}})();</script>
+<title>standalone -- personal statistics</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  color-scheme: light dark;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+  --transition: 160ms ease;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --good: #0ca30c; --good-bg: #e5f7e5; --warning: #b5710a; --warning-bg: #fdf1de;
+  --row-hover: #f2f1ec;
+  --shadow: 0 1px 2px rgba(20,18,12,0.06), 0 6px 16px -8px rgba(20,18,12,0.16), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0d12; --panel: #15181d; --text: #f2f3f5; --muted: #b7bcc4; --muted-faint: #7c828b;
+    --border: #262a31; --border-strong: #343a43; --accent: #3987e5; --accent-weak: #17233a;
+    --good: #3ecf3e; --good-bg: #12291a; --warning: #e0a53c; --warning-bg: #2e2312;
+    --row-hover: #1c2027;
+    --shadow: 0 1px 2px rgba(0,0,0,0.45), 0 8px 20px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.045);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --good: #0ca30c; --good-bg: #e5f7e5; --warning: #b5710a; --warning-bg: #fdf1de;
+  --row-hover: #f2f1ec;
+  --shadow: 0 1px 2px rgba(20,18,12,0.06), 0 6px 16px -8px rgba(20,18,12,0.16), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0d12; --panel: #15181d; --text: #f2f3f5; --muted: #b7bcc4; --muted-faint: #7c828b;
+  --border: #262a31; --border-strong: #343a43; --accent: #3987e5; --accent-weak: #17233a;
+  --good: #3ecf3e; --good-bg: #12291a; --warning: #e0a53c; --warning-bg: #2e2312;
+  --row-hover: #1c2027;
+  --shadow: 0 1px 2px rgba(0,0,0,0.45), 0 8px 20px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.045);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text); padding: var(--space-5); font-variant-numeric: tabular-nums; }
+.page-nav { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.page-nav-link { font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill); border: 1px solid var(--border); transition: border-color var(--transition), color var(--transition); }
+.page-nav-link:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); }
+.page-nav-link.page-nav-active { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); font-weight: 600;
+  box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--accent) 50%, transparent); }
+h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 2px; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 var(--space-4); max-width: 900px; }
+.methodology-note { font-size: 0.8rem; color: var(--muted); background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); max-width: 900px; }
+.empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center;
+  border: 1px dashed var(--border); border-radius: var(--radius-md); }
+.theme-toggle { position: fixed; top: var(--space-4); right: var(--space-4); z-index: 20;
+  display: flex; align-items: center; justify-content: center; width: 38px; height: 38px;
+  cursor: pointer; font-size: 1.05rem; line-height: 1; background: var(--panel);
+  border: 1px solid var(--border); border-radius: var(--radius-pill); box-shadow: var(--shadow);
+  transition: border-color var(--transition), transform var(--transition); }
+.theme-toggle:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); background: var(--panel); }
+table { border-collapse: collapse; width: 100%; min-width: 760px; }
+thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); border-bottom: 1px solid var(--border-strong);
+  text-align: left; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+  padding: var(--space-3) var(--space-3); cursor: pointer; user-select: none; white-space: nowrap;
+  transition: color var(--transition), background-color var(--transition); }
+thead th:hover { color: var(--text); }
+thead th.sorted { color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
+.sort-arrow { font-size: 0.7rem; margin-left: 3px; opacity: 0.7; }
+tbody tr { border-top: 1px solid var(--border); transition: background-color var(--transition); }
+tbody tr:hover { background: var(--row-hover); }
+tbody td { padding: var(--space-3); font-size: 0.88rem; }
+.rate-cell { display: flex; align-items: center; gap: var(--space-2); }
+.rate-bar-track { width: 60px; height: 6px; border-radius: var(--radius-pill); background: var(--border); overflow: hidden; flex-shrink: 0; }
+.rate-bar-fill { height: 100%; background: var(--good); border-radius: var(--radius-pill); }
+.low-sample { font-size: 0.7rem; color: var(--warning); background: var(--warning-bg); padding: 1px 6px; border-radius: var(--radius-pill); margin-left: 4px; }
+.n-note { color: var(--muted-faint); font-size: 0.78rem; }
+a:focus-visible, button:focus-visible, thead th[data-key]:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm);
+}
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+  <a class="page-nav-link" href="standalone_viewer.html">🗺️ Systems</a>
+  <a class="page-nav-link" href="standalone_events.html">🔍 Journal search</a>
+  <a class="page-nav-link" href="standalone_summary.html">📊 Recap</a>
+  <a class="page-nav-link" href="standalone_materials.html">🧪 Materials</a>
+  <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
+  <a class="page-nav-link" href="standalone_shipyard.html">🚀 Shipyard</a>
+  <a class="page-nav-link" href="standalone_powerplay.html">⚔️ Powerplay</a>
+  <a class="page-nav-link" href="standalone_colonization.html">🏗️ Colonization</a>
+  <a class="page-nav-link page-nav-active" href="standalone_stats.html">📈 Stats</a>
+</nav>
+<button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
+
+<h1>Personal Statistics</h1>
+<p class="subtitle" id="subtitle"></p>
+<div class="methodology-note">
+  <strong>How these rates are weighted:</strong> the notable-body rate only ever divides by systems
+  you've actually <em>fully scanned</em> -- a system you've barely looked at can't fairly count as
+  "no notable body," you just haven't checked yet. Star types with a small sample size are flagged
+  (<span class="low-sample">low sample</span>) rather than hidden, so a 100% rate from 2 systems
+  doesn't read the same as one from 200.
+</div>
+
+<div id="content"></div>
+
+<script id="stats-data" type="application/json">__DATA_JSON__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('stats-data').textContent);
+const LOW_SAMPLE_THRESHOLD = 5;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
+
+document.getElementById('subtitle').textContent = DATA.commander
+  ? `${DATA.commander} -- generated ${DATA.generatedAt}`
+  : `Generated ${DATA.generatedAt}`;
+
+const columns = [
+  { key: 'starGroup', label: 'Star type' },
+  { key: 'systemCount', label: 'Systems visited' },
+  { key: 'fullyScannedCount', label: 'Fully scanned' },
+  { key: 'notableRate', label: 'Notable rate (per system)' },
+  { key: 'notablePerBodyRate', label: 'Notable rate (per body)' },
+  { key: 'avgBodyCount', label: 'Avg bodies/system' },
+];
+
+let sortKey = 'systemCount';
+let sortDir = -1;
+
+function rateCellHtml(rate, n, count, total) {
+  const lowSample = n > 0 && n < LOW_SAMPLE_THRESHOLD;
+  if (n === 0) return '<span class="n-note">no data yet</span>';
+  return `<div class="rate-cell">
+    <div class="rate-bar-track"><div class="rate-bar-fill" style="width:${Math.min(rate * 100, 100)}%"></div></div>
+    <span>${fmtPct(rate)}</span>
+    <span class="n-note">(${fmtInt(count)}/${fmtInt(total)})</span>
+    ${lowSample ? '<span class="low-sample">low sample</span>' : ''}
+  </div>`;
+}
+
+function render() {
+  const content = document.getElementById('content');
+  if (!DATA.starTypes || !DATA.starTypes.length) {
+    content.innerHTML = '<div class="empty-note">No scanned systems with a confirmed arrival star found yet -- honk a few systems, then re-run this tool.</div>';
+    return;
+  }
+  const rows = DATA.starTypes.slice().sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (typeof av === 'string') return av.localeCompare(bv) * sortDir;
+    return (av - bv) * sortDir;
+  });
+
+  content.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr>${columns.map(c => `<th data-key="${c.key}">${escapeHtml(c.label)}<span class="sort-arrow"></span></th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `
+      <tr>
+        <td><strong>${escapeHtml(r.starGroup)}</strong></td>
+        <td>${fmtInt(r.systemCount)}</td>
+        <td>${fmtInt(r.fullyScannedCount)}${r.fullyScannedCount < r.systemCount ? `<span class="n-note"> (${fmtInt(r.systemCount - r.fullyScannedCount)} partial)</span>` : ''}</td>
+        <td>${rateCellHtml(r.notableRate, r.fullyScannedCount, r.notableSystemCount, r.fullyScannedCount)}</td>
+        <td>${rateCellHtml(r.notablePerBodyRate, r.scannedPlanetCount, r.notablePlanetCount, r.scannedPlanetCount)}</td>
+        <td>${r.honkedCount > 0 ? `${r.avgBodyCount.toFixed(1)} <span class="n-note">(${fmtInt(r.honkedCount)} honked)</span>` : '<span class="n-note">no data yet</span>'}</td>
+      </tr>`).join('')}</tbody>
+  </table></div>`;
+
+  document.querySelectorAll('thead th[data-key]').forEach(th => {
+    const isSorted = th.getAttribute('data-key') === sortKey;
+    th.classList.toggle('sorted', isSorted);
+    th.setAttribute('aria-sort', isSorted ? (sortDir === 1 ? 'ascending' : 'descending') : 'none');
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = isSorted ? (sortDir === 1 ? '▲' : '▼') : '';
+    th.setAttribute('tabindex', '0');
+    const activate = () => {
+      if (sortKey === th.getAttribute('data-key')) { sortDir *= -1; } else { sortKey = th.getAttribute('data-key'); sortDir = sortKey === 'starGroup' ? 1 : -1; }
+      render();
+    };
+    th.onclick = activate;
+    th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); } };
+  });
+}
+render();
+
+// Manual light/dark override -- see the other pages for the same pattern.
+function currentTheme() {
+  const forced = document.documentElement.getAttribute('data-theme');
+  if (forced === 'light' || forced === 'dark') return forced;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('standalone_theme', theme); } catch (e) {}
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+applyTheme(currentTheme());
+const themeToggleBtn = document.getElementById('themeToggle');
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener('click', () => applyTheme(currentTheme() === 'dark' ? 'light' : 'dark'));
+}
+</script>
+</body>
+</html>

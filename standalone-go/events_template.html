@@ -121,6 +121,8 @@ a:focus-visible, input:focus-visible, select:focus-visible, .event-row:focus-vis
   <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
   <a class="page-nav-link" href="standalone_shipyard.html">🚀 Shipyard</a>
   <a class="page-nav-link" href="standalone_powerplay.html">⚔️ Powerplay</a>
+  <a class="page-nav-link" href="standalone_colonization.html">🏗️ Colonization</a>
+  <a class="page-nav-link" href="standalone_stats.html">📈 Stats</a>
 </nav>
 <button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
 
@@ -138,40 +140,67 @@ a:focus-visible, input:focus-visible, select:focus-visible, .event-row:focus-vis
 <div class="result-count" id="resultCount"></div>
 <div id="results"></div>
 
-<script id="event-data" type="application/json">__DATA_JSON__</script>
+<script id="event-data-gzip-b64" type="text/plain">__DATA_GZIP_B64__</script>
 <script>
-const DATA = JSON.parse(document.getElementById('event-data').textContent);
 const RESULT_CAP = 300;
+let DATA = null;
+let openKeys = new Set();
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// Event-type counts, most frequent first -- lets the dropdown surface what's actually common in
-// THIS commander's own journal rather than a fixed alphabetical list of 170+ names to scroll.
-const typeCounts = new Map();
-for (const e of DATA.events) typeCounts.set(e.event, (typeCounts.get(e.event) || 0) + 1);
-const sortedTypes = [...typeCounts.entries()].sort((a, b) => b[1] - a[1]);
-document.getElementById('eventTypeSelect').innerHTML += sortedTypes
-  .map(([type, n]) => `<option value="${escapeHtml(type)}">${escapeHtml(type)} (${n.toLocaleString('en-US')})</option>`)
-  .join('');
-
-document.getElementById('subtitle').textContent =
-  `Generated ${DATA.generatedAt} — ${DATA.events.length.toLocaleString('en-US')} journal events, every event type, not just exploration-relevant ones.`;
-
-// standalone_viewer.html's "Journal ↗" button links here as "#q=<system name>" -- lets "show me
-// the raw journal for this system" be a real link between the two pages instead of a dead end
-// (the search page otherwise has no way to know why someone arrived at it). Read once at load,
-// same reasoning as viewer_template.html's systemFromHash: this page never rewrites its own
-// hash, so there's nothing for a hashchange listener to react to.
-const hashMatch = location.hash.match(/q=([^&]+)/);
-if (hashMatch) {
-  document.getElementById('searchInput').value = decodeURIComponent(hashMatch[1]);
+// The embedded payload is gzip-then-base64 (see eventsearch.go's comment for why -- real journal
+// data compresses roughly 12x thanks to how much repeated event-type/field-name/system-name text
+// there is), so it has to come back through DecompressionStream before it's usable JSON.
+// DecompressionStream is native to every evergreen browser (Chrome 80+, Firefox 113+, Safari
+// 16.4+) -- no bundled library needed, just a clear message if it's genuinely missing.
+async function loadData() {
+  const b64 = document.getElementById('event-data-gzip-b64').textContent.trim();
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const text = await new Response(stream).text();
+  return JSON.parse(text);
 }
 
-let openKeys = new Set();
+async function init() {
+  if (!('DecompressionStream' in window)) {
+    document.getElementById('resultCount').textContent =
+      "Your browser doesn't support DecompressionStream, which this page needs to unpack its journal data -- try a recent Chrome, Firefox, or Safari.";
+    return;
+  }
+  document.getElementById('resultCount').textContent = 'Decompressing journal data...';
+  DATA = await loadData();
+
+  // Event-type counts, most frequent first -- lets the dropdown surface what's actually common in
+  // THIS commander's own journal rather than a fixed alphabetical list of 170+ names to scroll.
+  const typeCounts = new Map();
+  for (const e of DATA.events) typeCounts.set(e.event, (typeCounts.get(e.event) || 0) + 1);
+  const sortedTypes = [...typeCounts.entries()].sort((a, b) => b[1] - a[1]);
+  document.getElementById('eventTypeSelect').innerHTML += sortedTypes
+    .map(([type, n]) => `<option value="${escapeHtml(type)}">${escapeHtml(type)} (${n.toLocaleString('en-US')})</option>`)
+    .join('');
+
+  document.getElementById('subtitle').textContent =
+    `Generated ${DATA.generatedAt} — ${DATA.events.length.toLocaleString('en-US')} journal events, every event type, not just exploration-relevant ones.`;
+
+  // standalone_viewer.html's "Journal ↗" button links here as "#q=<system name>" -- lets "show me
+  // the raw journal for this system" be a real link between the two pages instead of a dead end
+  // (the search page otherwise has no way to know why someone arrived at it). Read once at load,
+  // same reasoning as viewer_template.html's systemFromHash: this page never rewrites its own
+  // hash, so there's nothing for a hashchange listener to react to.
+  const hashMatch = location.hash.match(/q=([^&]+)/);
+  if (hashMatch) {
+    document.getElementById('searchInput').value = decodeURIComponent(hashMatch[1]);
+  }
+
+  render();
+}
 
 function render() {
+  if (!DATA) return;
   const needle = document.getElementById('searchInput').value.trim().toLowerCase();
   const typeFilter = document.getElementById('eventTypeSelect').value;
   const asc = document.getElementById('sortAscInput').checked;
@@ -243,7 +272,7 @@ document.getElementById('searchInput').addEventListener('input', () => {
 document.getElementById('eventTypeSelect').addEventListener('change', render);
 document.getElementById('sortAscInput').addEventListener('change', render);
 
-render();
+init();
 
 // Manual light/dark override -- CSS already auto-follows the OS via
 // @media(prefers-color-scheme), but that gives no way to actually compare both from inside the

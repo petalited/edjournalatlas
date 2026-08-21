@@ -1,10 +1,9 @@
 package main
 
-// Exobiology value/sold/lost reconciliation -- ported from edexotracker's standalone/
-// reconcile.py, itself ported from edexotracker/datasource.py's already-proven
-// _reconcile_sale_status()/value-formula logic. See docs/ExobiologyValueMechanics.md for the
-// full mechanics writeup; docs/StandaloneJournalParser.md for why SellOrganicData can't shortcut
-// this (its BioData array has no body/system reference at all).
+// Exobiology value/sold/lost reconciliation -- ported from this project's earlier Python
+// version's reconcile.py, itself ported from an already-proven _reconcile_sale_status()/
+// value-formula implementation. SellOrganicData can't shortcut this reconciliation -- its
+// BioData array has no body/system reference at all.
 
 import "sort"
 

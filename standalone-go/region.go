@@ -1,7 +1,7 @@
 package main
 
 // Offline (x, y, z) -> galactic region name lookup. No network call. Ported from
-// edexotracker's standalone/region_map.py (itself reimplemented from EDMC-ExploData's
+// this project's Python version's region_map.py (itself reimplemented from EDMC-ExploData's
 // RegionMap.py, GPLv2) -- see regiondata.json (generated from the same vendored
 // RegionMapData.py table) and its own README under standalone/vendor/explodata_region_data/
 // for full provenance. Matched exactly ("Inner Orion Spur") against a real CodexEntry event's

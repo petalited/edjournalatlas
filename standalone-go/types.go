@@ -35,6 +35,8 @@ type Star struct {
 	BarycenterIDs []int // set when this star is one half (or more) of a binary/multi pair
 	WasDiscovered *bool
 	WasFootfalled *bool
+	RingClasses   []string // real rings can attach directly to a star's own Scan event too, not just planets
+	ReserveLevel  string
 	UpdatedAt     string
 }
 
@@ -61,8 +63,15 @@ type Planet struct {
 	Efficient          bool
 	WasFootfalled      *bool
 	BioSignalCount     int
-	Flora              map[string]*FloraScan // keyed by genus+"|"+species
-	UpdatedAt          string
+	GeoSignalCount     int
+	// RingClasses/ReserveLevel/TidalLock feed the Colonization page's real body-bonus derivation --
+	// confirmed real fields on the same Scan event already parsed for everything else on this
+	// struct, just not captured until now.
+	RingClasses  []string // real RingClass values with the "eRingClass_" prefix stripped, e.g. "Rocky"/"Icy"/"MetalRich"/"Metallic"
+	ReserveLevel string   // "PristineResources"/"MajorResources"/"CommonResources"/"LowResources"/"DepletedResources", only set when RingClasses is non-empty
+	TidalLock    bool
+	Flora        map[string]*FloraScan // keyed by genus+"|"+species
+	UpdatedAt    string
 }
 
 type FloraScan struct {

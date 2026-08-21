@@ -1,13 +1,13 @@
 package main
 
 // shipyard.go builds a 6th page: the real fleet, real fitted modules, and an honest per-ship
-// engineering completion percentage. See docs/ShipyardPlanner.md for the full design discussion
-// (including why "fork Coriolis" doesn't work as literally asked, and how the scope settled on
-// this instead) -- summary: Loadout gives full real module detail (including Engineering) for
-// whichever ship is currently ACTIVE; StoredShips is a periodic full snapshot of every OTHER
+// engineering completion percentage. "Fork Coriolis" doesn't work as literally stated (data
+// licensing, tech stack), so the scope settled on this instead: Loadout gives full real module
+// detail (including Engineering) for whichever ship is currently ACTIVE; StoredShips is a
+// periodic full snapshot of every OTHER
 // ship's type/name/value/location (never its modules -- the journal only ever reports a
 // non-active ship's Loadout while it WAS active, in the past). Same "ground truth snapshot, not
-// net-accumulated" pattern already used for Materials/EngineerProgress this session.
+// net-accumulated" pattern already used for Materials/EngineerProgress elsewhere in this codebase.
 //
 // Real, confirmed gotcha: ShipID is a slot number reused after a ship is sold (confirmed directly
 // in this commander's own data: ShipID 8 shows up as "asp" in some Loadout events and later as
@@ -188,8 +188,8 @@ func effectsByType() map[string][]string {
 
 // blueprintsByType groups the existing vendored blueprintCatalog by Type, collapsing each
 // (Type, Name) group's real grade rows down to just that blueprint's real max grade (155 of 160
-// real blueprint groups cap at 5, a handful of utility upgrades cap lower -- see
-// docs/ShipyardPlanner.md, already relied on by maxGradeFor).
+// real blueprint groups cap at 5, a handful of utility upgrades cap lower -- already relied on
+// by maxGradeFor).
 func blueprintsByType() map[string][]blueprintOpt {
 	seen := map[string]map[string]int{} // Type -> Name -> max grade seen so far
 	for _, b := range blueprintCatalog {
@@ -246,7 +246,7 @@ func buildModuleOut(m shipyardLoadoutModule) moduleOut {
 
 // maxGradeFor looks up the real max grade a (Type, Name) blueprint goes to in this project's own
 // vendored catalog -- almost always 5, but a handful of utility upgrades cap lower (checked
-// directly against the vendored data, see docs/ShipyardPlanner.md), so this doesn't just assume.
+// directly against the vendored data), so this doesn't just assume.
 func maxGradeFor(bpType, bpName string) int {
 	max := 0
 	for _, b := range blueprintCatalog {

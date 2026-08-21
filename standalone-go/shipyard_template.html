@@ -283,7 +283,7 @@ h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 
    from engineering_template.html/materials_template.html's own trade calculator: click a
    "short by X" material-needed card to see what you could give up from what you already hold to
    cover it, plus the nearest known trader of the right type from your own real journal history.
-   See materialtrader.go/docs/MaterialTraderMechanics.md for the underlying ratio mechanic. */
+   See materialtrader.go for the underlying ratio mechanic. */
 .need-card.trade-trigger { cursor: pointer; transition: transform var(--transition); }
 .need-card.trade-trigger:hover { transform: translateY(-1px); }
 .trade-modal-overlay { position: fixed; inset: 0; background: rgba(10,10,10,0.55); display: flex;
@@ -357,6 +357,8 @@ a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible
   <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
   <a class="page-nav-link page-nav-active" href="standalone_shipyard.html">🚀 Shipyard</a>
   <a class="page-nav-link" href="standalone_powerplay.html">⚔️ Powerplay</a>
+  <a class="page-nav-link" href="standalone_colonization.html">🏗️ Colonization</a>
+  <a class="page-nav-link" href="standalone_stats.html">📈 Stats</a>
 </nav>
 <button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
 <button class="materials-needed-btn" type="button" id="materialsNeededBtn" disabled title="See combined materials needed across everything you've added to your engineering plan">🧰 Materials Needed</button>
@@ -440,7 +442,7 @@ function formatCredits(n) {
 // this page's Materials Needed panel feature-matches the engineering planner's own: click a
 // "short by X" material-needed card to see what you could give up from what you already hold to
 // cover it, plus the nearest known trader of the right type. Ratio math and family/type rules are
-// the real Material Trader mechanic -- see docs/MaterialTraderMechanics.md for full derivation.
+// the real Material Trader mechanic (same math as materialtrader.go).
 function tradeQuantities(giveGrade, giveFamily, getGrade, getFamily) {
   let give = 1, get = 1;
   if (getGrade > giveGrade) give = Math.pow(6, getGrade - giveGrade);
@@ -772,7 +774,7 @@ function materialsGrid() {
   // Same trade-trigger pattern as the engineering planner's own materialsSummary: only short
   // cards get it, and only if the material is actually tradeable
   // (belongs to a named family -- Guardian/Thargoid materials aren't tradeable at any Material
-  // Trader, see docs/MaterialTraderMechanics.md).
+  // Trader).
   const cards = rows.map(m => {
     const held = DATA.heldMaterials[m.key] || 0;
     const short = m.count - held;
@@ -1224,7 +1226,7 @@ function parseExportedUrl(raw) {
   // Coriolis's own compact share format puts the ship type right in the URL PATH as a plain
   // slug (e.g. "/outfit/panthermkii?code=..."), readable with no decoding at all -- pure URL
   // parsing, not the site's actual proprietary bit-packed module encoding (which this project
-  // still doesn't attempt, see docs/ShipyardPlanner.md for why). Surfaced so an import attempt on
+  // still doesn't attempt -- see the scope-limit note below). Surfaced so an import attempt on
   // a compact link can at least confirm/deny "this build is for the right kind of ship" for free.
   m = s.match(/coriolis\.io\/outfit\/([a-z0-9_-]+)/i);
   if (m) return { site: 'Coriolis', compact: true, shipSlug: m[1] };
@@ -1293,7 +1295,7 @@ async function importFromUrl() {
     return;
   }
   if (parsed.compact) {
-    // Real, deliberate scope limit -- see docs/ShipyardPlanner.md: fully decoding either site's
+    // Real, deliberate scope limit: fully decoding either site's
     // own compact build-share code needs their own large internal per-module ID catalog and (for
     // Coriolis) a further nested engineering-modifications sub-format; guessing at it risks
     // silently setting wrong goals, so it isn't attempted. The ship-type slug in a Coriolis

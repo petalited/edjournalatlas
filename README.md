@@ -1,10 +1,11 @@
 # edjournalatlas
 
 A local, offline toolkit for Elite Dangerous, built entirely from your own journal files — no
-account, no companion app, no network calls. Seven browsable pages:
+account, no companion app, no network calls. Nine browsable pages:
 
 - **Systems explorer** — every system you've visited: region, population, bodies scanned, notable
-  finds, presumed exobiology value; drill into stars/moons/exobiology detail per body.
+  finds, presumed exobiology value; drill into stars/moons/detail per body, with a mode toggle to
+  switch each body's detail between general/exploration/mining/colonization info.
 - **Journal search** — every event you've ever logged, not just exploration ones, free-text
   searchable.
 - **Career recap** — a "wrapped"-style stat summary across 17 categories (Combat, Crime, Wing,
@@ -19,6 +20,13 @@ account, no companion app, no network calls. Seven browsable pages:
   %, and export to EDSY/Coriolis.
 - **Powerplay** — current standing, a full merit/delivery/collection history log, a real
   cumulative-merits chart, and a weekly-cycle viewer for reviewing any past Powerplay cycle.
+- **Colonization** — real per-commander claim/construction-depot/contribution activity, plus a
+  body bonus browser: search any visited system to see each body's real colonization
+  economy-bonus and population-benchmark potential before committing to a build there.
+- **Stats** — personal rates, not just totals (e.g. what % of a given star type has actually
+  produced a notable body), weighted honestly: only fully-scanned systems count toward a rate's
+  denominator, and every rate ships with its real sample size so a 2-system fluke doesn't read the
+  same as a well-sampled one.
 
 A trade calculator (materials page and engineering planner) ties the inventory and the planner
 together — short on a material, click it to see what you could give up instead, and the nearest
@@ -31,15 +39,15 @@ local cache file next to itself.
 Two implementations exist, but they're not equivalent anymore:
 
 - **`standalone-go/`** — a single ~3MB self-contained binary (Linux/Windows), no runtime
-  dependency of any kind. **This is the actively developed, full-featured version** — all seven
+  dependency of any kind. **This is the actively developed, full-featured version** — all nine
   pages above, plus a small coverage-report JSON file listing which journal event types aren't
   summarized yet (safe to share: event names and field names only, never your actual data). No
   Mac build: Elite Dangerous has no supported native Mac client anymore, so there's no realistic
   audience with journal files to point one at.
 - **`standalone/`** — the original Python version. Still works, but only has the systems viewer
-  (no full-journal search, no career recap, no materials/engineering pages) — it's no longer being
-  extended. Use it if you'd rather run from source with just the stdlib, but the Go version is
-  where new features land.
+  (no full-journal search, no career recap, no materials/engineering/colonization/stats pages) —
+  it's no longer being extended. Use it if you'd rather run from source with just the stdlib, but
+  the Go version is where new features land.
 
 Both keep their own local cache and output files, so it's fine to have both around.
 
@@ -111,23 +119,29 @@ to run just one step (e.g. rebuild the viewer without re-checking the journal). 
 double-click program from it, see `standalone/build_executable.py` (uses PyInstaller; only
 produces a binary for whichever OS you run the build on).
 
-## The seven pages (Go version)
+## The nine pages (Go version)
 
-Running the binary writes/updates all seven every time — a small pill-tab bar at the top of each
+Running the binary writes/updates all nine every time — a small pill-tab bar at the top of each
 page switches between them. Every page also has a light/dark toggle (top-right corner) that
 overrides your OS/browser preference and follows you across pages, in case the automatic
 light/dark detection isn't what you want.
 
 **`standalone_viewer.html` — systems explorer.** A sortable/searchable table of every visited
-system: region, population, bodies scanned, notable-find count, presumed exobiology value. Click
-a system to expand it: stars, bodies grouped under whichever star (or shared binary-star
-barycenter — circumbinary bodies are grouped correctly, not just attached to the nearest single
-star) they orbit, moons nested under their parent planet (shown as a small connected tree, with
-each body's distance from the arrival star), click a body for full detail (mass, gravity,
-atmosphere, temperature, pressure, terraform state, full flora-scan history). Bonus/
-first-discovery badges, EDSM/Inara/full-journal-search links per system, a 📍 button to re-sort
-the whole table by distance from any system, copy-to-clipboard and Discord-formatted export
-buttons.
+system: region, population, bodies scanned, notable-find count, presumed exobiology value —
+filterable to notable-only, bio-only, or ★ favourited systems (favouriting a system sticks around
+across runs). Click a system to expand it: stars, bodies grouped under whichever star (or shared
+binary-star barycenter — circumbinary bodies are grouped correctly, not just attached to the
+nearest single star) they orbit, moons nested under their parent planet (shown as a small
+connected tree, with each body's distance from the arrival star). A 4-way mode toggle inside each
+system's own dropdown (🌍 General / 🔬 Exploration / ⛏️ Mining / 🏗️ Colonization, sticky as you
+scroll) changes what every body card in that system shows — general info, full exploration detail
+(mass, gravity, atmosphere, temperature, pressure, terraform state, flora-scan history,
+first-footfall status), ring/reserve-level mining detail, or colonization economy-bonus/population
+detail — plus mode-relevant summary stats at the top of the dropdown (e.g. total possible
+population for Colonization mode). Bonus/first-discovery badges, EDSM/Inara/full-journal-search
+links per system, a 📍 button to re-sort the whole table by distance from any system, and a
+copy-summary menu per system offering four plaintext export formats (General/Mining/
+Exploration/Colonization) alongside the original Discord-formatted export.
 
 **`standalone_events.html` — full journal search.** Every single journal event you've ever
 generated, not just exploration-relevant ones — combat, trading, missions, engineering, cargo,
@@ -189,6 +203,24 @@ the power it belonged to. A cumulative-merits chart, tinted to your power's own 
 every Thursday 07:00 UTC, not the same thing as a system's own BGS tick), so you can review any
 past cycle's merits/deliveries/rank-ups on their own — each with its own Discord-export summary,
 alongside the page-wide one.
+
+**`standalone_colonization.html` — colonization.** Two parts: "Your Colonization Activity" — real
+systems you've claimed, every construction depot's progress (including the real per-commodity
+resource breakdown, not just an overall %), and total units contributed by commodity, all pulled
+straight from your journal. And a "Body Bonus Browser" — search any system you've visited to see a
+body-by-body breakdown of its real colonization economy bonuses (ringed/biological/geological/body
+type, each with why) and known population benchmarks (facility tier, rapid-growth population,
+inflection point, asymptote), so you can judge a system's potential before claiming it. The
+economy/population reference tables are manually ported from a researched community knowledge base
+(not a source project with code to import — see `standalone-go/colonization.go`'s header comment).
+
+**`standalone_stats.html` — personal statistics.** Real rates, not just totals — e.g. what % of a
+given star type has actually produced a notable body — broken down by star type group (white
+dwarf/neutron star/black hole and every common main-sequence/giant type, grouped the same way the
+recap does so the two pages never disagree). Two honesty rules baked in: a rate's denominator only
+ever counts fully-scanned systems (a partially-scanned system isn't fairly "no notable body," you
+just haven't looked yet), and every rate ships with its real sample size so a 2-system fluke never
+reads with the same confidence as a well-sampled one.
 
 **`standalone_unmodeled.json`** — not really meant to be read directly. A small coverage
 report: which journal event types your data has that the recap doesn't summarize yet, with real

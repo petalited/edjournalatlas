@@ -14,7 +14,7 @@ import "strings"
 // Source: EDDiscovery/EliteDangerousCore's Recipes.cs (Apache 2.0,
 // https://github.com/EDDiscovery/EliteDangerousCore/blob/master/EliteDangerous/FrontierData/
 // Recipes/Recipes.cs, fetched 2026-08-05) -- the same real, independent, community-maintained
-// project already trusted once this session for the Elite rank prestige (Elite I-V) fix. Its
+// project already trusted elsewhere in this codebase for the Elite rank prestige (Elite I-V) fix. Its
 // `EngineeringRecipe` entries carry the real journal FDName/BlueprintName symbol alongside a
 // human name and applicable module type(s) for essentially every real graded blueprint (59
 // distinct symbols) and Experimental Effect (85 distinct symbols) in the game.

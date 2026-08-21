@@ -1,6 +1,6 @@
 package main
 
-// Builds the same self-contained local-EDSM-style HTML viewer as edexotracker's standalone/
+// Builds the same self-contained local-EDSM-style HTML viewer as this project's Python version's
 // viewer.py + viewer_template.py -- identical JSON data shape, so the exact same embedded
 // JS/CSS (viewer_template.html, a verbatim copy) renders it without any changes on that side.
 
@@ -82,20 +82,33 @@ type viewerBody struct {
 	Efficient      bool          `json:"efficient"`
 	WasFootfalled  *bool         `json:"wasFootfalled"`
 	BioSignalCount int           `json:"bioSignalCount"`
+	GeoSignalCount int           `json:"geoSignalCount"`
 	NotableLabel   string        `json:"notableLabel,omitempty"`
 	Flora          []viewerFlora `json:"flora"`
+	// Ring/reserve/tidal-lock plus the same colonization.go bonus/population-benchmark
+	// derivation used on the Colonization page -- reused here (not recomputed differently) so
+	// the plaintext system-summary copy buttons (mining/colonization) never disagree with that
+	// page about what a body is worth for a build site.
+	RingClasses          []string              `json:"ringClasses,omitempty"`
+	ReserveLevel         string                `json:"reserveLevel,omitempty"`
+	TidalLock            bool                  `json:"tidalLock,omitempty"`
+	EconomyBonuses       []economyBonus        `json:"economyBonuses,omitempty"`
+	PopulationBenchmarks []populationBenchmark `json:"populationBenchmarks,omitempty"`
 }
 
 type viewerStar struct {
-	Name          string  `json:"name"`
-	Distance      float64 `json:"distance"`
-	Type          string  `json:"type"`
-	Subclass      int     `json:"subclass"`
-	Luminosity    string  `json:"luminosity"`
-	Mass          float64 `json:"mass"`
-	WasDiscovered *bool   `json:"wasDiscovered"`
-	WasFootfalled *bool   `json:"wasFootfalled"`
-	NotableLabel  string  `json:"notableLabel,omitempty"`
+	Name           string         `json:"name"`
+	Distance       float64        `json:"distance"`
+	Type           string         `json:"type"`
+	Subclass       int            `json:"subclass"`
+	Luminosity     string         `json:"luminosity"`
+	Mass           float64        `json:"mass"`
+	WasDiscovered  *bool          `json:"wasDiscovered"`
+	WasFootfalled  *bool          `json:"wasFootfalled"`
+	NotableLabel   string         `json:"notableLabel,omitempty"`
+	RingClasses    []string       `json:"ringClasses,omitempty"`
+	ReserveLevel   string         `json:"reserveLevel,omitempty"`
+	EconomyBonuses []economyBonus `json:"economyBonuses,omitempty"`
 }
 
 type viewerSystem struct {
@@ -154,7 +167,10 @@ func Render(store *Store) (string, int, error) {
 				Name: st.Name, Distance: st.Distance, Type: st.Type, Subclass: st.Subclass,
 				Luminosity: st.Luminosity, Mass: st.Mass,
 				WasDiscovered: st.WasDiscovered, WasFootfalled: st.WasFootfalled,
-				NotableLabel: classifyRareStarType(st.Type),
+				NotableLabel:   classifyRareStarType(st.Type),
+				RingClasses:    st.RingClasses,
+				ReserveLevel:   st.ReserveLevel,
+				EconomyBonuses: starEconomyBonuses(st),
 			})
 		}
 		sort.Slice(stars, func(i, j int) bool { return stars[i].Distance < stars[j].Distance })
@@ -208,8 +224,13 @@ func Render(store *Store) (string, int, error) {
 				Discovered: pl.Discovered, WasDiscovered: pl.WasDiscovered,
 				Mapped: pl.Mapped, WasMapped: pl.WasMapped,
 				Efficient: pl.Efficient, WasFootfalled: pl.WasFootfalled,
-				BioSignalCount: pl.BioSignalCount, NotableLabel: notableBodyTypes[pl.Type],
-				Flora: flora,
+				BioSignalCount: pl.BioSignalCount, GeoSignalCount: pl.GeoSignalCount, NotableLabel: notableBodyTypes[pl.Type],
+				Flora:                flora,
+				RingClasses:          pl.RingClasses,
+				ReserveLevel:         pl.ReserveLevel,
+				TidalLock:            pl.TidalLock,
+				EconomyBonuses:       planetEconomyBonuses(pl),
+				PopulationBenchmarks: populationBenchmarksFor(pl.Type),
 			})
 		}
 		sort.Slice(bodies, func(i, j int) bool { return bodies[i].Distance < bodies[j].Distance })

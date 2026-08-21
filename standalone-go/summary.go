@@ -3,8 +3,7 @@ package main
 // summary.go builds a third page: a whole-career recap (combat, trading, mining, ships,
 // missions, rivalries) computed from the same universal RawEvent capture eventsearch.go uses,
 // pre-aggregated into a curated set of interesting numbers instead of a raw searchable log.
-// Go-only -- see docs/StandaloneJournalParser.md for why the Python side stopped getting new
-// features partway through this session.
+// Go-only -- the Python version stopped getting new features once this rewrite existed.
 //
 // Every stat here is grounded against this commander's real journal data before being written,
 // same practice as the rest of this project: e.g. ship internal keys (Loadout's "Ship" field,

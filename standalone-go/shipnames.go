@@ -17,7 +17,7 @@ import (
 // this commander's captured journal history began have no such event on record at all). Falls
 // back to a small static table for the rest, sourced from EDCD/FDevIDs' own `shipyard.csv`
 // (https://github.com/EDCD/FDevIDs/blob/master/shipyard.csv, fetched 2026-08-06) -- the same
-// trusted org/source already used for `material.csv` and (this session) the module-symbol
+// trusted org/source already used for `material.csv` and (elsewhere in this codebase) the module-symbol
 // cross-reference -- covering every real ship symbol in the game, so this always has an answer
 // even for a stored ship whose purchase predates this commander's own journal history.
 var shipTypeDisplayNames = map[string]string{

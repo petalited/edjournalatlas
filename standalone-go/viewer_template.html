@@ -104,6 +104,23 @@ button.secondary { background: transparent; color: var(--accent); border: 1px so
 button.secondary:hover { background: var(--accent-weak); }
 .checkbox-field { display: flex; align-items: center; gap: var(--space-2); font-size: 0.85rem; cursor: pointer; }
 input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
+/* Lives inside the currently-open system's own dropdown (not the page-top .controls bar) so it's
+   right next to the orbit tree it controls -- no scrolling back to the top of the page to switch
+   modes. Sticky (not just inline) on top of that: once a long body list scrolls this out of its
+   normal position, it anchors to the top of the viewport instead of scrolling away entirely, then
+   un-sticks and sits back in its normal spot once you scroll back above it. The detail-wrap
+   background match keeps body cards scrolling underneath from showing through while it's stuck. */
+.mode-toggle-group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  position: sticky; top: 0; z-index: 4; background: var(--bg); padding: var(--space-2) 0;
+  margin: 0 0 var(--space-2); }
+.mode-toggle-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.05em; margin-right: 2px; }
+.mode-toggle-btn { background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  border-radius: var(--radius-pill); padding: var(--space-2) var(--space-3); font-size: 0.82rem;
+  cursor: pointer; transition: border-color var(--transition), background-color var(--transition), color var(--transition); }
+.mode-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mode-toggle-btn.mode-toggle-btn-active { background: var(--accent); color: white; border-color: var(--accent);
+  box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--accent) 50%, transparent); }
 .sort-arrow { font-size: 0.7rem; margin-left: 3px; opacity: 0.7; }
 /* table-layout: fixed (with explicit per-column widths below) keeps column widths tied only to
    the header row -- with the default auto layout, the detail row's colspan cell (which can hold
@@ -218,6 +235,23 @@ td.num, th.num { text-align: right; }
 .copy-btn:hover { color: var(--accent); border-color: var(--border); background: var(--accent-weak); }
 .copy-btn.copied { color: var(--good); border-color: var(--good); background: var(--good-bg); }
 .copy-btn.copy-failed { color: var(--bad-text); border-color: var(--bad-text); background: var(--bad-bg); }
+.summary-menu-wrap { position: relative; display: inline-block; }
+.summary-menu { position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 10;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  box-shadow: var(--shadow); padding: var(--space-1); display: flex; flex-direction: column; min-width: 175px; }
+.summary-menu-item { background: transparent; color: var(--text); border: none; text-align: left;
+  padding: var(--space-2) var(--space-3); font-size: 0.82rem; border-radius: var(--radius-sm);
+  cursor: pointer; transition: background-color var(--transition), color var(--transition); }
+.summary-menu-item:hover, .summary-menu-item:focus-visible { background: var(--accent-weak); color: var(--accent); }
+/* .summary-menu's own `display: flex` above is an author style, which beats the UA stylesheet's
+   default `[hidden] { display: none }` regardless of source order -- without this, the hidden
+   attribute gets set/cleared correctly in JS but the menu stays visually open the whole time. */
+.summary-menu[hidden] { display: none; }
+.fav-star { background: transparent; border: none; cursor: pointer; font-size: 1rem; line-height: 1;
+  padding: 0; margin-right: 5px; color: var(--muted-faint); vertical-align: -1px;
+  transition: color var(--transition), transform var(--transition); }
+.fav-star:hover { color: var(--bonus-text); transform: scale(1.15); }
+.fav-star.fav-active { color: var(--bonus-text); }
 .ext-link { font-size: 0.78rem; color: var(--accent); text-decoration: none; border: 1px solid var(--border);
   border-radius: var(--radius-pill); padding: 2px var(--space-3); transition: border-color var(--transition), background-color var(--transition); }
 .ext-link:hover { text-decoration: underline; border-color: var(--accent); background: var(--accent-weak); }
@@ -267,6 +301,8 @@ button:focus-visible, thead th[data-key]:focus-visible, tbody tr.system-row:focu
   <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
   <a class="page-nav-link" href="standalone_shipyard.html">🚀 Shipyard</a>
   <a class="page-nav-link" href="standalone_powerplay.html">⚔️ Powerplay</a>
+  <a class="page-nav-link" href="standalone_colonization.html">🏗️ Colonization</a>
+  <a class="page-nav-link" href="standalone_stats.html">📈 Stats</a>
 </nav>
 <button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
 
@@ -286,6 +322,10 @@ button:focus-visible, thead th[data-key]:focus-visible, tbody tr.system-row:focu
   <label class="checkbox-field">
     <input type="checkbox" id="bioOnlyInput">
     Only systems with bio value
+  </label>
+  <label class="checkbox-field">
+    <input type="checkbox" id="favoritesOnlyInput">
+    ★ Only favourited systems
   </label>
   <button class="secondary" id="resetBtn">Reset filters</button>
 </div>
@@ -322,6 +362,22 @@ function formatCredits(n) {
   if (n === null || n === undefined) return '—';
   return n.toLocaleString('en-US') + ' cr';
 }
+// populationBenchmarks[].asymptote arrives as a real, already-formatted string ("3,100m",
+// "380.01k", "100m") -- parsed back to a plain number so several bodies' figures can be summed
+// into one system-wide total, then reformatted the same way for display.
+function parsePopFigure(str) {
+  if (!str) return 0;
+  const m = String(str).replace(/,/g, '').match(/^([\d.]+)([mk])?$/i);
+  if (!m) return 0;
+  const num = parseFloat(m[1]);
+  const suffix = (m[2] || '').toLowerCase();
+  return suffix === 'm' ? num * 1e6 : suffix === 'k' ? num * 1e3 : num;
+}
+function formatPopFigure(n) {
+  if (n >= 1e6) return (n / 1e6).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'm';
+  if (n >= 1e3) return (n / 1e3).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'k';
+  return Math.round(n).toLocaleString('en-US');
+}
 // Just the date portion (real timestamp's own ISO-8601 prefix) -- sorting itself uses the full
 // raw string via the generic data-key comparator above, this is only the display text.
 function formatVisitedDate(iso) {
@@ -343,10 +399,12 @@ function inaraUrl(systemName) {
 function eventsSearchUrl(systemName) {
   return `standalone_events.html#q=${encodeURIComponent(systemName)}`;
 }
+function colonizationUrl(systemName) {
+  return `standalone_colonization.html#system=${encodeURIComponent(systemName)}`;
+}
 // No per-body/per-star deep link is reliable without EDSM's own internal numeric IDs (this
 // project never fetches them) -- every name links to the same system page instead, which lists
-// all of a system's known bodies once EDSM has data for it. Same approach edexotracker's main
-// report uses for its own Discord export.
+// all of a system's known bodies once EDSM has data for it.
 function discordLink(label, systemName) {
   return `[${label}](${edsmUrl(systemName)})`;
 }
@@ -419,6 +477,21 @@ function discordCopyBtn(name) {
 }
 function discordObjectiveCopyBtn(name) {
   return `<button class="copy-btn discord-copy-btn" type="button" data-copy-mode="objective" title="Copy an objective overview for Discord (no personal bonuses -- what's actually available)" aria-label="Copy an objective overview for Discord" data-copy-name="${escapeHtml(name)}">🌐</button>`;
+}
+// Plaintext (non-Discord) equivalent -- one button opening a small menu instead of one button per
+// format, since there's only ever one system's detail row rendered at a time (the table only
+// opens one row at a once, see the isOpen check in render()), so the menu doesn't need its own
+// data-name -- the click handler just reads the module-level openSystem variable.
+function summaryMenuHtml() {
+  return `<div class="summary-menu-wrap">
+    <button class="copy-btn summary-menu-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Copy a plaintext system summary" aria-label="Copy a plaintext system summary">📝▾</button>
+    <div class="summary-menu" hidden>
+      <button type="button" class="summary-menu-item" data-summary-mode="general">General summary</button>
+      <button type="button" class="summary-menu-item" data-summary-mode="mining">⛏️ Mining summary</button>
+      <button type="button" class="summary-menu-item" data-summary-mode="exploration">🔬 Exploration summary</button>
+      <button type="button" class="summary-menu-item" data-summary-mode="colonization">🏗️ Colonization summary</button>
+    </div>
+  </div>`;
 }
 
 function starDiscordBits(s) {
@@ -512,8 +585,8 @@ function appendBodyLines(lines, bodies, lineForBody) {
   if (remaining > 0) lines.push(`  _+${remaining} more_`);
 }
 
-// Two Discord export variants, same reasoning as edexotracker's main report: a commander's own
-// bonuses (first footfall, first-logged) are one-time opportunities -- once claimed, they're
+// Two Discord export variants -- a commander's own bonuses (first footfall, first-logged) are
+// one-time opportunities -- once claimed, they're
 // gone for whoever else visits, so they don't belong in a number meant to represent what's
 // genuinely still "available" to share/compare.
 //   - Personal ("your progress"): actual bonus-inclusive value, first-discovery bragging.
@@ -587,11 +660,186 @@ function formatSystemForDiscordObjective(s) {
   return lines.join('\n');
 }
 
+// Plaintext system-summary exports -- unlike the Discord variants above, these are meant to be
+// pasted anywhere (a chat client with no markdown, a text file, a wiki): a short title line
+// followed by an emoji-prefixed bullet list, not one long fact-packed line. Kept to a soft per-
+// list character budget where practical -- only the enumerable per-item lists (body types, rings,
+// rare bodies) get truncated with a "+N more" tail once a system is large enough to blow past it;
+// the fixed stat lines before that point are never cut.
+const SUMMARY_LIST_CHAR_BUDGET = 500;
+
+function joinWithBudget(prefix, items, budget, sep = ', ') {
+  if (!items.length) return prefix;
+  let shown = [];
+  for (const item of items) {
+    const candidate = shown.concat(item);
+    if (shown.length > 0 && (prefix + candidate.join(sep)).length > budget) break;
+    shown = candidate;
+  }
+  const remaining = items.length - shown.length;
+  return `${prefix}${shown.join(sep)}${remaining > 0 ? `${sep}+${remaining} more` : ''}`;
+}
+
+function starTypeSummary(s) {
+  if (!s.stars.length) return 'no scanned star';
+  const counts = {};
+  for (const st of s.stars) counts[st.type] = (counts[st.type] || 0) + 1;
+  return Object.entries(counts).map(([t, n]) => n > 1 ? `${n}x ${t}` : t).join('/');
+}
+
+// Every distinct real PlanetClass in the system with its count -- this is a SYSTEM summary (every
+// body type and how many), not a discovery-progress summary, so it lists body types even for ones
+// with zero notable/bio value, sorted by how common they are (most-frequent type first).
+function bodyTypeCounts(s) {
+  const counts = {};
+  for (const b of s.bodies) {
+    const t = b.type || 'Unknown body';
+    counts[t] = (counts[t] || 0) + 1;
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+}
+// Shared by General AND Colonization -- Colonization is meant to read as the SAME body-type list,
+// just annotated with what each group is worth for a build (e.g. "4x High metal content body
+// (Extraction)" -- one combined line per type, not a separate near-identical line for each of the
+// 4), not a second, divergent list. annotateType(type) -> extra "(...)" text for that type's
+// line, or '' for none; omitted entirely for the plain General format.
+function typeCountLines(s, annotateType) {
+  // bodyEmoji (defined above, used by the body cards) keys off a real PlanetClass string --
+  // reused as-is here (via a throwaway {type} shim) rather than a second type->emoji table.
+  const items = bodyTypeCounts(s).map(([t, n]) => {
+    const label = `${bodyEmoji({ type: t })} ${n > 1 ? n + 'x ' : ''}${t}`;
+    const extra = annotateType ? annotateType(t) : '';
+    return extra ? `${label} (${extra})` : label;
+  });
+  return items.length ? joinWithBudget('  ', items, SUMMARY_LIST_CHAR_BUDGET, '\n  ') : '  (no individually-scanned bodies)';
+}
+function generalSummaryLines(s, annotateType) {
+  const lines = [s.name, `⭐ Stars: ${starTypeSummary(s)}`,
+    `🪐 Bodies: ${s.recordedBodyCount}/${s.bodyCountTotal || s.recordedBodyCount} scanned`];
+  lines.push(typeCountLines(s, annotateType));
+  if (notableTotal(s) > 0) {
+    lines.push(`✨ Notable: ${Object.entries(s.notableCounts).map(([label, n]) => `${n}x ${label}`).join(', ')}`);
+  }
+  if (s.population > 0) lines.push(`👥 Population: ${s.population.toLocaleString('en-US')}${s.faction ? ' (' + s.faction + ')' : ''}`);
+  if (s.bioValue > 0) lines.push(`🧬 Bio value: ${formatCredits(s.bioValue)}`);
+  if (s.firstDiscoveryCount > 0) lines.push(`🌟 First discoveries: ${s.firstDiscoveryCount}`);
+  return lines;
+}
+function formatSystemSummaryGeneral(s) {
+  return generalSummaryLines(s).join('\n');
+}
+
+// Real ReserveLevel values arrive as "PristineResources"/"MajorResources"/"CommonResources"/
+// "LowResources"/"DepletedResources" -- stripping the shared "Resources" suffix leaves just the
+// tier word, which is all that's meaningful to a miner deciding whether a ring is worth visiting.
+function reserveLevelLabel(reserveLevel) {
+  return reserveLevel ? reserveLevel.replace('Resources', '') : '';
+}
+function ringedBodySummaries(s) {
+  const out = [];
+  for (const st of s.stars) {
+    if (st.ringClasses && st.ringClasses.length) {
+      const reserve = reserveLevelLabel(st.reserveLevel);
+      out.push(`💍 ${st.name} — ${st.ringClasses.join('/')}${reserve ? ' (' + reserve + ')' : ''}`);
+    }
+  }
+  for (const b of s.bodies) {
+    if (b.ringClasses && b.ringClasses.length) {
+      const reserve = reserveLevelLabel(b.reserveLevel);
+      out.push(`💍 ${bodyDesignator(b, s.name)} — ${b.ringClasses.join('/')}${reserve ? ' (' + reserve + ')' : ''}`);
+    }
+  }
+  return out;
+}
+function formatSystemSummaryMining(s) {
+  const ringed = ringedBodySummaries(s);
+  const lines = [`${s.name} — ⛏️ Mining`];
+  lines.push(ringed.length ? joinWithBudget('  ', ringed, SUMMARY_LIST_CHAR_BUDGET, '\n  ') : '  No rings recorded in this system.');
+  return lines.join('\n');
+}
+
+function systemUnclaimedBio(s) {
+  return s.bodies.reduce((sum, b) => sum + b.flora.reduce(
+    (s2, f) => s2 + ((f.value && !f.sold && !f.lost) ? f.value : 0), 0), 0);
+}
+function formatSystemSummaryExploration(s) {
+  const lines = [`${s.name} — 🔬 Exploration`,
+    `🔭 Scanned: ${s.recordedBodyCount}/${s.bodyCountTotal || s.recordedBodyCount}`];
+  if (s.firstDiscoveryCount > 0) lines.push(`🌟 First discoveries: ${s.firstDiscoveryCount}`);
+  if (s.bioValue > 0) lines.push(`🧬 Bio: ${formatCredits(systemUnclaimedBio(s))} unclaimed / ${formatCredits(s.bioValue)} total`);
+  const terraformable = s.bodies.filter(b => b.terraformable).length;
+  if (terraformable > 0) lines.push(`🌱 Terraformable: ${terraformable}`);
+  if (notableTotal(s) > 0) {
+    lines.push(`✨ Notable: ${Object.entries(s.notableCounts).map(([label, n]) => `${n}x ${label}`).join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+// Per real PlanetClass (not per individual body) -- a group's colonization "effect" is the UNION
+// of every economy any body of that type in this system actually carries (base type economy plus
+// any real ring/bio/geo modifier), and its population benchmark (populationBenchmarksFor only
+// depends on the type/tier, never on an individual body, so it's identical for every member of
+// the group). This is what lets "4x High metal content body" show ONE combined "(Extraction)"
+// instead of four near-identical per-body lines.
+function colonizationTypeEffects(s) {
+  const effects = new Map();
+  for (const b of s.bodies) {
+    const t = b.type || 'Unknown body';
+    if (!effects.has(t)) effects.set(t, { economies: new Set(), benchmark: null });
+    const e = effects.get(t);
+    for (const eb of (b.economyBonuses || [])) e.economies.add(eb.economy);
+    if (!e.benchmark && b.populationBenchmarks && b.populationBenchmarks.length) e.benchmark = b.populationBenchmarks[0];
+  }
+  return effects;
+}
+function formatSystemSummaryColonization(s) {
+  const effects = colonizationTypeEffects(s);
+  const lines = generalSummaryLines(s, t => {
+    const e = effects.get(t);
+    if (!e) return '';
+    const bits = [];
+    if (e.economies.size) bits.push([...e.economies].join('/'));
+    // "each" matters here -- this is the population a SINGLE body of this type could reach with
+    // its own facility, not a total summed across the whole "Nx <type>" group it's attached to.
+    if (e.benchmark) bits.push(`pop→${e.benchmark.asymptote} each`);
+    return bits.join(', ');
+  });
+  lines.push('', `🏗️ Colonization: ${s.claimedByCommander ? 'Claimed by you' : 'Unclaimed'}`);
+  const ringedCount = ringedBodySummaries(s).length;
+  if (ringedCount > 0) lines.push(`💍 Ringed bodies: ${ringedCount}`);
+  return lines.join('\n');
+}
+
+// Favourited systems -- purely a client-side preference (no journal event backs this), stored in
+// localStorage the same way the theme toggle already is on this page, so it survives a reload of
+// the same generated file:// page across runs (same path = same storage origin).
+const FAVORITES_STORAGE_KEY = 'standalone_favorites';
+function loadFavorites() {
+  try {
+    const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch (e) { return new Set(); }
+}
+function saveFavorites() {
+  try { localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...favorites])); } catch (e) { /* storage unavailable */ }
+}
+let favorites = loadFavorites();
+function toggleFavorite(name) {
+  if (favorites.has(name)) favorites.delete(name); else favorites.add(name);
+  saveFavorites();
+}
+function favStarBtn(name) {
+  const active = favorites.has(name);
+  const label = active ? 'Remove from favourites' : 'Add to favourites';
+  return `<button class="fav-star${active ? ' fav-active' : ''}" type="button" data-fav-name="${escapeHtml(name)}" title="${label}" aria-label="${label}" aria-pressed="${active}">${active ? '★' : '☆'}</button>`;
+}
+
 let sortKey = 'bioValue';
 let sortDir = -1;
 let filterText = '';
 let notableOnly = false;
 let bioOnly = false;
+let favoritesOnly = false;
 let openSystem = null;
 let focusAfterRender = null;
 let focusAfterRenderBodyKey = null;
@@ -622,6 +870,7 @@ function sortedSystems() {
   let list = DATA.systems.filter(s => systemMatchesSearch(s, needle));
   if (notableOnly) list = list.filter(s => notableTotal(s) > 0);
   if (bioOnly) list = list.filter(s => s.bioValue > 0);
+  if (favoritesOnly) list = list.filter(s => favorites.has(s.name));
   // Plain Euclidean distance against every system's own galactic X/Y/Z -- an O(n) scan over
   // 470-ish systems is trivial in a browser, no spatial index needed at this scale.
   const refSys = distanceFromSystem ? DATA.systems.find(s => s.name === distanceFromSystem) : null;
@@ -654,6 +903,29 @@ function bodyKey(sys, b) {
   return `${sys.name}::${b.name}`;
 }
 
+// Which lens the orbit tree's body cards render through -- mirrors the four plaintext
+// copy-summary categories (see formatSystemSummaryGeneral/Mining/Exploration/Colonization
+// above), so switching mode here answers the same "show me the mining/colonization angle instead
+// of exo data" need without leaving the page. The state itself is page-wide (switching modes
+// while system A is open, then opening system B instead, keeps the same mode) -- only the toggle
+// BUTTONS live inside the currently-open system's own dropdown (see modeToggleHtml/detail-header
+// in render()), right next to the orbit tree they control, rather than up in .controls where
+// switching modes meant scrolling back to the top of the page every time.
+let bodyInfoMode = 'general';
+
+function modeToggleHtml() {
+  const modes = [
+    ['general', '🌍 General'], ['mining', '⛏️ Mining'],
+    ['exploration', '🔬 Exploration'], ['colonization', '🏗️ Colonization'],
+  ];
+  return `<div class="mode-toggle-group" role="group" aria-label="Body info mode">
+    <span class="mode-toggle-label">Body info:</span>
+    ${modes.map(([mode, label]) =>
+      `<button type="button" class="mode-toggle-btn${mode === bodyInfoMode ? ' mode-toggle-btn-active' : ''}" data-mode="${mode}">${label}</button>`
+    ).join('')}
+  </div>`;
+}
+
 // SurfaceGravity/SurfacePressure come off the journal in raw SI (m/s^2, Pa) -- converted here to
 // the units the game's own UI shows (Earth g, atmospheres) since that's what's actually
 // meaningful to a player, not the raw physics units.
@@ -672,9 +944,20 @@ function formatCamel(s) {
   return s ? s.replace(/([a-z0-9])([A-Z])/g, '$1 $2') : '';
 }
 
-// Every field the parser already captures for a body but the compact card doesn't normally show
-// -- surfaced in full once a body is clicked open, rather than just the summary badges.
-function bodyDetailRows(b) {
+// Four detail-row builders, one per bodyInfoMode -- deliberately separate small functions (not
+// one function with a mode switch buried inside) so each mode's field set stays easy to scan on
+// its own, matching this project's own established style elsewhere in this file.
+
+// General: deliberately the leanest mode -- just enough to identify the body, nothing a deeper
+// mode (Exploration/Mining/Colonization) already owns.
+function generalDetailRows(b) {
+  return [['Landable', b.landable ? 'Yes' : 'No']];
+}
+
+// Exploration: every field the parser captures for a body that a deep exploration pass would
+// care about -- this is the same field set the orbit tree always showed before the mode toggle
+// existed.
+function explorationDetailRows(b) {
   const rows = [];
   if (b.mass) rows.push(['Mass', `${b.mass.toLocaleString('en-US', {maximumFractionDigits: 3})} Earth masses`]);
   const gravity = formatGravity(b.gravity);
@@ -687,9 +970,48 @@ function bodyDetailRows(b) {
   rows.push(['Landable', b.landable ? 'Yes' : 'No']);
   if (b.mapped) rows.push(['Mapped', b.wasMapped === false ? 'Yes — first mapping' : 'Yes']);
   if (b.discovered) rows.push(['Discovered', b.wasDiscovered === false ? 'Yes — first discovery' : 'Yes']);
-  if (b.wasFootfalled !== null && b.wasFootfalled !== undefined) {
+  // Real Scan events report WasFootfalled for every body type, including ones on-foot landing was
+  // never possible on (gas giants, and -- as of this game version -- Water/Ammonia worlds too) --
+  // it isn't a "not yet claimed" signal there, footfall was simply never an option. Gate on
+  // Landable so this only ever shows for a body it can actually mean something on.
+  if (b.landable && b.wasFootfalled !== null && b.wasFootfalled !== undefined) {
     rows.push(['First footfall', b.wasFootfalled ? 'Already claimed' : 'Available']);
   }
+  return rows;
+}
+
+// Mining: ring/reserve data plus geological signals (surface prospecting relevance), landable
+// for surface-deposit context.
+function miningDetailRows(b) {
+  const rows = [];
+  if (b.ringClasses && b.ringClasses.length) {
+    rows.push(['Ring classes', b.ringClasses.join(' / ')]);
+    const reserve = reserveLevelLabel(b.reserveLevel);
+    if (reserve) rows.push(['Reserve level', reserve]);
+  } else {
+    rows.push(['Rings', 'None']);
+  }
+  if (b.geoSignalCount > 0) rows.push(['Geological signals', String(b.geoSignalCount)]);
+  rows.push(['Landable', b.landable ? 'Yes' : 'No']);
+  return rows;
+}
+
+// Colonization: every real economy bonus with its own reason (see planetEconomyBonuses/
+// starEconomyBonuses, colonization.go), every known population-benchmark tier in full (only 5
+// real body/tier combos are known at all -- see populationBenchmarks, colonization.go -- so an
+// absent benchmark means "not yet known," not shown as a zero), tidal lock, landable.
+function colonizationDetailRows(b) {
+  const rows = [];
+  if (b.economyBonuses && b.economyBonuses.length) {
+    for (const eb of b.economyBonuses) rows.push([eb.economy, eb.why]);
+  } else {
+    rows.push(['Economy bonuses', 'None']);
+  }
+  for (const bench of (b.populationBenchmarks || [])) {
+    rows.push([`Population (${bench.facility})`, `${bench.rapidPop} by tick 15 → ${bench.inflect} inflection → ${bench.asymptote} max`]);
+  }
+  rows.push(['Tidal lock', b.tidalLock ? 'Yes' : 'No']);
+  rows.push(['Landable', b.landable ? 'Yes' : 'No']);
   return rows;
 }
 
@@ -715,36 +1037,90 @@ function floraDetailLine(f) {
   return bits.join(' · ');
 }
 
-function bodyCard(sys, b) {
-  const key = bodyKey(sys, b);
-  const isOpen = openBodies.has(key);
+// Per-mode badges (collapsed card, always visible) -- General owns the two headline identity
+// facts; Exploration owns the footfall badge (paired with its own detail rows/flora); Mining and
+// Colonization surface their own domain chips only when the body actually has something to show.
+function bodyBadgesForMode(b) {
+  if (bodyInfoMode === 'exploration') {
+    return b.landable && b.wasFootfalled === false
+      ? ['<span class="badge badge-unclaimed">First footfall available</span>'] : [];
+  }
+  if (bodyInfoMode === 'mining') {
+    if (!b.ringClasses || !b.ringClasses.length) return [];
+    const reserve = reserveLevelLabel(b.reserveLevel);
+    return [`<span class="badge">💍 ${escapeHtml(b.ringClasses.join('/'))}${reserve ? ' · ' + escapeHtml(reserve) : ''}</span>`];
+  }
+  if (bodyInfoMode === 'colonization') {
+    const badges = (b.economyBonuses || []).length
+      ? [...new Set(b.economyBonuses.map(eb => eb.economy))].map(e => `<span class="badge">${escapeHtml(e)}</span>`)
+      : [];
+    if (b.populationBenchmarks && b.populationBenchmarks.length) {
+      badges.push(`<span class="badge badge-notable">pop→${escapeHtml(b.populationBenchmarks[0].asymptote)}</span>`);
+    }
+    return badges;
+  }
+  // general
   const badges = [];
   if (b.notableLabel) badges.push(notableBadge(b.notableLabel));
   if (b.discovered && b.wasDiscovered === false) badges.push('<span class="badge">🌟 First discovery</span>');
-  if (b.wasFootfalled === false) badges.push('<span class="badge badge-unclaimed">First footfall available</span>');
-  const floraHtml = b.flora.length ? `<ul class="flora-list">${b.flora.map(f => {
-    const label = f.species || (f.genus ? f.genus + ' (undetermined)' : 'Unknown organism');
-    const bits = [];
-    if (f.sold) bits.push('<span class="badge badge-sold">Sold</span>');
-    else if (f.lost) bits.push('<span class="badge badge-lost">Lost</span>');
-    else if (f.value) bits.push('<span class="badge badge-unclaimed">Unclaimed</span>');
-    if (f.footfallBonus) bits.push('<span class="badge">Footfall bonus</span>');
-    if (f.firstLoggedBonus) bits.push('<span class="badge">First logged bonus</span>');
-    const detailLine = isOpen ? floraDetailLine(f) : '';
-    const labelHtml = detailLine
-      ? `${escapeHtml(label)}<div class="muted" style="font-size:0.75rem">${escapeHtml(detailLine)}</div>`
-      : escapeHtml(label);
-    return `<li><span>${labelHtml}</span><span>${f.value ? formatCredits(f.value) : ''} ${bits.join(' ')}</span></li>`;
-  }).join('')}</ul>` : '';
+  return badges;
+}
+
+// Collapsed subheader's extra bit (after the distance) -- the one place each mode gets a
+// glanceable hint without opening the card at all.
+function bodySubheaderExtraForMode(b) {
+  if (bodyInfoMode === 'exploration') {
+    return b.bioSignalCount > 0 ? ` · ${b.bioSignalCount} bio signal${b.bioSignalCount === 1 ? '' : 's'}` : '';
+  }
+  if (bodyInfoMode === 'mining') {
+    return b.ringClasses && b.ringClasses.length ? ` · 💍 ${escapeHtml(b.ringClasses.join('/'))}` : '';
+  }
+  if (bodyInfoMode === 'colonization') {
+    const economies = [...new Set((b.economyBonuses || []).map(eb => eb.economy))];
+    return economies.length ? ` · 🏗️ ${escapeHtml(economies.join('/'))}` : '';
+  }
+  return '';
+}
+
+function detailRowsForMode(b) {
+  if (bodyInfoMode === 'exploration') return explorationDetailRows(b);
+  if (bodyInfoMode === 'mining') return miningDetailRows(b);
+  if (bodyInfoMode === 'colonization') return colonizationDetailRows(b);
+  return generalDetailRows(b);
+}
+
+function bodyCard(sys, b) {
+  const key = bodyKey(sys, b);
+  const isOpen = openBodies.has(key);
+  const badges = bodyBadgesForMode(b);
+  // Flora/bio data is exclusive to Exploration mode -- General/Mining/Colonization cards never
+  // show it at all, so switching mode genuinely changes what a card is about rather than just
+  // adding to an always-shown baseline.
+  const floraHtml = bodyInfoMode === 'exploration' && b.flora.length
+    ? `<ul class="flora-list">${b.flora.map(f => {
+        const label = f.species || (f.genus ? f.genus + ' (undetermined)' : 'Unknown organism');
+        const bits = [];
+        if (f.sold) bits.push('<span class="badge badge-sold">Sold</span>');
+        else if (f.lost) bits.push('<span class="badge badge-lost">Lost</span>');
+        else if (f.value) bits.push('<span class="badge badge-unclaimed">Unclaimed</span>');
+        if (f.footfallBonus) bits.push('<span class="badge">Footfall bonus</span>');
+        if (f.firstLoggedBonus) bits.push('<span class="badge">First logged bonus</span>');
+        const detailLine = isOpen ? floraDetailLine(f) : '';
+        const labelHtml = detailLine
+          ? `${escapeHtml(label)}<div class="muted" style="font-size:0.75rem">${escapeHtml(detailLine)}</div>`
+          : escapeHtml(label);
+        return `<li><span>${labelHtml}</span><span>${f.value ? formatCredits(f.value) : ''} ${bits.join(' ')}</span></li>`;
+      }).join('')}</ul>`
+    : '';
   const detailHtml = isOpen
-    ? `<ul class="flora-list">${bodyDetailRows(b).map(([label, value]) =>
+    ? `<ul class="flora-list">${detailRowsForMode(b).map(([label, value]) =>
         `<li><span>${escapeHtml(label)}</span><span>${escapeHtml(value)}</span></li>`
       ).join('')}</ul>`
     : '';
   const lsLabel = `${b.distance.toLocaleString('en-US', {maximumFractionDigits: 1})} ls`;
   return `<div class="body-card${isOpen ? ' body-card-open' : ''}" data-body-key="${escapeHtml(key)}" tabindex="0" aria-expanded="${isOpen}">
     <div class="body-title"><span class="body-name">${escapeHtml(b.name)}</span><span class="body-type">${escapeHtml(b.type)}</span></div>
-    <div class="muted" style="font-size:0.8rem;margin-top:2px">${lsLabel}${b.bioSignalCount > 0 ? ` · ${b.bioSignalCount} bio signal${b.bioSignalCount===1?'':'s'}` : ''}</div>
+    <div class="muted" style="font-size:0.8rem;margin-top:2px">${lsLabel}${bodySubheaderExtraForMode(b)}</div>
     ${badges.length ? `<div class="body-badges">${badges.join('')}</div>` : ''}
     ${detailHtml}
     ${floraHtml}
@@ -755,15 +1131,25 @@ function starChip(sys, st) {
   const label = st.distance > 0 ? `${st.distance.toLocaleString('en-US')} ls` : 'main star';
   const notable = st.notableLabel ? ` ${notableBadge(st.notableLabel)}` : '';
   const first = st.wasDiscovered === false ? ' <span class="badge">🌟 First discovery</span>' : '';
+  // Stars carry the same ring/economy fields a planet does -- light, additive extension for
+  // Mining/Colonization modes only, never removing anything the default view already shows.
+  let modeExtra = '';
+  if (bodyInfoMode === 'mining' && st.ringClasses && st.ringClasses.length) {
+    const reserve = reserveLevelLabel(st.reserveLevel);
+    modeExtra = ` <span class="badge">💍 ${escapeHtml(st.ringClasses.join('/'))}${reserve ? ' · ' + escapeHtml(reserve) : ''}</span>`;
+  } else if (bodyInfoMode === 'colonization' && st.economyBonuses && st.economyBonuses.length) {
+    const economies = [...new Set(st.economyBonuses.map(eb => eb.economy))];
+    modeExtra = economies.map(e => ` <span class="badge">${escapeHtml(e)}</span>`).join('');
+  }
   return `<div class="star-chip" id="${starAnchorId(sys.name, st.name)}"><strong>${escapeHtml(st.name)}</strong>
-    <span class="star-type">${escapeHtml(st.type)}${st.subclass ? ' ' + st.subclass : ''}${st.luminosity ? ' ' + escapeHtml(st.luminosity) : ''} · ${label}</span>${notable}${first}
+    <span class="star-type">${escapeHtml(st.type)}${st.subclass ? ' ' + st.subclass : ''}${st.luminosity ? ' ' + escapeHtml(st.luminosity) : ''} · ${label}</span>${notable}${first}${modeExtra}
   </div>`;
 }
 
 // Groups bodies by which star(s) they orbit. parentStars is a list, not a single name -- a body
 // genuinely orbiting a binary pair's shared barycenter rather than either star individually
 // (real confirmed example: bodies named "AB 2"/"AB 4") has every star sharing that barycenter
-// listed, same pattern as edexotracker/report.py's proven version for the ExploData-backed tool.
+// listed.
 function groupBodiesByOrbit(bodies) {
   const groups = new Map();
   for (const b of bodies) {
@@ -830,6 +1216,9 @@ function orbitGroupLabel(sys, stars) {
   return `Orbiting ${links}${stars.length > 1 ? ' (circumbinary)' : ''}`;
 }
 
+// Base stats are the same regardless of mode; each non-General mode appends its own related
+// system-wide summary on top -- e.g. Colonization's total possible population across every body
+// with a known benchmark, not just per-body figures buried in the orbit tree below.
 function systemStatsHtml(s) {
   const stats = [
     [s.recordedBodyCount, 'bodies recorded'],
@@ -838,6 +1227,34 @@ function systemStatsHtml(s) {
   if (notableTotal(s) > 0) stats.push([notableTotal(s), 'notable']);
   if (s.firstDiscoveryCount > 0) stats.push([s.firstDiscoveryCount, 'first discoveries 🌟']);
   if (s.claimedByCommander) stats.push(['🚩', 'claimed (Colonisation)']);
+
+  if (bodyInfoMode === 'exploration') {
+    if (s.bioValue > 0) {
+      stats.push([formatCredits(systemUnclaimedBio(s)), 'bio unclaimed']);
+      stats.push([formatCredits(s.bioValue), 'bio total']);
+    }
+    const terraformable = s.bodies.filter(b => b.terraformable).length;
+    if (terraformable > 0) stats.push([terraformable, 'terraformable']);
+  } else if (bodyInfoMode === 'mining') {
+    const ringed = ringedBodySummaries(s);
+    if (ringed.length > 0) {
+      stats.push([ringed.length, 'ringed bodies 💍']);
+      const richReserves = [...s.bodies, ...s.stars].filter(b =>
+        b.ringClasses && b.ringClasses.length && ['Pristine', 'Major'].includes(reserveLevelLabel(b.reserveLevel))
+      ).length;
+      if (richReserves > 0) stats.push([richReserves, 'Pristine/Major reserves']);
+    }
+  } else if (bodyInfoMode === 'colonization') {
+    const colonizable = s.bodies.filter(b => b.economyBonuses && b.economyBonuses.length > 0).length +
+      s.stars.filter(st => st.economyBonuses && st.economyBonuses.length > 0).length;
+    if (colonizable > 0) stats.push([colonizable, 'colonizable']);
+    let totalPop = 0;
+    for (const b of s.bodies) {
+      if (b.populationBenchmarks && b.populationBenchmarks.length) totalPop += parsePopFigure(b.populationBenchmarks[0].asymptote);
+    }
+    if (totalPop > 0) stats.push([formatPopFigure(totalPop), 'total possible pop']);
+  }
+
   return '<div class="system-stats">' +
     stats.map(([num, label]) => `<div class="stat"><strong>${num}</strong><span>${escapeHtml(label)}</span></div>`).join('') +
     '</div>';
@@ -886,7 +1303,7 @@ function render() {
         ? ' <span class="muted" style="font-size:0.78rem">📍 reference</span>'
         : ` <span class="muted" style="font-size:0.78rem">📍 ${s.distance.toLocaleString('en-US', {maximumFractionDigits: 1})} LY</span>`;
     const row = `<tr class="system-row ${isOpen ? 'open' : ''}" data-name="${escapeHtml(s.name)}" tabindex="0" aria-expanded="${isOpen}">
-      <td>${escapeHtml(s.name)}${distanceBadge}</td>
+      <td>${favStarBtn(s.name)}${escapeHtml(s.name)}${distanceBadge}</td>
       <td class="muted">${escapeHtml(s.region || '—')}</td>
       <td class="num">${s.population.toLocaleString('en-US')}</td>
       <td class="num">${s.recordedBodyCount}</td>
@@ -906,7 +1323,8 @@ function render() {
       : '<div class="muted">No individually-scanned bodies recorded for this system.</div>';
 
     const detail = `<tr class="detail-row"><td colspan="8"><div class="detail-wrap">
-      <div class="detail-header"><h3>${escapeHtml(s.name)}</h3>${copyBtn(s.name)}${discordCopyBtn(s.name)}${discordObjectiveCopyBtn(s.name)}<a class="ext-link" href="${edsmUrl(s.name)}" target="_blank" rel="noopener">EDSM ↗</a><a class="ext-link" href="${inaraUrl(s.name)}" target="_blank" rel="noopener">Inara ↗</a><a class="ext-link" href="${eventsSearchUrl(s.name)}" target="_blank" rel="noopener" title="Search the full journal for this system">Journal ↗</a><button class="nearest-btn" type="button" data-nearest-name="${escapeHtml(s.name)}" title="Sort every system in the table by distance from this one" aria-label="Sort every system in the table by distance from ${escapeHtml(s.name)}">📍 Nearest</button>${s.faction ? `<span class="muted">Controlled by ${escapeHtml(s.faction)}</span>` : ''}</div>
+      <div class="detail-header"><h3>${favStarBtn(s.name)}${escapeHtml(s.name)}</h3>${copyBtn(s.name)}${discordCopyBtn(s.name)}${discordObjectiveCopyBtn(s.name)}${summaryMenuHtml()}<a class="ext-link" href="${edsmUrl(s.name)}" target="_blank" rel="noopener">EDSM ↗</a><a class="ext-link" href="${inaraUrl(s.name)}" target="_blank" rel="noopener">Inara ↗</a><a class="ext-link" href="${eventsSearchUrl(s.name)}" target="_blank" rel="noopener" title="Search the full journal for this system">Journal ↗</a><a class="ext-link" href="${colonizationUrl(s.name)}" target="_blank" rel="noopener" title="Body-by-body colonization economy bonuses for this system">🏗️ Colonization ↗</a><button class="nearest-btn" type="button" data-nearest-name="${escapeHtml(s.name)}" title="Sort every system in the table by distance from this one" aria-label="Sort every system in the table by distance from ${escapeHtml(s.name)}">📍 Nearest</button>${s.faction ? `<span class="muted">Controlled by ${escapeHtml(s.faction)}</span>` : ''}</div>
+      ${modeToggleHtml()}
       ${systemStatsHtml(s)}
       ${starsHtml}
       ${bodiesHtml}
@@ -936,7 +1354,15 @@ function render() {
     });
   });
 
-  tbody.querySelectorAll('.copy-btn:not(.discord-copy-btn)').forEach(btn => {
+  tbody.querySelectorAll('.fav-star').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      toggleFavorite(btn.getAttribute('data-fav-name'));
+      render();
+    });
+  });
+
+  tbody.querySelectorAll('.copy-btn:not(.discord-copy-btn):not(.summary-menu-btn)').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       copyWithFeedback(btn, btn.getAttribute('data-copy-name'));
@@ -952,6 +1378,42 @@ function render() {
         ? formatSystemForDiscordObjective(sys)
         : formatSystemForDiscordPersonal(sys);
       copyWithFeedback(btn, text);
+    });
+  });
+
+  const summaryMenuBtn = tbody.querySelector('.summary-menu-btn');
+  if (summaryMenuBtn) {
+    const menu = summaryMenuBtn.nextElementSibling;
+    summaryMenuBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const opening = menu.hasAttribute('hidden');
+      closeAllSummaryMenus();
+      if (opening) {
+        menu.removeAttribute('hidden');
+        summaryMenuBtn.setAttribute('aria-expanded', 'true');
+      }
+    });
+    menu.querySelectorAll('.summary-menu-item').forEach(item => {
+      item.addEventListener('click', e => {
+        e.stopPropagation();
+        closeAllSummaryMenus();
+        const sys = DATA.systems.find(s => s.name === openSystem);
+        if (!sys) return;
+        const mode = item.getAttribute('data-summary-mode');
+        const text = mode === 'mining' ? formatSystemSummaryMining(sys)
+          : mode === 'exploration' ? formatSystemSummaryExploration(sys)
+          : mode === 'colonization' ? formatSystemSummaryColonization(sys)
+          : formatSystemSummaryGeneral(sys);
+        copyWithFeedback(summaryMenuBtn, text);
+      });
+    });
+  }
+
+  tbody.querySelectorAll('.mode-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      bodyInfoMode = btn.getAttribute('data-mode');
+      render();
     });
   });
 
@@ -1022,14 +1484,36 @@ document.querySelectorAll('thead th[data-key]').forEach(th => {
 document.getElementById('filterInput').addEventListener('input', e => { filterText = e.target.value; render(); });
 document.getElementById('notableOnlyInput').addEventListener('change', e => { notableOnly = e.target.checked; render(); });
 document.getElementById('bioOnlyInput').addEventListener('change', e => { bioOnly = e.target.checked; render(); });
+document.getElementById('favoritesOnlyInput').addEventListener('change', e => { favoritesOnly = e.target.checked; render(); });
 
 document.getElementById('resetBtn').addEventListener('click', () => {
-  filterText = ''; notableOnly = false; bioOnly = false; openSystem = null;
+  // Resets FILTER criteria only -- favoritesOnly (the filter checkbox) is cleared, but the actual
+  // favourited-systems set itself is a saved preference, not a filter, so it's deliberately left
+  // untouched here (same reasoning as the theme toggle: a "reset filters" action shouldn't also
+  // discard an unrelated saved preference).
+  filterText = ''; notableOnly = false; bioOnly = false; favoritesOnly = false; openSystem = null;
   sortKey = 'bioValue'; sortDir = -1; distanceFromSystem = null;
   document.getElementById('filterInput').value = '';
   document.getElementById('notableOnlyInput').checked = false;
   document.getElementById('bioOnlyInput').checked = false;
+  document.getElementById('favoritesOnlyInput').checked = false;
   render();
+});
+
+// Only one summary-menu ever exists in the DOM (only one system's detail row is ever rendered
+// at a time -- see the isOpen check in render()), but a document-level click/Escape listener
+// still needs to close it when the user clicks anywhere else, since there's no per-item outside-
+// click detection otherwise.
+function closeAllSummaryMenus() {
+  document.querySelectorAll('.summary-menu:not([hidden])').forEach(m => m.setAttribute('hidden', ''));
+  document.querySelectorAll('.summary-menu-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('.summary-menu-wrap')) return;
+  closeAllSummaryMenus();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeAllSummaryMenus();
 });
 
 // scroll doesn't bubble, but a capturing listener on document still sees it from any descendant

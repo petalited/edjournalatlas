@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var q=new URLSearchParams(location.search).get('theme');var t=(q==='light'||q==='dark')?q:localStorage.getItem('standalone_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);if(q)localStorage.setItem('standalone_theme',t);}}catch(e){}})();</script>
+<title>standalone -- colonization</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  color-scheme: light dark;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+  --transition: 160ms ease;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --good: #0ca30c; --good-bg: #e5f7e5; --warning: #b5710a; --warning-bg: #fdf1de;
+  --bonus-bg: #fdf1d3; --bonus-text: #7a5a00;
+  --notable-bg: #efe6fb; --notable-text: #6b3fb0;
+  --bad-bg: #fbe2df; --bad-text: #c22f2f;
+  --shadow: 0 1px 2px rgba(20,18,12,0.06), 0 6px 16px -8px rgba(20,18,12,0.16), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0d12; --panel: #15181d; --text: #f2f3f5; --muted: #b7bcc4; --muted-faint: #7c828b;
+    --border: #262a31; --border-strong: #343a43; --accent: #3987e5; --accent-weak: #17233a;
+    --good: #3ecf3e; --good-bg: #12291a; --warning: #e0a53c; --warning-bg: #2e2312;
+    --bonus-bg: #3d3110; --bonus-text: #f0c766;
+    --notable-bg: #2c2140; --notable-text: #caa9f7;
+    --bad-bg: #3a1f1f; --bad-text: #e66767;
+    --shadow: 0 1px 2px rgba(0,0,0,0.45), 0 8px 20px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.045);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f9f9f7; --panel: #fcfcfb; --text: #0b0b0b; --muted: #52514e; --muted-faint: #898781;
+  --border: #e1e0d9; --border-strong: #c3c2b7; --accent: #2a78d6; --accent-weak: #e6f0fc;
+  --good: #0ca30c; --good-bg: #e5f7e5; --warning: #b5710a; --warning-bg: #fdf1de;
+  --bonus-bg: #fdf1d3; --bonus-text: #7a5a00;
+  --notable-bg: #efe6fb; --notable-text: #6b3fb0;
+  --bad-bg: #fbe2df; --bad-text: #c22f2f;
+  --shadow: 0 1px 2px rgba(20,18,12,0.06), 0 6px 16px -8px rgba(20,18,12,0.16), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0d12; --panel: #15181d; --text: #f2f3f5; --muted: #b7bcc4; --muted-faint: #7c828b;
+  --border: #262a31; --border-strong: #343a43; --accent: #3987e5; --accent-weak: #17233a;
+  --good: #3ecf3e; --good-bg: #12291a; --warning: #e0a53c; --warning-bg: #2e2312;
+  --bonus-bg: #3d3110; --bonus-text: #f0c766;
+  --notable-bg: #2c2140; --notable-text: #caa9f7;
+  --bad-bg: #3a1f1f; --bad-text: #e66767;
+  --shadow: 0 1px 2px rgba(0,0,0,0.45), 0 8px 20px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.045);
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text); padding: var(--space-5); font-variant-numeric: tabular-nums; }
+.page-nav { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.page-nav-link { font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill); border: 1px solid var(--border); transition: border-color var(--transition), color var(--transition); }
+.page-nav-link:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); }
+.page-nav-link.page-nav-active { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); font-weight: 600;
+  box-shadow: 0 2px 10px -4px color-mix(in srgb, var(--accent) 50%, transparent); }
+h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 2px; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin: 0 0 var(--space-5); max-width: 900px; }
+.empty-note { color: var(--muted); padding: var(--space-6) var(--space-4); text-align: center;
+  border: 1px dashed var(--border); border-radius: var(--radius-md); }
+.theme-toggle { position: fixed; top: var(--space-4); right: var(--space-4); z-index: 20;
+  display: flex; align-items: center; justify-content: center; width: 38px; height: 38px;
+  cursor: pointer; font-size: 1.05rem; line-height: 1; background: var(--panel);
+  border: 1px solid var(--border); border-radius: var(--radius-pill); box-shadow: var(--shadow);
+  transition: border-color var(--transition), transform var(--transition); }
+.theme-toggle:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+.section { margin-bottom: var(--space-6); }
+.section-title { font-size: 1.05rem; font-weight: 700; margin: 0 0 var(--space-3); padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.03em; }
+
+.status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
+.stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-4); box-shadow: var(--shadow); }
+.stat-label { font-size: 0.73rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 5px; }
+.stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; }
+.stat-sub { font-size: 0.8rem; color: var(--muted-faint); margin-top: 3px; }
+
+.depot-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-3); }
+.depot-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.depot-title { font-weight: 700; font-size: 1.02rem; }
+.depot-sub { font-size: 0.8rem; color: var(--muted); }
+.depot-bar-track { height: 8px; border-radius: var(--radius-pill); background: var(--border); overflow: hidden; margin: var(--space-3) 0; }
+.depot-bar-fill { height: 100%; background: var(--accent); border-radius: var(--radius-pill); transition: width 300ms ease; }
+.depot-bar-fill.complete { background: var(--good); }
+.depot-bar-fill.failed { background: var(--bad-text); }
+.resource-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; margin-top: var(--space-3); }
+.resource-row { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 0.8rem;
+  padding: var(--space-2) var(--space-3); background: var(--bg); border-radius: var(--radius-sm); }
+.resource-remaining { color: var(--warning); font-weight: 600; }
+
+.contrib-list { display: flex; flex-direction: column; gap: 4px; }
+.contrib-row { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm); font-size: 0.85rem; }
+.contrib-row:nth-child(odd) { background: var(--panel); }
+
+.system-picker-row { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4); }
+.system-picker-row input { flex: 1; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); font-size: 0.9rem; font: inherit; }
+.system-picker-results { position: relative; }
+.system-picker-list { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 10; max-height: 260px; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow); }
+.system-picker-list[hidden] { display: none; }
+.system-picker-item { padding: var(--space-2) var(--space-3); cursor: pointer; font-size: 0.88rem; }
+.system-picker-item:hover, .system-picker-item.active { background: var(--accent-weak); color: var(--accent); }
+.system-picker-item .claimed-flag { font-size: 0.72rem; color: var(--good); margin-left: var(--space-2); }
+
+.body-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3); }
+.body-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-4); box-shadow: var(--shadow); }
+.body-card-name { font-weight: 700; font-size: 0.95rem; }
+.body-card-type { font-size: 0.78rem; color: var(--muted); margin-bottom: var(--space-2); }
+.body-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: var(--space-2); }
+.body-flag { font-size: 0.7rem; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+.body-flag.ring { background: var(--bonus-bg); color: var(--bonus-text); border-color: transparent; }
+.body-flag.tidal { background: var(--bad-bg); color: var(--bad-text); border-color: transparent; }
+.economy-pill-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--space-2); }
+.economy-pill { font-size: 0.74rem; padding: 3px 9px; border-radius: var(--radius-pill); background: var(--accent-weak); color: var(--accent); }
+.economy-pill .why { color: var(--muted-faint); margin-left: 3px; }
+.pop-benchmark { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); font-size: 0.78rem; color: var(--muted); }
+.pop-benchmark-row { display: flex; justify-content: space-between; gap: var(--space-2); }
+.pop-benchmark-row + .pop-benchmark-row { margin-top: 2px; }
+.no-bonus-note { font-size: 0.8rem; color: var(--muted-faint); font-style: italic; }
+a:focus-visible, input:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm);
+}
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+  <a class="page-nav-link" href="standalone_viewer.html">🗺️ Systems</a>
+  <a class="page-nav-link" href="standalone_events.html">🔍 Journal search</a>
+  <a class="page-nav-link" href="standalone_summary.html">📊 Recap</a>
+  <a class="page-nav-link" href="standalone_materials.html">🧪 Materials</a>
+  <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
+  <a class="page-nav-link" href="standalone_shipyard.html">🚀 Shipyard</a>
+  <a class="page-nav-link" href="standalone_powerplay.html">⚔️ Powerplay</a>
+  <a class="page-nav-link page-nav-active" href="standalone_colonization.html">🏗️ Colonization</a>
+  <a class="page-nav-link" href="standalone_stats.html">📈 Stats</a>
+</nav>
+<button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
+
+<h1>Colonization</h1>
+<p class="subtitle" id="subtitle"></p>
+
+<div id="content"></div>
+
+<script id="colonization-data" type="application/json">__DATA_JSON__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('colonization-data').textContent);
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtInt(n) { return Number(n || 0).toLocaleString('en-US'); }
+
+document.getElementById('subtitle').textContent = DATA.commander
+  ? `${DATA.commander} -- generated ${DATA.generatedAt}`
+  : `Generated ${DATA.generatedAt}`;
+
+function depotCardHtml(d) {
+  const pct = Math.round((d.progress || 0) * 1000) / 10;
+  const barClass = d.failed ? 'failed' : (d.complete ? 'complete' : '');
+  const resourcesHtml = (d.resources && d.resources.length)
+    ? `<div class="resource-grid">${d.resources.map(r => `
+        <div class="resource-row">
+          <span>${escapeHtml(r.name)}</span>
+          <span class="resource-remaining">${fmtInt(r.remaining)} needed</span>
+        </div>`).join('')}</div>`
+    : '';
+  return `
+    <div class="depot-card">
+      <div class="depot-head">
+        <div class="depot-title">${escapeHtml(d.station || 'Construction site')}${d.system ? ` -- ${escapeHtml(d.system)}` : ''}</div>
+        <div class="depot-sub">${d.failed ? 'Failed' : (d.complete ? 'Complete' : pct.toFixed(1) + '%')}</div>
+      </div>
+      <div class="depot-bar-track"><div class="depot-bar-fill ${barClass}" style="width:${Math.min(pct, 100)}%"></div></div>
+      ${resourcesHtml}
+    </div>`;
+}
+
+function economyPillHtml(b) {
+  return `<span class="economy-pill">${escapeHtml(b.economy)}<span class="why">(${escapeHtml(b.why)})</span></span>`;
+}
+
+function bodyCardHtml(b) {
+  const flags = [];
+  if (b.ringClasses && b.ringClasses.length) {
+    flags.push(`<span class="body-flag ring">💍 ${b.ringClasses.map(escapeHtml).join('/')}${b.reserveLevel ? ' -- ' + escapeHtml(b.reserveLevel.replace('Resources', '')) : ''}</span>`);
+  }
+  if (b.tidalLock) flags.push(`<span class="body-flag tidal">Tidally locked</span>`);
+  if (b.landable) flags.push(`<span class="body-flag">Landable</span>`);
+
+  const bonusesHtml = (b.bonuses && b.bonuses.length)
+    ? `<div class="economy-pill-row">${b.bonuses.map(economyPillHtml).join('')}</div>`
+    : `<div class="no-bonus-note">No colonization economy data for this body type.</div>`;
+
+  const popHtml = (b.populationBenchmarks && b.populationBenchmarks.length)
+    ? `<div class="pop-benchmark">
+        <div style="margin-bottom:4px;color:var(--muted-faint)">Known population benchmarks:</div>
+        ${b.populationBenchmarks.map(p => `
+          <div class="pop-benchmark-row"><span>${escapeHtml(p.facility)}</span><span>${escapeHtml(p.rapidPop)} → ${escapeHtml(p.inflect)} → <strong>${escapeHtml(p.asymptote)}</strong></span></div>
+        `).join('')}
+      </div>`
+    : '';
+
+  return `
+    <div class="body-card">
+      <div class="body-card-name">${escapeHtml(b.name)}${b.kind === 'star' ? ' ★' : ''}</div>
+      <div class="body-card-type">${escapeHtml(b.type)}</div>
+      ${flags.length ? `<div class="body-flags">${flags.join('')}</div>` : ''}
+      ${bonusesHtml}
+      ${popHtml}
+    </div>`;
+}
+
+function renderYourActivity() {
+  const hasActivity = DATA.claimedSystems.length || DATA.depots.length || DATA.totalContributed > 0;
+  if (!hasActivity) {
+    return `<div class="section"><div class="section-title">Your Colonization Activity</div>
+      <div class="empty-note">No real Colonisation activity found in your journal yet -- claim a system or start a construction project in-game, then re-run this tool.</div>
+    </div>`;
+  }
+  const statCards = [];
+  if (DATA.claimedSystems.length) {
+    statCards.push({ label: 'Systems claimed', value: fmtInt(DATA.claimedSystems.length), sub: DATA.claimedSystems.join(', ') });
+  }
+  if (DATA.depots.length) {
+    const activeCount = DATA.depots.filter(d => !d.complete && !d.failed).length;
+    statCards.push({ label: 'Construction sites', value: fmtInt(DATA.depots.length), sub: `${fmtInt(activeCount)} in progress` });
+  }
+  if (DATA.totalContributed > 0) {
+    statCards.push({ label: 'Total units contributed', value: fmtInt(DATA.totalContributed) });
+  }
+  const statsHtml = `<div class="status-grid">${statCards.map(c => `
+    <div class="stat-card">
+      <div class="stat-label">${escapeHtml(c.label)}</div>
+      <div class="stat-value">${escapeHtml(c.value)}</div>
+      ${c.sub ? `<div class="stat-sub">${escapeHtml(c.sub)}</div>` : ''}
+    </div>`).join('')}</div>`;
+
+  const depotsHtml = DATA.depots.length
+    ? `<div style="margin-top:var(--space-4)">${DATA.depots.map(depotCardHtml).join('')}</div>`
+    : '';
+
+  const contribHtml = DATA.contributions.length
+    ? `<div class="depot-card" style="margin-top:var(--space-4)">
+        <div class="depot-title" style="margin-bottom:var(--space-3)">Contributed by commodity</div>
+        <div class="contrib-list">${DATA.contributions.map(c => `
+          <div class="contrib-row"><span>${escapeHtml(c.name)}</span><span>${fmtInt(c.amount)}</span></div>
+        `).join('')}</div>
+      </div>`
+    : '';
+
+  return `<div class="section"><div class="section-title">Your Colonization Activity</div>${statsHtml}${depotsHtml}${contribHtml}</div>`;
+}
+
+let currentSystem = null;
+
+function renderSystemBrowser() {
+  return `<div class="section">
+    <div class="section-title">Body Bonus Browser</div>
+    <div class="system-picker-row">
+      <div class="system-picker-results" style="flex:1">
+        <input type="text" id="systemPicker" placeholder="Search a system you've visited..." autocomplete="off">
+        <div class="system-picker-list" id="systemPickerList" hidden></div>
+      </div>
+    </div>
+    <div id="systemBodyGrid"></div>
+  </div>`;
+}
+
+function renderBodyGridFor(systemName) {
+  const sys = DATA.systems.find(s => s.system === systemName);
+  const grid = document.getElementById('systemBodyGrid');
+  if (!grid) return;
+  if (!sys) {
+    grid.innerHTML = '<div class="empty-note">System not found in your journal history yet.</div>';
+    return;
+  }
+  currentSystem = systemName;
+  document.getElementById('systemPicker').value = systemName;
+  location.hash = 'system=' + encodeURIComponent(systemName);
+  grid.innerHTML = `<div style="margin:var(--space-3) 0;font-weight:700">${escapeHtml(systemName)}${sys.claimed ? ' <span style="color:var(--good);font-size:0.8rem">🚩 Claimed by you</span>' : ''}</div>
+    <div class="body-grid">${sys.bodies.map(bodyCardHtml).join('')}</div>`;
+}
+
+function wireSystemPicker() {
+  const input = document.getElementById('systemPicker');
+  const list = document.getElementById('systemPickerList');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (q.length < 2) { list.hidden = true; return; }
+    const matches = DATA.systems.filter(s => s.system.toLowerCase().includes(q)).slice(0, 20);
+    if (!matches.length) { list.hidden = true; return; }
+    list.innerHTML = matches.map(s => `<div class="system-picker-item" data-system="${escapeHtml(s.system)}">${escapeHtml(s.system)}${s.claimed ? '<span class="claimed-flag">🚩 claimed</span>' : ''}</div>`).join('');
+    list.hidden = false;
+  });
+  list.addEventListener('click', e => {
+    const item = e.target.closest('[data-system]');
+    if (!item) return;
+    list.hidden = true;
+    renderBodyGridFor(item.getAttribute('data-system'));
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.system-picker-results')) list.hidden = true;
+  });
+}
+
+function renderContent() {
+  document.getElementById('content').innerHTML = renderYourActivity() + renderSystemBrowser();
+  wireSystemPicker();
+  const m = location.hash.match(/system=([^&]+)/);
+  const initial = m ? decodeURIComponent(m[1]) : (DATA.claimedSystems[0] || (DATA.systems[0] && DATA.systems[0].system));
+  if (initial) renderBodyGridFor(initial);
+}
+renderContent();
+
+// Manual light/dark override -- see the other pages for the same pattern.
+function currentTheme() {
+  const forced = document.documentElement.getAttribute('data-theme');
+  if (forced === 'light' || forced === 'dark') return forced;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('standalone_theme', theme); } catch (e) {}
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+applyTheme(currentTheme());
+const themeToggleBtn = document.getElementById('themeToggle');
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener('click', () => applyTheme(currentTheme() === 'dark' ? 'light' : 'dark'));
+}
+</script>
+</body>
+</html>

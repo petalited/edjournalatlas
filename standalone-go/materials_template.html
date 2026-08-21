@@ -136,7 +136,7 @@ a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible
 
 /* Trade calculator: click a material (grid cell or list card) to see what you could give up from
    what you already hold to get more of it, plus the nearest known trader of the right type from
-   your own real journal history. See materialtrader.go/docs/MaterialTraderMechanics.md. */
+   your own real journal history. See materialtrader.go. */
 .trade-trigger { cursor: pointer; }
 .trade-modal-overlay { position: fixed; inset: 0; background: rgba(10,10,10,0.55); display: flex;
   align-items: center; justify-content: center; z-index: 100; padding: var(--space-4); }
@@ -204,6 +204,8 @@ a:focus-visible, input:focus-visible, select:focus-visible, button:focus-visible
   <a class="page-nav-link" href="standalone_engineering.html">⚙️ Engineering planner</a>
   <a class="page-nav-link" href="standalone_shipyard.html">🚀 Shipyard</a>
   <a class="page-nav-link" href="standalone_powerplay.html">⚔️ Powerplay</a>
+  <a class="page-nav-link" href="standalone_colonization.html">🏗️ Colonization</a>
+  <a class="page-nav-link" href="standalone_stats.html">📈 Stats</a>
 </nav>
 <button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
 
@@ -274,9 +276,8 @@ function legacyCopy(text) {
 }
 
 // Trade calculator -- click a material you're short on to see what you could trade at a Material
-// Trader instead. Ratio math and family/type rules are the real Material Trader mechanic, see
-// docs/MaterialTraderMechanics.md for full
-// derivation and sourcing: same family, same category -- pure grade-difference ratio (6^n going
+// Trader instead. Ratio math and family/type rules are the real Material Trader mechanic:
+// same family, same category -- pure grade-difference ratio (6^n going
 // up a grade, 1:3^n going down); different family, same category -- an extra flat x6 on the
 // "give" side on top of whatever the grade difference already costs. Categories (raw/manufactured/
 // encoded) never cross at all -- a single trader only ever deals in one.
@@ -492,8 +493,8 @@ function gradeBadge(m) {
 
 function materialCard(m) {
   // Only tradeable if it belongs to a named family (see materialCatalogForTrading, Go side) --
-  // Guardian/Thargoid materials aren't tradeable at any Material Trader (verified,
-  // docs/MaterialTraderMechanics.md), so no trigger for those.
+  // Guardian/Thargoid materials aren't tradeable at any Material Trader (verified), so no
+  // trigger for those.
   const tradeable = !!tradeCatalogByKey[m.key];
   return `<div class="material-card${tradeable ? ' trade-trigger' : ''}"${tradeable ? ` data-material-key="${escapeHtml(m.key)}" title="Click to see trade options for ${escapeHtml(m.name)}"` : ''}>
     <div class="material-card-head">

@@ -1,9 +1,8 @@
 // standalone -- a local "explore what you've found" viewer for Elite Dangerous. Parses your
 // own journal files directly (no ExploData/BioScan/Pioneer dependency), keeps its own small
-// local cache for fast incremental re-runs, and builds a browsable HTML report. See
-// docs/StandaloneJournalParser.md for the full mechanics writeup and README.md for how to use
-// this program. This is the Go rewrite of edexotracker/standalone/ -- same mechanics, same
-// verified numbers, much smaller/faster binary; see that directory's own docs for why.
+// local cache for fast incremental re-runs, and builds a browsable HTML report. See README.md
+// for how to use this program. This is the Go rewrite of this project's own Python version --
+// same mechanics, same verified numbers, much smaller/faster binary.
 package main
 
 import (
@@ -27,6 +26,8 @@ const defaultMaterialsOutPath = "standalone_materials.html"
 const defaultEngineeringOutPath = "standalone_engineering.html"
 const defaultShipyardOutPath = "standalone_shipyard.html"
 const defaultPowerplayOutPath = "standalone_powerplay.html"
+const defaultColonizationOutPath = "standalone_colonization.html"
+const defaultStatsOutPath = "standalone_stats.html"
 
 func main() {
 	journalDir := flag.String("journal-dir", "", "Directory containing Journal.*.log files (auto-detected if omitted)")
@@ -46,6 +47,10 @@ func main() {
 	noShipyard := flag.Bool("no-shipyard", false, "Skip building the shipyard/fleet page")
 	powerplayOutPath := flag.String("powerplay-out", defaultPowerplayOutPath, "Path to write the Powerplay status/history page")
 	noPowerplay := flag.Bool("no-powerplay", false, "Skip building the Powerplay status/history page")
+	colonizationOutPath := flag.String("colonization-out", defaultColonizationOutPath, "Path to write the Colonization page")
+	noColonization := flag.Bool("no-colonization", false, "Skip building the Colonization page")
+	statsOutPath := flag.String("stats-out", defaultStatsOutPath, "Path to write the personal statistics page")
+	noStats := flag.Bool("no-stats", false, "Skip building the personal statistics page")
 	noOpen := flag.Bool("no-open", false, "Don't open the viewer in a browser automatically")
 	flag.Parse()
 
@@ -203,6 +208,28 @@ func main() {
 		}
 	}
 
+	if !*noColonization {
+		colonizationHTML, err := RenderColonization(store)
+		if err != nil {
+			fmt.Println("Error building Colonization page:", err)
+		} else if err := os.WriteFile(*colonizationOutPath, []byte(colonizationHTML), 0o644); err != nil {
+			fmt.Println("Error writing Colonization page:", err)
+		} else {
+			fmt.Printf("Wrote %s (real Colonisation activity, plus a body-by-body economy bonus browser for any system)\n", *colonizationOutPath)
+		}
+	}
+
+	if !*noStats {
+		statsHTML, err := RenderStats(store)
+		if err != nil {
+			fmt.Println("Error building stats page:", err)
+		} else if err := os.WriteFile(*statsOutPath, []byte(statsHTML), 0o644); err != nil {
+			fmt.Println("Error writing stats page:", err)
+		} else {
+			fmt.Printf("Wrote %s (real, weighted personal statistics -- notable-body rates by star type)\n", *statsOutPath)
+		}
+	}
+
 	if !*noOpen {
 		openBrowser(*outPath)
 	}
@@ -212,7 +239,7 @@ func main() {
 // parseJournalDirectory walks every Journal.*.log in the given directory in chronological
 // (filename) order, incrementally: an unchanged file (same size/mtime as last recorded) is
 // skipped entirely without being opened; a grown or new file resumes from its saved line count.
-// Mirrors edexotracker/standalone/parse_journals.py's incremental design exactly.
+// Mirrors this project's Python version's parse_journals.py incremental design exactly.
 func parseJournalDirectory(store *Store, dir string) (filesTouched, newLinesTotal int, err error) {
 	matches, err := filepath.Glob(filepath.Join(dir, journalGlob))
 	if err != nil {

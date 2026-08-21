@@ -1,8 +1,8 @@
 package main
 
 // Loads the vendored BioScan-derived species value table and ExploData's genus display names.
-// Same data as edexotracker's standalone/value_table.py, embedded directly into the binary via
-// go:embed instead of read from disk at runtime -- see standalone/vendor/bio_value_data/README.md
+// Same data as this project's Python version's value_table.py, embedded directly into the binary
+// via go:embed instead of read from disk at runtime -- see standalone/vendor/bio_value_data/README.md
 // for full provenance/refresh instructions.
 
 import (

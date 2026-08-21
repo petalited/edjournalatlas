@@ -1,10 +1,10 @@
 package main
 
 // Journal event parsing -- ported from journal_parse.py's event handlers. Same real-journal
-// field grounding as the Python version (see docs/StandaloneJournalParser.md): almost every
-// mechanic here is a direct field read, not something requiring independent state-machine
-// invention. Comments below only repeat the non-obvious parts (units, real field-name
-// quirks); see the Python version's own comments for the fuller "why" on each one.
+// field grounding as the Python version: almost every mechanic here is a direct field read, not
+// something requiring independent state-machine invention. Comments below only repeat the
+// non-obvious parts (units, real field-name quirks); see the Python version's own comments for
+// the fuller "why" on each one.
 //
 // IMPORTANT real bug found and fixed here: a single shared struct across all event types is
 // unsafe -- Elite Dangerous's journal reuses field NAMES across incompatible event types with
@@ -21,6 +21,7 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 )
 
 type eventHead struct {
@@ -96,6 +97,11 @@ type scanEntry struct {
 	WasMapped             *bool            `json:"WasMapped"`
 	WasFootfalled         *bool            `json:"WasFootfalled"`
 	Parents               []map[string]int `json:"Parents"`
+	TidalLock             *bool            `json:"TidalLock"`
+	ReserveLevel          string           `json:"ReserveLevel"`
+	Rings                 []struct {
+		RingClass string `json:"RingClass"`
+	} `json:"Rings"`
 }
 
 type saaScanCompleteEntry struct {
@@ -326,8 +332,8 @@ func (p *Parser) onJumpOrLocation(e *jumpEntry, timestamp string) {
 
 // CodexEntry directly reports Region_Localised -- a more direct ground-truth than the
 // coordinate lookup (confirmed matching exactly for the same real coordinate in the Python
-// version, see docs/StandaloneJournalParser.md), used opportunistically whenever a CodexEntry
-// happens to fire, overwriting any earlier coordinate-based guess.
+// version), used opportunistically whenever a CodexEntry happens to fire, overwriting any
+// earlier coordinate-based guess.
 func (p *Parser) onCodexEntry(e *codexEntryEvent) {
 	if e.SystemAddress == nil || e.RegionLocalised == "" {
 		return
@@ -366,6 +372,22 @@ func (p *Parser) onColonisationClaim(e *colonisationClaimEntry, timestamp string
 	sys.UpdatedAt = timestamp
 }
 
+// ringClasses strips the real "eRingClass_" prefix (confirmed against real journal data, e.g.
+// "eRingClass_Rocky", "eRingClass_MetalRich") down to just the class name, for the Colonization
+// page's own body-bonus derivation.
+func ringClasses(rings []struct {
+	RingClass string `json:"RingClass"`
+}) []string {
+	if len(rings) == 0 {
+		return nil
+	}
+	out := make([]string, len(rings))
+	for i, r := range rings {
+		out[i] = strings.TrimPrefix(r.RingClass, "eRingClass_")
+	}
+	return out
+}
+
 func (p *Parser) onScan(e *scanEntry, timestamp string) {
 	systemAddress := int64(0)
 	if e.SystemAddress != nil {
@@ -399,6 +421,8 @@ func (p *Parser) onScan(e *scanEntry, timestamp string) {
 		st.WasDiscovered = e.WasDiscovered
 		st.WasFootfalled = e.WasFootfalled
 		_, st.BarycenterIDs = parentAncestry(e.Parents)
+		st.RingClasses = ringClasses(e.Rings)
+		st.ReserveLevel = e.ReserveLevel
 		st.UpdatedAt = timestamp
 	} else if e.PlanetClass != "" {
 		pl, ok := sys.Planets[*e.BodyID]
@@ -434,6 +458,11 @@ func (p *Parser) onScan(e *scanEntry, timestamp string) {
 		pl.WasDiscovered = e.WasDiscovered
 		pl.WasMapped = e.WasMapped
 		pl.WasFootfalled = e.WasFootfalled
+		if e.TidalLock != nil {
+			pl.TidalLock = *e.TidalLock
+		}
+		pl.RingClasses = ringClasses(e.Rings)
+		pl.ReserveLevel = e.ReserveLevel
 		pl.UpdatedAt = timestamp
 	}
 }
@@ -442,8 +471,7 @@ func (p *Parser) onScan(e *scanEntry, timestamp string) {
 // [{"Star":1},{"Null":0}] -- 'Null' entries are barycenters, not real bodies. Returns the first
 // real 'Star' ancestor's BodyID, unresolved -- name resolution happens at render time
 // (viewer.go), not here, since a planet's own Scan can fire before its parent star's own Scan
-// (confirmed against real data, see docs/StandaloneJournalParser.md), so a parse-time name
-// lookup could permanently miss it.
+// (confirmed against real data), so a parse-time name lookup could permanently miss it.
 //
 // A body genuinely orbiting a binary pair's shared barycenter (not either star individually --
 // real example confirmed against live data: bodies named "AB 2"/"AB 4") has no 'Star' entry
@@ -530,13 +558,16 @@ func (p *Parser) onSignals(e *signalsEntry, timestamp string) {
 	if systemAddress == 0 || e.BodyID == nil {
 		return
 	}
-	bioCount := 0
+	bioCount, geoCount := 0, 0
 	for _, sig := range e.Signals {
-		if sig.Type == "$SAA_SignalType_Biological;" {
+		switch sig.Type {
+		case "$SAA_SignalType_Biological;":
 			bioCount = sig.Count
+		case "$SAA_SignalType_Geological;":
+			geoCount = sig.Count
 		}
 	}
-	if bioCount == 0 {
+	if bioCount == 0 && geoCount == 0 {
 		return
 	}
 	sys := p.store.getOrCreateSystem(systemAddress)
@@ -545,7 +576,12 @@ func (p *Parser) onSignals(e *signalsEntry, timestamp string) {
 		pl = &Planet{BodyID: *e.BodyID, Flora: make(map[string]*FloraScan)}
 		sys.Planets[*e.BodyID] = pl
 	}
-	pl.BioSignalCount = bioCount
+	if bioCount > 0 {
+		pl.BioSignalCount = bioCount
+	}
+	if geoCount > 0 {
+		pl.GeoSignalCount = geoCount
+	}
 	pl.UpdatedAt = timestamp
 }
 
