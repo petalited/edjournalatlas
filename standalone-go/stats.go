@@ -1,9 +1,9 @@
 package main
 
-// stats.go builds a 9th page: personal statistics that are real RATES, not just totals -- the
-// user explicitly asked "make sure its weighted right, so i want to know what % of a certain star
-// type has notable bodies". Two real methodology choices worth being explicit about, since a
-// naive version of this stat would be misleading:
+// stats.go builds a 9th page: personal statistics that are real RATES, not just totals -- e.g.
+// what % of a given star type has produced a notable body, weighted honestly rather than as a
+// raw count. Two real methodology choices worth being explicit about, since a naive version of
+// this stat would be misleading:
 //
 //  1. Denominator honesty: a system that's only PARTIALLY scanned can't fairly count as "no
 //     notable body" -- you just haven't looked at everything yet. The notable-body RATE only

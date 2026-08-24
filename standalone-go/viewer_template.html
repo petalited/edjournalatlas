@@ -129,9 +129,9 @@ input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
    makes that impossible: the detail row's content is now genuinely confined to the already-
    established column width and left to its own overflow-x:auto (see .orbit-tree) instead. */
 table { border-collapse: collapse; width: 100%; min-width: 900px; table-layout: fixed; }
-th.col-name { width: 21%; } th.col-region { width: 13%; } th.col-population { width: 10%; }
-th.col-bodies { width: 9%; } th.col-notable { width: 9%; } th.col-first { width: 12%; }
-th.col-bio { width: 12%; } th.col-visited { width: 14%; }
+th.col-name { width: 19%; } th.col-region { width: 12%; } th.col-population { width: 9%; }
+th.col-bodies { width: 8%; } th.col-notable { width: 8%; } th.col-colony { width: 10%; }
+th.col-first { width: 11%; } th.col-bio { width: 11%; } th.col-visited { width: 12%; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
   overflow-x: auto; box-shadow: var(--shadow); position: relative; }
 /* Edge-fade cue for horizontally-scrollable containers (the results table and each system's
@@ -163,6 +163,7 @@ tbody tr.system-row.open { background: var(--accent-weak); box-shadow: inset 3px
 td.num, th.num { text-align: right; }
 .value { font-weight: 600; }
 .value.good { color: var(--good); font-weight: 700; }
+.value.warning { color: var(--warning); font-weight: 700; }
 .muted { color: var(--muted); }
 .detail-row td { padding: 0; }
 .detail-wrap { padding: var(--space-1) var(--space-3) var(--space-4) var(--space-6); background: var(--bg); }
@@ -341,6 +342,7 @@ button:focus-visible, thead th[data-key]:focus-visible, tbody tr.system-row:focu
         <th class="col-population num" data-key="population">Population<span class="sort-arrow"></span></th>
         <th class="col-bodies num" data-key="recordedBodyCount" title="Bodies with any individual scan data, out of the Discovery Scanner's true total">Bodies<span class="sort-arrow"></span></th>
         <th class="col-notable num" data-key="notableTotal">Notable<span class="sort-arrow"></span></th>
+        <th class="col-colony num" data-key="colonizationScore" title="How well-suited this system looks for a colonization build, from rare-body presence, economy-bonus cleanliness, ring resource level, and body count -- see colonizationScore() for the breakdown">Colony score<span class="sort-arrow"></span></th>
         <th class="col-first num" data-key="firstDiscoveryCount">First discoveries<span class="sort-arrow"></span></th>
         <th class="col-bio num" data-key="bioValue">Bio value<span class="sort-arrow"></span></th>
         <th class="col-visited" data-key="lastVisitedAt" title="Most recent real journal event that touched this system">Last visited<span class="sort-arrow"></span></th>
@@ -775,6 +777,157 @@ function formatSystemSummaryExploration(s) {
   return lines.join('\n');
 }
 
+// colonizationScore: how good a candidate this system looks for a colonization build, adapted
+// from the same community "system build effectiveness" scoring approach the economy-bonus/
+// population-benchmark tables elsewhere in this file are sourced from. That full methodology also
+// weighs slot capacity, the primary port's in-system (Ls) distance, and CP-escalation headroom --
+// none of which exist here (this project has no visibility into which port got built where, or
+// real slot counts), so those three are dropped entirely and the remaining, actually-computable
+// dimensions' weights are rescaled to still sum to 1 -- the same proportional-rebalancing approach
+// that source methodology itself uses whenever a dimension drops out.
+const COLONY_SCORE_WEIGHTS = { rareBody: 0.35, economy: 0.30, resource: 0.20, scale: 0.15 };
+const RESERVE_LEVEL_RANK = { Pristine: 5, Major: 4, Common: 3, Low: 2, Depleted: 1 };
+
+// Real per-body Ls distance (already on every scanned body) sometimes reveals a system that's
+// really two clusters: a close, practical core and a far-flung remainder that's a non-factor for
+// any real build -- confirmed against a real source-methodology writeup for a real scanned system
+// in this commander's own data: 3 close bodies at ~3,000 Ls treated as the whole practical system,
+// a 16-body cluster at 330,000+ Ls explicitly excluded from scoring. Detected generically (no
+// hardcoded system) by looking for one dominant gap in the sorted distance list -- if the far side
+// jumps 20x+ over the near side's max, and the near side already cleared a trivial few hundred Ls
+// (so this never fires on an ordinary compact system, e.g. a body at 6 Ls next to one at 670 Ls),
+// only the near side counts as "reachable" for every dimension below.
+const REACHABLE_GAP_MULTIPLIER = 20;
+const REACHABLE_MIN_NEAR_LS = 100;
+function reachableColonyBodies(s) {
+  const dists = s.bodies.map(b => b.distance).filter(d => d > 0).sort((a, b) => a - b);
+  let splitAt = Infinity;
+  for (let i = 1; i < dists.length; i++) {
+    if (dists[i - 1] >= REACHABLE_MIN_NEAR_LS && dists[i] > dists[i - 1] * REACHABLE_GAP_MULTIPLIER) {
+      splitAt = dists[i - 1];
+      break;
+    }
+  }
+  if (splitAt === Infinity) return s.bodies;
+  return s.bodies.filter(b => !b.distance || b.distance <= splitAt);
+}
+
+// Rare-body presence: the single strongest signal in the source methodology ("same tier as an
+// ELW/WW/AW" for an exotic star). Recomputed from reachable bodies + every star (stars anchor the
+// system itself, so never distance-filtered) rather than reusing notableTotal(s) as-is, so a rare
+// body sitting only in an excluded far cluster doesn't count.
+function colonyRareBodyScore(s) {
+  const reachable = reachableColonyBodies(s);
+  let hits = reachable.filter(b => b.notableLabel).length;
+  hits += s.stars.filter(st => st.notableLabel).length;
+  if (hits >= 3) return 5;
+  if (hits === 2) return 4;
+  if (hits === 1) return 3;
+  return 0;
+}
+
+// Economic cleanliness: "1-2 [economies on a body] is clean and easy to specialize (good); 3+
+// means real compatibility risk." Averaged across every REACHABLE body that has ANY colonization
+// economy potential at all -- a body with no economyBonuses (a type not in the base-economy table)
+// counts toward neither the numerator nor denominator, same as an unscored body anywhere else in
+// this project. Sample-size honesty (same principle as stats.go's own rate-weighting, which never
+// presents a 2-system sample with the same confidence as a 50-system one): a system where only 1-2
+// bodies have any economy data yet can't fairly claim a confident "clean economy" verdict off that
+// alone -- blend toward a neutral middle score, full confidence in the raw average only once
+// there's a real sample (5+ bodies) to average over.
+function colonyEconomyScore(s) {
+  const reachable = reachableColonyBodies(s);
+  let bodies = 0, economySum = 0;
+  for (const b of reachable) {
+    if (!b.economyBonuses || !b.economyBonuses.length) continue;
+    bodies++;
+    economySum += new Set(b.economyBonuses.map(e => e.economy)).size;
+  }
+  if (!bodies) return 0;
+  const avg = economySum / bodies;
+  let raw;
+  if (avg <= 1.5) raw = 5;
+  else if (avg <= 2) raw = 4;
+  else if (avg <= 2.5) raw = 3;
+  else if (avg <= 3) raw = 2;
+  else raw = 1;
+  const confidence = Math.min(1, bodies / 5);
+  return raw * confidence + 3 * (1 - confidence);
+}
+
+// Refinery feedstock / system resource level -- the source methodology's own Step 3 weight table
+// merges two distinct Step-2 signals under this one name, so both are scored and averaged here:
+// (a) is there a genuine Refinery-capable body at all (only Rocky/Rocky-Ice bodies grant the
+// Refinery economy -- a High metal content/Metal rich body grants Extraction only, see this file's
+// own bodyBaseEconomies-derived economyBonuses), confirmed as a real, independently-repeated
+// scoring factor across two different real systems' own writeups ("no Rocky/Rocky-Ice bodies" /
+// "no Refinery body" called out by name as a drag in both, despite each having plenty of High
+// metal content bodies); and (b) the best ring reserve level found anywhere, star or planet --
+// "directly modifies Extraction/Industrial/Refinery strong link strength system-wide" per the same
+// source. Both restricted to reachable bodies, same reasoning as the two dimensions above.
+function colonyResourceScore(s) {
+  const reachable = reachableColonyBodies(s);
+  const hasRefineryBody = reachable.some(b => (b.economyBonuses || []).some(e => e.economy === 'Refinery'));
+  let bestReserve = 0;
+  for (const st of s.stars) bestReserve = Math.max(bestReserve, RESERVE_LEVEL_RANK[reserveLevelLabel(st.reserveLevel)] || 0);
+  for (const b of reachable) bestReserve = Math.max(bestReserve, RESERVE_LEVEL_RANK[reserveLevelLabel(b.reserveLevel)] || 0);
+  return Math.round(((hasRefineryBody ? 5 : 0) + bestReserve) / 2);
+}
+
+// Scale: a loose stand-in for the source methodology's "slot capacity" dimension, which needs real
+// in-game slot counts this project has no access to. More real bodies generally means more possible
+// build sites, so this buckets off the same BodyCountTotal the Discovery Scanner itself reports
+// (falling back to what's actually been scanned if this system was never honked) -- scaled down
+// when a reachability split (see reachableColonyBodies) was actually detected among the bodies this
+// commander has scanned, so a system with a confirmed-far-off bulk of its bodies doesn't get full
+// scale credit for bodies there's direct evidence sit outside any practical build radius.
+function colonyScaleScore(s) {
+  const reachable = reachableColonyBodies(s);
+  let n = s.bodyCountTotal || s.recordedBodyCount;
+  if (s.bodies.length > 0 && reachable.length < s.bodies.length) {
+    n = Math.round(n * (reachable.length / s.bodies.length));
+  }
+  if (n >= 15) return 5;
+  if (n >= 10) return 4;
+  if (n >= 6) return 3;
+  if (n >= 3) return 2;
+  if (n >= 1) return 1;
+  return 0;
+}
+
+// Denominator honesty (same principle as stats.go's FullyScanned gate): a system where almost
+// nothing has actually been individually scanned yet can't fairly get a confident score at all --
+// the rare-body/economy/resource dimensions above all extrapolate from what's been scanned, and
+// with too little of that, "low score" would be indistinguishable from "haven't looked," which is
+// exactly the kind of silent conflation this project's own conventions elsewhere avoid. Confirmed
+// against two real systems this commander has barely visited but that carry a real third-party-
+// catalog-informed rating elsewhere: this project has no way to reproduce that rating from journal
+// data alone, and shouldn't pretend otherwise with a falsely confident number.
+function hasSufficientColonyData(s) {
+  if (s.recordedBodyCount < 3) return false;
+  if (s.bodyCountTotal > 0 && s.recordedBodyCount / s.bodyCountTotal < 0.2) return false;
+  return true;
+}
+
+// Composite, 0-5-per-dimension weighted sum * 20 -> 0-100, same scaling convention the source
+// methodology itself uses. null (not 0) when there isn't enough scan data to trust it -- see
+// hasSufficientColonyData.
+function colonizationScore(s) {
+  if (!hasSufficientColonyData(s)) return null;
+  const w = COLONY_SCORE_WEIGHTS;
+  const raw = colonyRareBodyScore(s) * w.rareBody + colonyEconomyScore(s) * w.economy +
+    colonyResourceScore(s) * w.resource + colonyScaleScore(s) * w.scale;
+  return Math.round(raw * 20);
+}
+function colonizationScoreTier(score) {
+  if (score == null) return 'Insufficient data';
+  if (score >= 80) return 'Exceptional';
+  if (score >= 60) return 'Strong';
+  if (score >= 40) return 'Workable';
+  if (score >= 20) return 'Marginal';
+  return 'Skip';
+}
+
 // Per real PlanetClass (not per individual body) -- a group's colonization "effect" is the UNION
 // of every economy any body of that type in this system actually carries (base type economy plus
 // any real ring/bio/geo modifier), and its population benchmark (populationBenchmarksFor only
@@ -877,6 +1030,7 @@ function sortedSystems() {
   list = list.map(s => ({
     ...s,
     notableTotal: notableTotal(s),
+    colonizationScore: colonizationScore(s),
     distance: refSys ? Math.sqrt((s.x - refSys.x) ** 2 + (s.y - refSys.y) ** 2 + (s.z - refSys.z) ** 2) : null,
   }));
   list.sort((a, b) => {
@@ -1308,6 +1462,7 @@ function render() {
       <td class="num">${s.population.toLocaleString('en-US')}</td>
       <td class="num">${s.recordedBodyCount}</td>
       <td class="num">${s.notableTotal > 0 ? `<strong>${s.notableTotal}</strong>` : '—'}</td>
+      <td class="num ${s.colonizationScore == null ? 'muted' : 'value ' + (s.colonizationScore >= 60 ? 'good' : s.colonizationScore >= 40 ? 'warning' : '')}" title="${s.colonizationScore == null ? 'Not enough of this system has been individually scanned yet to score it' : colonizationScoreTier(s.colonizationScore)}">${s.colonizationScore == null ? '—' : s.colonizationScore}</td>
       <td class="num">${s.firstDiscoveryCount > 0 ? s.firstDiscoveryCount : '—'}</td>
       <td class="num value ${s.bioValue > 0 ? 'good' : ''}">${s.bioValue > 0 ? formatCredits(s.bioValue) : '—'}</td>
       <td class="muted">${formatVisitedDate(s.lastVisitedAt)}</td>
@@ -1322,7 +1477,7 @@ function render() {
         ).join('')
       : '<div class="muted">No individually-scanned bodies recorded for this system.</div>';
 
-    const detail = `<tr class="detail-row"><td colspan="8"><div class="detail-wrap">
+    const detail = `<tr class="detail-row"><td colspan="9"><div class="detail-wrap">
       <div class="detail-header"><h3>${favStarBtn(s.name)}${escapeHtml(s.name)}</h3>${copyBtn(s.name)}${discordCopyBtn(s.name)}${discordObjectiveCopyBtn(s.name)}${summaryMenuHtml()}<a class="ext-link" href="${edsmUrl(s.name)}" target="_blank" rel="noopener">EDSM ↗</a><a class="ext-link" href="${inaraUrl(s.name)}" target="_blank" rel="noopener">Inara ↗</a><a class="ext-link" href="${eventsSearchUrl(s.name)}" target="_blank" rel="noopener" title="Search the full journal for this system">Journal ↗</a><a class="ext-link" href="${colonizationUrl(s.name)}" target="_blank" rel="noopener" title="Body-by-body colonization economy bonuses for this system">🏗️ Colonization ↗</a><button class="nearest-btn" type="button" data-nearest-name="${escapeHtml(s.name)}" title="Sort every system in the table by distance from this one" aria-label="Sort every system in the table by distance from ${escapeHtml(s.name)}">📍 Nearest</button>${s.faction ? `<span class="muted">Controlled by ${escapeHtml(s.faction)}</span>` : ''}</div>
       ${modeToggleHtml()}
       ${systemStatsHtml(s)}

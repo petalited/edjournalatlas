@@ -127,9 +127,11 @@ overrides your OS/browser preference and follows you across pages, in case the a
 light/dark detection isn't what you want.
 
 **`standalone_viewer.html` — systems explorer.** A sortable/searchable table of every visited
-system: region, population, bodies scanned, notable-find count, presumed exobiology value —
-filterable to notable-only, bio-only, or ★ favourited systems (favouriting a system sticks around
-across runs). Click a system to expand it: stars, bodies grouped under whichever star (or shared
+system: region, population, bodies scanned, notable-find count, presumed exobiology value, and a
+0-100 colonization suitability score (rare-body presence, economy-bonus cleanliness, ring resource
+level, reachable body count -- hover the column for the breakdown, systems with too little
+individually-scanned data show "insufficient data" rather than a misleading number) — filterable to
+notable-only, bio-only, or ★ favourited systems (favouriting a system sticks around across runs). Click a system to expand it: stars, bodies grouped under whichever star (or shared
 binary-star barycenter — circumbinary bodies are grouped correctly, not just attached to the
 nearest single star) they orbit, moons nested under their parent planet (shown as a small
 connected tree, with each body's distance from the arrival star). A 4-way mode toggle inside each
