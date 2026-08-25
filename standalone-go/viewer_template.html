@@ -280,6 +280,47 @@ button:focus-visible, thead th[data-key]:focus-visible, tbody tr.system-row:focu
   outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm);
 }
 
+.experimental-tag { display: inline-block; font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 2px var(--space-2); border-radius: var(--radius-pill);
+  background: var(--warning-bg); color: var(--warning); border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  vertical-align: middle; margin-left: 4px; }
+.colony-info-btn { background: transparent; border: none; color: var(--muted-faint); cursor: pointer;
+  font-size: 0.85rem; padding: 0 0 0 3px; line-height: 1; vertical-align: middle;
+  transition: color var(--transition); text-transform: none; letter-spacing: normal; }
+.colony-info-btn:hover { color: var(--accent); }
+.colony-info-link { background: transparent; border: none; color: var(--accent); cursor: pointer;
+  font-size: 0.78rem; padding: 0; margin-left: var(--space-2); text-decoration: underline;
+  text-underline-offset: 2px; }
+/* A real page-covering overlay (not just a positioned panel) so the box reads as modal -- click
+   anywhere outside .modal-box (i.e. directly on the overlay) closes it, same convention as the
+   summary-menu's outside-click handling elsewhere on this page. */
+.modal-overlay { position: fixed; inset: 0; z-index: 30; background: rgba(10,10,8,0.5);
+  display: flex; align-items: center; justify-content: center; padding: var(--space-4); }
+.modal-overlay[hidden] { display: none; }
+.modal-box { position: relative; background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: var(--space-5);
+  max-width: 560px; max-height: 80vh; overflow-y: auto; }
+.modal-box h3 { margin: 0 0 var(--space-3); font-size: 1.1rem; }
+.modal-box p { font-size: 0.85rem; line-height: 1.5; }
+.modal-close { position: absolute; top: var(--space-3); right: var(--space-3); background: transparent;
+  border: 1px solid var(--border); color: var(--muted); border-radius: var(--radius-pill);
+  width: 28px; height: 28px; cursor: pointer; transition: color var(--transition), border-color var(--transition); }
+.modal-close:hover { color: var(--accent); border-color: var(--accent); }
+.colony-info-dims { padding-left: 1.1em; font-size: 0.85rem; line-height: 1.6; }
+.colony-info-dims li { margin-bottom: var(--space-2); }
+.colony-score-panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4); margin-bottom: var(--space-3); box-shadow: var(--shadow); max-width: 620px; }
+.colony-score-headline { margin-bottom: var(--space-3); }
+.colony-dim-row { display: grid; grid-template-columns: 190px 1fr 34px; align-items: center; gap: var(--space-2);
+  font-size: 0.82rem; margin-top: var(--space-2); }
+.colony-dim-bar { display: block; height: 6px; border-radius: var(--radius-pill); background: var(--border); overflow: hidden; }
+.colony-dim-fill { display: block; height: 100%; background: var(--accent); border-radius: var(--radius-pill); }
+.colony-dim-value { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.colony-dim-why { font-size: 0.76rem; margin: 1px 0 0; }
+.colony-suggestions { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px dashed var(--border); }
+.colony-suggestions-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; }
+.colony-suggestions ul { margin: 0; padding-left: 1.1em; font-size: 0.82rem; line-height: 1.5; }
+
 /* Deliberately NOT a .page-nav-link -- a nav-styled pill would read as "one more page to
    visit," not a settings control. Fixed to the actual viewport corner (not just the top of the
    document) so it reads as persistent app chrome, closer to a game HUD's settings icon than
@@ -306,6 +347,10 @@ button:focus-visible, thead th[data-key]:focus-visible, tbody tr.system-row:focu
   <a class="page-nav-link" href="standalone_stats.html">📈 Stats</a>
 </nav>
 <button class="theme-toggle" type="button" id="themeToggle" aria-label="Switch color theme"></button>
+
+<div class="modal-overlay" id="colonyInfoModal" hidden>
+  <div class="modal-box" id="colonyInfoBox" role="dialog" aria-modal="true" aria-labelledby="colonyInfoTitle"></div>
+</div>
 
 <h1>standalone</h1>
 <p class="subtitle" id="subtitle"></p>
@@ -342,7 +387,7 @@ button:focus-visible, thead th[data-key]:focus-visible, tbody tr.system-row:focu
         <th class="col-population num" data-key="population">Population<span class="sort-arrow"></span></th>
         <th class="col-bodies num" data-key="recordedBodyCount" title="Bodies with any individual scan data, out of the Discovery Scanner's true total">Bodies<span class="sort-arrow"></span></th>
         <th class="col-notable num" data-key="notableTotal">Notable<span class="sort-arrow"></span></th>
-        <th class="col-colony num" data-key="colonizationScore" title="How well-suited this system looks for a colonization build, from rare-body presence, economy-bonus cleanliness, ring resource level, and body count -- see colonizationScore() for the breakdown">Colony score<span class="sort-arrow"></span></th>
+        <th class="col-colony num" data-key="colonizationScore" title="How well-suited this system looks for a colonization build, from rare-body presence, economy-bonus cleanliness, ring resource level, and body count -- see colonizationScore() for the breakdown">Colony score<button type="button" class="colony-info-btn" data-open-colony-info aria-label="How the colony score works" title="How the colony score works">ⓘ</button><span class="sort-arrow"></span></th>
         <th class="col-first num" data-key="firstDiscoveryCount">First discoveries<span class="sort-arrow"></span></th>
         <th class="col-bio num" data-key="bioValue">Bio value<span class="sort-arrow"></span></th>
         <th class="col-visited" data-key="lastVisitedAt" title="Most recent real journal event that touched this system">Last visited<span class="sort-arrow"></span></th>
@@ -816,14 +861,23 @@ function reachableColonyBodies(s) {
 // ELW/WW/AW" for an exotic star). Recomputed from reachable bodies + every star (stars anchor the
 // system itself, so never distance-filtered) rather than reusing notableTotal(s) as-is, so a rare
 // body sitting only in an excluded far cluster doesn't count.
-function colonyRareBodyScore(s) {
+// *Detail variants return the raw ingredients (hit counts, sample sizes, etc) behind each
+// dimension's 0-5 score, not just the number -- used both by the score function itself (below)
+// and by colonyScoreBreakdown() to explain a system's score in the viewer UI without recomputing
+// or duplicating this logic.
+function colonyRareBodyDetail(s) {
   const reachable = reachableColonyBodies(s);
   let hits = reachable.filter(b => b.notableLabel).length;
   hits += s.stars.filter(st => st.notableLabel).length;
-  if (hits >= 3) return 5;
-  if (hits === 2) return 4;
-  if (hits === 1) return 3;
-  return 0;
+  let score;
+  if (hits >= 3) score = 5;
+  else if (hits === 2) score = 4;
+  else if (hits === 1) score = 3;
+  else score = 0;
+  return { hits, score };
+}
+function colonyRareBodyScore(s) {
+  return colonyRareBodyDetail(s).score;
 }
 
 // Economic cleanliness: "1-2 [economies on a body] is clean and easy to specialize (good); 3+
@@ -835,7 +889,7 @@ function colonyRareBodyScore(s) {
 // bodies have any economy data yet can't fairly claim a confident "clean economy" verdict off that
 // alone -- blend toward a neutral middle score, full confidence in the raw average only once
 // there's a real sample (5+ bodies) to average over.
-function colonyEconomyScore(s) {
+function colonyEconomyDetail(s) {
   const reachable = reachableColonyBodies(s);
   let bodies = 0, economySum = 0;
   for (const b of reachable) {
@@ -843,7 +897,7 @@ function colonyEconomyScore(s) {
     bodies++;
     economySum += new Set(b.economyBonuses.map(e => e.economy)).size;
   }
-  if (!bodies) return 0;
+  if (!bodies) return { bodies: 0, avg: 0, raw: 0, confidence: 0, score: 0 };
   const avg = economySum / bodies;
   let raw;
   if (avg <= 1.5) raw = 5;
@@ -852,7 +906,11 @@ function colonyEconomyScore(s) {
   else if (avg <= 3) raw = 2;
   else raw = 1;
   const confidence = Math.min(1, bodies / 5);
-  return raw * confidence + 3 * (1 - confidence);
+  const score = raw * confidence + 3 * (1 - confidence);
+  return { bodies, avg, raw, confidence, score };
+}
+function colonyEconomyScore(s) {
+  return colonyEconomyDetail(s).score;
 }
 
 // Refinery feedstock / system resource level -- the source methodology's own Step 3 weight table
@@ -865,13 +923,17 @@ function colonyEconomyScore(s) {
 // metal content bodies); and (b) the best ring reserve level found anywhere, star or planet --
 // "directly modifies Extraction/Industrial/Refinery strong link strength system-wide" per the same
 // source. Both restricted to reachable bodies, same reasoning as the two dimensions above.
-function colonyResourceScore(s) {
+function colonyResourceDetail(s) {
   const reachable = reachableColonyBodies(s);
   const hasRefineryBody = reachable.some(b => (b.economyBonuses || []).some(e => e.economy === 'Refinery'));
   let bestReserve = 0;
   for (const st of s.stars) bestReserve = Math.max(bestReserve, RESERVE_LEVEL_RANK[reserveLevelLabel(st.reserveLevel)] || 0);
   for (const b of reachable) bestReserve = Math.max(bestReserve, RESERVE_LEVEL_RANK[reserveLevelLabel(b.reserveLevel)] || 0);
-  return Math.round(((hasRefineryBody ? 5 : 0) + bestReserve) / 2);
+  const score = Math.round(((hasRefineryBody ? 5 : 0) + bestReserve) / 2);
+  return { hasRefineryBody, bestReserve, score };
+}
+function colonyResourceScore(s) {
+  return colonyResourceDetail(s).score;
 }
 
 // Scale: a loose stand-in for the source methodology's "slot capacity" dimension, which needs real
@@ -881,18 +943,22 @@ function colonyResourceScore(s) {
 // when a reachability split (see reachableColonyBodies) was actually detected among the bodies this
 // commander has scanned, so a system with a confirmed-far-off bulk of its bodies doesn't get full
 // scale credit for bodies there's direct evidence sit outside any practical build radius.
-function colonyScaleScore(s) {
+function colonyScaleDetail(s) {
   const reachable = reachableColonyBodies(s);
   let n = s.bodyCountTotal || s.recordedBodyCount;
-  if (s.bodies.length > 0 && reachable.length < s.bodies.length) {
-    n = Math.round(n * (reachable.length / s.bodies.length));
-  }
-  if (n >= 15) return 5;
-  if (n >= 10) return 4;
-  if (n >= 6) return 3;
-  if (n >= 3) return 2;
-  if (n >= 1) return 1;
-  return 0;
+  const splitDetected = s.bodies.length > 0 && reachable.length < s.bodies.length;
+  if (splitDetected) n = Math.round(n * (reachable.length / s.bodies.length));
+  let score;
+  if (n >= 15) score = 5;
+  else if (n >= 10) score = 4;
+  else if (n >= 6) score = 3;
+  else if (n >= 3) score = 2;
+  else if (n >= 1) score = 1;
+  else score = 0;
+  return { n, splitDetected, excludedCount: s.bodies.length - reachable.length, score };
+}
+function colonyScaleScore(s) {
+  return colonyScaleDetail(s).score;
 }
 
 // Denominator honesty (same principle as stats.go's FullyScanned gate): a system where almost
@@ -926,6 +992,100 @@ function colonizationScoreTier(score) {
   if (score >= 40) return 'Workable';
   if (score >= 20) return 'Marginal';
   return 'Skip';
+}
+
+// Which of hasSufficientColonyData's two gates a system actually failed, in plain language -- so
+// the "Insufficient data" case in the viewer's per-system breakdown says WHY instead of just
+// asserting it, and (when it's the 20%-of-catalog gate) how much more scanning would clear it.
+function colonyScoreInsufficientReason(s) {
+  const reasons = [];
+  if (s.recordedBodyCount < 3) {
+    reasons.push(`only ${s.recordedBodyCount} bod${s.recordedBodyCount === 1 ? 'y' : 'ies'} individually scanned (need at least 3)`);
+  }
+  if (s.bodyCountTotal > 0 && s.recordedBodyCount / s.bodyCountTotal < 0.2) {
+    const pct = Math.round((s.recordedBodyCount / s.bodyCountTotal) * 100);
+    reasons.push(`only ${pct}% of the Discovery Scanner's catalog scanned (need at least 20%)`);
+  }
+  return reasons.join(' and ');
+}
+
+const RESERVE_LEVEL_LABEL_BY_RANK = Object.fromEntries(Object.entries(RESERVE_LEVEL_RANK).map(([k, v]) => [v, k]));
+
+// Explains a computed score, dimension by dimension, plus a list of concrete next steps -- powers
+// the "Colony score (experimental)" panel in each system's detail row. Reuses the same *Detail
+// functions the score itself is built from, so this can never drift out of sync with what
+// colonizationScore() actually computed.
+function colonyScoreBreakdown(s) {
+  const rare = colonyRareBodyDetail(s);
+  const econ = colonyEconomyDetail(s);
+  const resource = colonyResourceDetail(s);
+  const scale = colonyScaleDetail(s);
+  const w = COLONY_SCORE_WEIGHTS;
+
+  const dims = [
+    { label: 'Rare-body presence', weight: w.rareBody, value: rare.score,
+      why: rare.hits > 0
+        ? `${rare.hits} rare/notable ${rare.hits === 1 ? 'find' : 'finds'} (Earthlike/Water/Ammonia world, exotic star, etc.)`
+        : 'No rare/notable bodies or stars found yet' },
+    { label: 'Economy cleanliness', weight: w.economy, value: econ.score,
+      why: econ.bodies > 0
+        ? `Avg ${econ.avg.toFixed(2)} economy types/body across ${econ.bodies} scanned bod${econ.bodies === 1 ? 'y' : 'ies'}${econ.confidence < 1 ? ' -- small sample, blended toward neutral' : ''}`
+        : 'No bodies with known economy potential scanned yet' },
+    { label: 'Refinery feedstock / resources', weight: w.resource, value: resource.score,
+      why: `${resource.hasRefineryBody ? 'Has a Refinery-capable body' : 'No Refinery-capable body (needs Rocky/Rocky-Ice)'}; best ring reserve found: ${resource.bestReserve ? RESERVE_LEVEL_LABEL_BY_RANK[resource.bestReserve] : 'none'}` },
+    { label: 'Scale (body count)', weight: w.scale, value: scale.score,
+      why: `${scale.n} candidate ${scale.n === 1 ? 'body' : 'bodies'}${scale.splitDetected ? ` (excluded ${scale.excludedCount} too far away to reach)` : ''}` },
+  ];
+
+  const suggestions = [];
+  if (rare.hits === 0) {
+    suggestions.push('Scan further for an Earthlike, Water, or Ammonia world, or an exotic star -- the single strongest signal in this score.');
+  }
+  if (econ.bodies === 0) {
+    suggestions.push('No bodies with economy data yet -- scan more bodies to unlock this dimension.');
+  } else {
+    if (econ.confidence < 1) {
+      suggestions.push(`Only ${econ.bodies} reachable bod${econ.bodies === 1 ? 'y has' : 'ies have'} known economy data -- scanning more sharpens this dimension's confidence.`);
+    }
+    if (econ.raw <= 2) {
+      suggestions.push('Bodies here tend to stack several economy types each -- a body with just 1-2 clean economies would score better.');
+    }
+  }
+  if (!resource.hasRefineryBody) {
+    suggestions.push("No Rocky/Rocky-Ice body found -- without one, this system can't support a Refinery economy.");
+  }
+  if (resource.bestReserve <= 2) {
+    suggestions.push('No Pristine/Major ring reserve found -- check for unscanned rings, or this system may just be resource-poor.');
+  }
+  if (scale.score <= 2) {
+    suggestions.push(`Only ${scale.n} candidate bodies recorded -- the Discovery Scanner may reveal more (catalog says ${s.bodyCountTotal || s.recordedBodyCount} total).`);
+  }
+  if (scale.splitDetected) {
+    suggestions.push(`A cluster of ${scale.excludedCount} bod${scale.excludedCount === 1 ? 'y sits' : 'ies sit'} far outside a practical build radius and was excluded from this score.`);
+  }
+
+  return { dims, suggestions };
+}
+
+// Static methodology explainer for the "ⓘ" trigger (column header + the per-system panel's own
+// link) -- built once lazily (see showColonyInfoModal) since its content never depends on which
+// system, if any, is open.
+function colonyInfoModalHtml() {
+  const w = COLONY_SCORE_WEIGHTS;
+  const pct = n => Math.round(n * 100) + '%';
+  return `
+    <button type="button" class="modal-close" id="colonyInfoClose" aria-label="Close">✕</button>
+    <h3 id="colonyInfoTitle">🧪 Colony score <span class="experimental-tag">Experimental</span></h3>
+    <p class="muted">A rough estimate of how good a candidate a system looks for a colonization build, computed entirely from your own scan data. It's adapted from a community "system build effectiveness" methodology (edcolony) -- but that full methodology also weighs real in-game slot capacity, the primary port's in-system distance, and CP-escalation headroom, none of which this project can see. Those three are dropped, and the remaining, actually-computable dimensions below are reweighted to still add up to 100%.</p>
+    <ul class="colony-info-dims">
+      <li><strong>Rare-body presence (${pct(w.rareBody)})</strong> -- Earthlike/Water/Ammonia worlds and exotic stars are the single strongest signal a system's worth building in.</li>
+      <li><strong>Economy cleanliness (${pct(w.economy)})</strong> -- 1-2 economy types on a body is clean and easy to specialize; 3+ risks conflicting bonuses. Blended toward a neutral score when only a few bodies have economy data, so a tiny sample can't fake a confident "clean" verdict.</li>
+      <li><strong>Refinery feedstock / resources (${pct(w.resource)})</strong> -- needs a Rocky or Rocky-Ice body (only those grant the Refinery economy) plus the best ring reserve level found anywhere in the system.</li>
+      <li><strong>Scale / body count (${pct(w.scale)})</strong> -- more real bodies generally means more possible build sites. A cluster of bodies far outside a practical travel radius is excluded rather than counted at face value.</li>
+    </ul>
+    <p class="muted">Dimensions are each scored 0-5, weighted, summed, and scaled to 0-100. <strong>80+ Exceptional, 60+ Strong, 40+ Workable, 20+ Marginal</strong>, below that Skip. A system shows <strong>"Insufficient data"</strong> instead of a number once too little of it has actually been individually scanned -- a low score should never be confused with "haven't looked yet."</p>
+    <p class="muted"><strong>Experimental:</strong> this is a heuristic built from your own journal data, not an official in-game rating -- treat it as a rough compass, not a verdict.</p>
+  `;
 }
 
 // Per real PlanetClass (not per individual body) -- a group's colonization "effect" is the UNION
@@ -1414,6 +1574,38 @@ function systemStatsHtml(s) {
     '</div>';
 }
 
+// Per-system "Colony score (experimental)" panel in the detail row -- s here is a sortedSystems()
+// list item, so s.colonizationScore is already computed (see sortedSystems); reused directly
+// rather than recomputed. Shows the WHY behind each dimension plus concrete next steps when a
+// score exists, or which specific data gate is unmet when it doesn't (see
+// colonyScoreInsufficientReason) -- never just a bare number with no explanation.
+function colonyScoreSectionHtml(s) {
+  if (s.colonizationScore == null) {
+    return `<div class="section-label">🧪 Colony score <span class="experimental-tag">Experimental</span></div>
+      <div class="colony-score-panel muted">Not enough of this system has been individually scanned yet to score it: ${escapeHtml(colonyScoreInsufficientReason(s))}.
+        <button type="button" class="colony-info-link" data-open-colony-info aria-label="How the colony score works">What's this?</button></div>`;
+  }
+  const scoreClass = s.colonizationScore >= 60 ? 'good' : s.colonizationScore >= 40 ? 'warning' : '';
+  const { dims, suggestions } = colonyScoreBreakdown(s);
+  const dimsHtml = dims.map(d => `
+    <div class="colony-dim-row">
+      <span class="colony-dim-label">${escapeHtml(d.label)}</span>
+      <span class="colony-dim-bar" aria-hidden="true"><span class="colony-dim-fill" style="width:${d.value / 5 * 100}%"></span></span>
+      <span class="colony-dim-value">${d.value}/5</span>
+    </div>
+    <div class="colony-dim-why muted">${escapeHtml(d.why)}</div>`).join('');
+  const suggestionsHtml = suggestions.length
+    ? `<div class="colony-suggestions"><div class="colony-suggestions-label">Suggestions</div><ul>${suggestions.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul></div>`
+    : '<div class="colony-suggestions muted">No specific suggestions -- every dimension is already scoring at or near its ceiling.</div>';
+  return `<div class="section-label">🧪 Colony score <span class="experimental-tag">Experimental</span></div>
+    <div class="colony-score-panel">
+      <div class="colony-score-headline"><span class="value ${scoreClass}" style="font-size:1.3rem">${s.colonizationScore}</span><span class="muted"> / 100 — ${escapeHtml(colonizationScoreTier(s.colonizationScore))}</span>
+        <button type="button" class="colony-info-link" data-open-colony-info aria-label="How the colony score works">What's this?</button></div>
+      ${dimsHtml}
+      ${suggestionsHtml}
+    </div>`;
+}
+
 function updateScrollShadowState(el) {
   const maxScroll = el.scrollWidth - el.clientWidth;
   el.classList.toggle('scroll-left', el.scrollLeft > 1);
@@ -1481,6 +1673,7 @@ function render() {
       <div class="detail-header"><h3>${favStarBtn(s.name)}${escapeHtml(s.name)}</h3>${copyBtn(s.name)}${discordCopyBtn(s.name)}${discordObjectiveCopyBtn(s.name)}${summaryMenuHtml()}<a class="ext-link" href="${edsmUrl(s.name)}" target="_blank" rel="noopener">EDSM ↗</a><a class="ext-link" href="${inaraUrl(s.name)}" target="_blank" rel="noopener">Inara ↗</a><a class="ext-link" href="${eventsSearchUrl(s.name)}" target="_blank" rel="noopener" title="Search the full journal for this system">Journal ↗</a><a class="ext-link" href="${colonizationUrl(s.name)}" target="_blank" rel="noopener" title="Body-by-body colonization economy bonuses for this system">🏗️ Colonization ↗</a><button class="nearest-btn" type="button" data-nearest-name="${escapeHtml(s.name)}" title="Sort every system in the table by distance from this one" aria-label="Sort every system in the table by distance from ${escapeHtml(s.name)}">📍 Nearest</button>${s.faction ? `<span class="muted">Controlled by ${escapeHtml(s.faction)}</span>` : ''}</div>
       ${modeToggleHtml()}
       ${systemStatsHtml(s)}
+      ${colonyScoreSectionHtml(s)}
       ${starsHtml}
       ${bodiesHtml}
     </div></td></tr>`;
@@ -1668,7 +1861,34 @@ document.addEventListener('click', e => {
   closeAllSummaryMenus();
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeAllSummaryMenus();
+  if (e.key === 'Escape') { closeAllSummaryMenus(); hideColonyInfoModal(); }
+});
+
+// Colony-score methodology modal -- one trigger lives statically in the column header, others are
+// re-rendered per system inside colonyScoreSectionHtml (both the "Insufficient data" and normal
+// paths), so a single delegated CAPTURE-phase listener on document handles every trigger
+// regardless of render() churn, rather than rewiring a click handler on every render pass like the
+// dynamic elements below do. Capture (not bubble) matters here specifically because the header
+// trigger sits inside a sortable <th data-key> that has its own bubble-phase click listener for
+// sorting -- stopping propagation during capture, before the event ever reaches the button/th,
+// is the only way to open the modal without ALSO re-sorting the table underneath it.
+let colonyInfoModalBuilt = false;
+function showColonyInfoModal() {
+  if (!colonyInfoModalBuilt) {
+    document.getElementById('colonyInfoBox').innerHTML = colonyInfoModalHtml();
+    document.getElementById('colonyInfoClose').addEventListener('click', hideColonyInfoModal);
+    colonyInfoModalBuilt = true;
+  }
+  document.getElementById('colonyInfoModal').removeAttribute('hidden');
+}
+function hideColonyInfoModal() {
+  document.getElementById('colonyInfoModal').setAttribute('hidden', '');
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-open-colony-info]')) { e.stopPropagation(); showColonyInfoModal(); }
+}, true);
+document.getElementById('colonyInfoModal').addEventListener('click', e => {
+  if (e.target.id === 'colonyInfoModal') hideColonyInfoModal();
 });
 
 // scroll doesn't bubble, but a capturing listener on document still sees it from any descendant

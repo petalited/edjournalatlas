@@ -128,9 +128,11 @@ light/dark detection isn't what you want.
 
 **`standalone_viewer.html` — systems explorer.** A sortable/searchable table of every visited
 system: region, population, bodies scanned, notable-find count, presumed exobiology value, and a
-0-100 colonization suitability score (rare-body presence, economy-bonus cleanliness, ring resource
-level, reachable body count -- hover the column for the breakdown, systems with too little
-individually-scanned data show "insufficient data" rather than a misleading number) — filterable to
+0-100 colonization suitability score, marked experimental (rare-body presence, economy-bonus
+cleanliness, ring resource level, reachable body count -- click the ⓘ next to the column header for
+a full explanation, or expand a system for its own dimension-by-dimension breakdown and
+suggestions; systems with too little individually-scanned data show "insufficient data" rather than
+a misleading number) — filterable to
 notable-only, bio-only, or ★ favourited systems (favouriting a system sticks around across runs). Click a system to expand it: stars, bodies grouped under whichever star (or shared
 binary-star barycenter — circumbinary bodies are grouped correctly, not just attached to the
 nearest single star) they orbit, moons nested under their parent planet (shown as a small
